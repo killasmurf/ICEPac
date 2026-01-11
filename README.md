@@ -1,4 +1,4 @@
-# icepac
+# ICEPac
 
 Microsoft Project File Reader Web API
 
