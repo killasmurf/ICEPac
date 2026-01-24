@@ -19,4 +19,31 @@ build/
 .vscode/
 .idea/
 *.log
+
+# Claude Code
+.claude/chat_history/
+.claude/temp/
+
+# Additional Python
+*.pyo
+*.pyd
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.tox/
+.cache
+.pytest_cache/
+coverage.xml
+*.cover
+.hypothesis/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
 icepac/

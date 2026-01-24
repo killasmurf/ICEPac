@@ -1,92 +1,87 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
+"""
+ICEPac FastAPI Application
+Cost Estimation & Project Risk Management System
+"""
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.routes import project
-from app.config import settings
-from app.database import init_db_async, close_db
-from app.logging_config import setup_logging
-from app.exceptions import (
-    ICEPacException,
-    icepac_exception_handler,
-    http_exception_handler,
-    validation_exception_handler,
-    general_exception_handler
-)
+from app.core.config import settings
+from app.core.database import init_db
+from app.middleware.error_handler import ErrorHandlerMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 
-# Setup logging
-setup_logging(
-    log_level="DEBUG" if settings.debug else "INFO",
-    json_format=not settings.debug
+# Configure logging
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format=settings.LOG_FORMAT,
 )
-
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for startup and shutdown events"""
-    # Startup
-    logger.info("Starting ICEPac API...")
-    try:
-        await init_db_async()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-
+    """Application lifespan - startup and shutdown events."""
+    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Debug mode: {settings.DEBUG}")
     yield
-
-    # Shutdown
-    logger.info("Shutting down ICEPac API...")
-    try:
-        await close_db()
-        logger.info("Database connections closed")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+    logger.info(f"Shutting down {settings.APP_NAME}")
 
 
+# Create FastAPI application
 app = FastAPI(
-    title="ICEPac API",
-    description="Microsoft Project File Reader and Analysis API",
-    version="1.0.0",
-    lifespan=lifespan
+    title=settings.APP_NAME,
+    description=settings.APP_DESCRIPTION,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-# CORS middleware
+# Middleware (order matters - last added is first executed)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Exception handlers
-app.add_exception_handler(ICEPacException, icepac_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(Exception, general_exception_handler)
-
-# Include routers
-app.include_router(project.router, prefix="/api/v1", tags=["projects"])
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ErrorHandlerMiddleware)
 
 
-@app.get("/health")
+@app.get("/health", tags=["System"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint."""
     return {
         "status": "healthy",
-        "service": "ICEPac API",
-        "version": "1.0.0"
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
     }
 
 
-@app.get("/")
+@app.get("/", tags=["System"])
 async def root():
-    """Root endpoint"""
+    """Root endpoint - API information."""
     return {
-        "message": "Welcome to ICEPac API",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "description": settings.APP_DESCRIPTION,
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
+
+
+# Include routers
+from app.routes import auth, admin  # noqa: E402
+
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
+app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

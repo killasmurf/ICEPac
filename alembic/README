@@ -1,18 +1,1 @@
-Generic single-database configuration for Alembic migrations.
-
-# Common Commands
-
-## Create a new migration
-alembic revision --autogenerate -m "description of changes"
-
-## Apply migrations
-alembic upgrade head
-
-## Rollback one migration
-alembic downgrade -1
-
-## View current revision
-alembic current
-
-## View migration history
-alembic history
+Generic single-database configuration.
