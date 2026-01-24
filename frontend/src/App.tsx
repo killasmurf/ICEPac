@@ -4,6 +4,7 @@ import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
 import Help from './pages/Help';
 import HelpTopic from './pages/HelpTopic';
 
@@ -15,6 +16,7 @@ function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/help" element={<Help />} />
           <Route path="/help/:id" element={<HelpTopic />} />
         </Route>
