@@ -1,2 +1,2 @@
 """API routes package."""
-from app.routes import auth, admin  # noqa: F401
+from app.routes import auth, admin, help  # noqa: F401

@@ -2,6 +2,7 @@ import React from 'react';
 import { Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
+import HelpIcon from '@mui/icons-material/Help';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const DRAWER_WIDTH = 240;
@@ -9,6 +10,7 @@ const DRAWER_WIDTH = 240;
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Projects', icon: <FolderIcon />, path: '/projects' },
+  { text: 'Help', icon: <HelpIcon />, path: '/help' },
 ];
 
 interface SidebarProps {

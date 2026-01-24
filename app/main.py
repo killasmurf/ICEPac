@@ -76,10 +76,11 @@ async def root():
 
 
 # Include routers
-from app.routes import auth, admin  # noqa: E402
+from app.routes import auth, admin, help  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
+app.include_router(help.router, prefix=settings.API_V1_PREFIX, tags=["Help"])
 
 
 if __name__ == "__main__":

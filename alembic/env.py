@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so Alembic can detect them for autogenerate
-from app.models.database import User  # noqa: F401
+from app.models.database import User, HelpCategory, HelpTopic, HelpDescription  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
