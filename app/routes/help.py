@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import require_any_role
 from app.models.schemas.help import (
     HelpCategoryCreate, HelpCategoryUpdate, HelpCategoryResponse,
     HelpTopicCreate, HelpTopicUpdate, HelpTopicResponse, HelpTopicListResponse,
@@ -82,7 +82,7 @@ async def get_category_topics(
 async def create_topic(
     topic_in: HelpTopicCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Create a new help topic (admin only)."""
     service = HelpService(db)
@@ -94,7 +94,7 @@ async def update_topic(
     topic_id: int,
     topic_in: HelpTopicUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Update a help topic (admin only)."""
     service = HelpService(db)
@@ -105,7 +105,7 @@ async def update_topic(
 async def delete_topic(
     topic_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Delete a help topic (admin only)."""
     service = HelpService(db)
@@ -116,7 +116,7 @@ async def delete_topic(
 async def create_category(
     category_in: HelpCategoryCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Create a new help category (admin only)."""
     service = HelpService(db)
@@ -128,7 +128,7 @@ async def update_category(
     category_id: int,
     category_in: HelpCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Update a help category (admin only)."""
     service = HelpService(db)

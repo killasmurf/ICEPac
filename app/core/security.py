@@ -99,15 +99,15 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ):
     """
-    Get current authenticated user.
-
-    This is a dependency that can be used in endpoints to require authentication.
+    Get current authenticated user from the database.
 
     Usage:
         @app.get("/me")
         def read_current_user(current_user = Depends(get_current_user)):
             return current_user
     """
+    from app.models.database.user import User
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -122,14 +122,15 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    # TODO: Fetch user from database
-    # user = get_user_by_id(db, user_id=int(user_id))
-    # if user is None:
-    #     raise credentials_exception
-    # return user
-
-    # For now, return a mock user
-    return {"id": user_id, "username": "test_user"}
+    user = db.get(User, int(user_id))
+    if user is None:
+        raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+    return user
 
 
 def require_role(required_role: str):
@@ -140,18 +141,16 @@ def require_role(required_role: str):
         @app.get("/admin")
         def admin_only(
             current_user = Depends(get_current_user),
-            _: None = Depends(require_role("Admin"))
+            _: None = Depends(require_role("admin"))
         ):
             return {"message": "Welcome, admin!"}
     """
     async def role_checker(current_user = Depends(get_current_user)):
-        # TODO: Check user role from database
-        # if current_user.role != required_role:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions"
-        #     )
-        pass
+        if current_user.role.value != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
 
     return role_checker
 
@@ -164,17 +163,15 @@ def require_any_role(*roles: str):
         @app.get("/managers")
         def managers_only(
             current_user = Depends(get_current_user),
-            _: None = Depends(require_any_role("Admin", "ProjectManager"))
+            _: None = Depends(require_any_role("admin", "manager"))
         ):
             return {"message": "Welcome, manager!"}
     """
     async def role_checker(current_user = Depends(get_current_user)):
-        # TODO: Check if user has any of the required roles
-        # if current_user.role not in roles:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions"
-        #     )
-        pass
+        if current_user.role.value not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
 
     return role_checker
