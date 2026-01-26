@@ -1,59 +1,58 @@
+"""
+Pytest configuration and fixtures for ICEPac tests.
+"""
 import pytest
-import asyncio
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-
-from app.main import app
-from app.database import get_db
-from app.models.project import Base
-
-
-TEST_DATABASE_URL = "postgresql+asyncpg://icepac:icepac_dev_password@localhost:5432/icepac_test"
-
-# Create test engine
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    poolclass=NullPool,
-    echo=False
-)
-
-TestSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
 
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an event loop for the test session"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def anyio_backend():
+    """Use asyncio as the anyio backend."""
+    return "asyncio"
 
 
-@pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create a fresh database session for each test"""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with TestSessionLocal() as session:
-        yield session
-        await session.rollback()
+@pytest.fixture
+def mock_db():
+    """Create a mock database session."""
+    from sqlalchemy.orm import Session
+    return MagicMock(spec=Session)
 
 
-@pytest.fixture(scope="function")
-def client(db_session: AsyncSession):
-    """Create a test client with database session override"""
+@pytest.fixture
+def mock_current_user():
+    """Create a mock current user."""
+    user = MagicMock()
+    user.id = 1
+    user.email = "test@example.com"
+    user.username = "testuser"
+    user.role = "admin"
+    user.is_active = True
+    return user
 
-    async def override_get_db():
-        yield db_session
+
+@pytest.fixture
+def client():
+    """Create a test client with mocked dependencies."""
+    from app.main import app
+    from app.core.database import get_db
+    from app.core.security import get_current_user
+
+    # Create mocks
+    mock_session = MagicMock()
+    mock_user = MagicMock()
+    mock_user.id = 1
+    mock_user.email = "test@example.com"
+    mock_user.role = "admin"
+
+    def override_get_db():
+        yield mock_session
+
+    def override_get_current_user():
+        return mock_user
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     with TestClient(app) as test_client:
         yield test_client
@@ -63,7 +62,7 @@ def client(db_session: AsyncSession):
 
 @pytest.fixture
 def sample_mpp_data():
-    """Sample MPP project data for testing"""
+    """Sample MPP project data for testing."""
     return {
         "name": "Test Project",
         "start_date": "2024-01-01T00:00:00",
@@ -104,4 +103,37 @@ def sample_mpp_data():
                 "type": "Work"
             }
         ]
+    }
+
+
+@pytest.fixture
+def sample_project_create():
+    """Sample project creation data."""
+    return {
+        "name": "Test Project",
+        "description": "A test project",
+        "code": "TEST-001"
+    }
+
+
+@pytest.fixture
+def sample_user_create():
+    """Sample user creation data."""
+    return {
+        "email": "newuser@example.com",
+        "username": "newuser",
+        "password": "securepassword123",
+        "first_name": "New",
+        "last_name": "User"
+    }
+
+
+@pytest.fixture
+def sample_resource_create():
+    """Sample resource creation data."""
+    return {
+        "name": "Test Resource",
+        "resource_type": "Labor",
+        "rate": 75.00,
+        "rate_unit": "hour"
     }
