@@ -18,12 +18,22 @@ import {
   DialogActions,
   CircularProgress,
   IconButton,
+  Chip,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import { getProjects, createProject, deleteProject, Project, ProjectCreateInput } from '../api/projects';
+
+const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info'> = {
+  draft: 'default',
+  importing: 'info',
+  imported: 'success',
+  import_failed: 'error',
+  active: 'primary',
+  archived: 'warning',
+};
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -132,15 +142,16 @@ const Projects: React.FC = () => {
               <TableRow>
                 <TableCell>Name</TableCell>
                 <TableCell>Manager</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Tasks</TableCell>
                 <TableCell>Created</TableCell>
-                <TableCell>Last Modified</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Typography color="text.secondary" sx={{ py: 4 }}>
                       No projects found.
                     </Typography>
@@ -158,8 +169,18 @@ const Projects: React.FC = () => {
                       <Typography fontWeight={500}>{project.project_name}</Typography>
                     </TableCell>
                     <TableCell>{project.project_manager || '-'}</TableCell>
+                    <TableCell>
+                      {project.status && (
+                        <Chip
+                          label={project.status.replace('_', ' ')}
+                          color={STATUS_COLORS[project.status] || 'default'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell align="right">{project.task_count || 0}</TableCell>
                     <TableCell>{formatDate(project.created_at)}</TableCell>
-                    <TableCell>{formatDate(project.updated_at)}</TableCell>
                     <TableCell align="right">
                       <IconButton size="small" onClick={(e) => handleDelete(e, project.id)}>
                         <DeleteIcon fontSize="small" />

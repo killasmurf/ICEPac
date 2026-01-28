@@ -15,7 +15,15 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so Alembic can detect them for autogenerate
-from app.models.database import User, HelpCategory, HelpTopic, HelpDescription  # noqa: F401
+from app.models.database import (  # noqa: F401
+    User, Project, ProjectStatus, ProjectSourceFormat,
+    WBS, Resource, Supplier, ResourceAssignment, Risk,
+    ImportJob, ImportStatus,
+    CostType, ExpenseType, Region, BusinessArea,
+    EstimatingTechnique, RiskCategory, ProbabilityLevel,
+    SeverityLevel, ExpenditureIndicator, PMBWeight,
+    AuditLog, HelpCategory, HelpTopic, HelpDescription,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

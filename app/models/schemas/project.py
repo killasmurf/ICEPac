@@ -24,6 +24,16 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(ProjectBase):
     id: int
     archived: bool
+    status: Optional[str] = None
+    source_file: Optional[str] = None
+    source_format: Optional[str] = None
+    start_date: Optional[datetime] = None
+    finish_date: Optional[datetime] = None
+    baseline_start: Optional[datetime] = None
+    baseline_finish: Optional[datetime] = None
+    task_count: int = 0
+    resource_count: int = 0
+    owner_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
