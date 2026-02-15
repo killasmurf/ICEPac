@@ -18,7 +18,7 @@ class TestAuthEndpoints:
         user.username = "testuser"
         user.first_name = "Test"
         user.last_name = "User"
-        user.role = "user"
+        user.role = MagicMock(value="user")
         user.is_active = True
         user.hashed_password = "$2b$12$test"  # Mock hashed password
         return user
@@ -41,7 +41,7 @@ class TestAuthEndpoints:
         response = client.get("/")
         assert response.status_code == 200
         data = response.json()
-        assert "name" in data
+        assert "app" in data
         assert "version" in data
 
     @patch('app.routes.auth.UserService')

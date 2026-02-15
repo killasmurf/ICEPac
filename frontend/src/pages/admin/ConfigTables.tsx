@@ -1,14 +1,19 @@
 /**
  * ConfigTables Component
- * 
+ *
  * Admin page for managing configuration/lookup tables.
+ * Connected to real backend API endpoints.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import { ConfigItem, WeightedConfigItem, ConfigTableName, CONFIG_TABLE_INFO } from '../../api/admin';
+import {
+  getConfigItems, createConfigItem, updateConfigItem, deleteConfigItem,
+  ConfigItem, WeightedConfigItem, ConfigTableName, CONFIG_TABLE_INFO,
+  ConfigItemCreate, WeightedConfigItemCreate, ConfigItemUpdate, WeightedConfigItemUpdate,
+} from '../../api/admin';
 
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
@@ -36,39 +41,13 @@ const styles: Record<string, React.CSSProperties> = {
   weightBadge: { padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '13px', fontWeight: 500 },
 };
 
-// Config table info
-const CONFIG_TABLES: { name: ConfigTableName; label: string; weighted: boolean }[] = [
-  { name: 'cost-types', label: 'Cost Types', weighted: false },
-  { name: 'expense-types', label: 'Expense Types', weighted: false },
-  { name: 'regions', label: 'Regions', weighted: false },
-  { name: 'business-areas', label: 'Business Areas', weighted: false },
-  { name: 'estimating-techniques', label: 'Estimating Techniques', weighted: false },
-  { name: 'risk-categories', label: 'Risk Categories', weighted: false },
-  { name: 'expenditure-indicators', label: 'Expenditure Indicators', weighted: false },
-  { name: 'probability-levels', label: 'Probability Levels', weighted: true },
-  { name: 'severity-levels', label: 'Severity Levels', weighted: true },
-  { name: 'pmb-weights', label: 'PMB Weights', weighted: true },
-];
-
-// Mock data
-const mockConfigItems: Record<string, (ConfigItem | WeightedConfigItem)[]> = {
-  'cost-types': [
-    { id: 1, code: 'LABOR', description: 'Labor costs', is_active: true, created_at: '2024-01-01' },
-    { id: 2, code: 'MATERIAL', description: 'Material costs', is_active: true, created_at: '2024-01-01' },
-    { id: 3, code: 'EQUIPMENT', description: 'Equipment costs', is_active: true, created_at: '2024-01-01' },
-    { id: 4, code: 'SUBCONTRACT', description: 'Subcontract costs', is_active: true, created_at: '2024-01-01' },
-    { id: 5, code: 'TRAVEL', description: 'Travel expenses', is_active: false, created_at: '2024-01-01' },
-    { id: 6, code: 'ODC', description: 'Other direct costs', is_active: true, created_at: '2024-01-01' },
-    { id: 7, code: 'OVERHEAD', description: 'Overhead costs', is_active: true, created_at: '2024-01-01' },
-  ],
-  'probability-levels': [
-    { id: 1, code: 'VERY_LOW', description: 'Very Low (< 10%)', weight: 0.05, is_active: true, created_at: '2024-01-01' },
-    { id: 2, code: 'LOW', description: 'Low (10-25%)', weight: 0.15, is_active: true, created_at: '2024-01-01' },
-    { id: 3, code: 'MEDIUM', description: 'Medium (25-50%)', weight: 0.35, is_active: true, created_at: '2024-01-01' },
-    { id: 4, code: 'HIGH', description: 'High (50-75%)', weight: 0.65, is_active: true, created_at: '2024-01-01' },
-    { id: 5, code: 'VERY_HIGH', description: 'Very High (> 75%)', weight: 0.85, is_active: true, created_at: '2024-01-01' },
-  ],
-};
+// Build CONFIG_TABLES from the shared CONFIG_TABLE_INFO
+const CONFIG_TABLES: { name: ConfigTableName; label: string; weighted: boolean }[] =
+  (Object.keys(CONFIG_TABLE_INFO) as ConfigTableName[]).map(name => ({
+    name,
+    label: CONFIG_TABLE_INFO[name].description,
+    weighted: CONFIG_TABLE_INFO[name].weighted,
+  }));
 
 interface FormData { code: string; description: string; weight: string; is_active: boolean; }
 const initialFormData: FormData = { code: '', description: '', weight: '0', is_active: true };
@@ -91,10 +70,14 @@ function ConfigTables() {
 
   const loadItems = useCallback(async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 300));
-    const data = mockConfigItems[selectedTable] || mockConfigItems['cost-types'];
-    setItems(data);
-    setLoading(false);
+    try {
+      const response = await getConfigItems(selectedTable);
+      setItems(response.items);
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to load items', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [selectedTable]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
@@ -109,7 +92,25 @@ function ConfigTables() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleCreate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Item created', 'success'); setShowCreateDialog(false); setFormData(initialFormData); loadItems(); setSaving(false); };
+  const handleCreate = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    try {
+      const payload: ConfigItemCreate | WeightedConfigItemCreate = isWeighted
+        ? { code: formData.code, description: formData.description, is_active: formData.is_active, weight: parseFloat(formData.weight) || 0 }
+        : { code: formData.code, description: formData.description, is_active: formData.is_active };
+      await createConfigItem(selectedTable, payload);
+      showToast('Item created successfully', 'success');
+      setShowCreateDialog(false);
+      setFormData(initialFormData);
+      loadItems();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to create item', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleEdit = (item: ConfigItem | WeightedConfigItem) => {
     setSelectedItem(item);
     setFormData({
@@ -121,9 +122,43 @@ function ConfigTables() {
     setFormErrors({});
     setShowEditDialog(true);
   };
-  const handleUpdate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Item updated', 'success'); setShowEditDialog(false); setSelectedItem(null); loadItems(); setSaving(false); };
+
+  const handleUpdate = async () => {
+    if (!validateForm() || !selectedItem) return;
+    setSaving(true);
+    try {
+      const payload: ConfigItemUpdate | WeightedConfigItemUpdate = isWeighted
+        ? { code: formData.code, description: formData.description, is_active: formData.is_active, weight: parseFloat(formData.weight) || 0 }
+        : { code: formData.code, description: formData.description, is_active: formData.is_active };
+      await updateConfigItem(selectedTable, selectedItem.id, payload);
+      showToast('Item updated successfully', 'success');
+      setShowEditDialog(false);
+      setSelectedItem(null);
+      loadItems();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to update item', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = (item: ConfigItem | WeightedConfigItem) => { setSelectedItem(item); setShowDeleteDialog(true); };
-  const confirmDelete = async () => { setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Item deleted', 'success'); setShowDeleteDialog(false); setSelectedItem(null); loadItems(); setSaving(false); };
+  const confirmDelete = async () => {
+    if (!selectedItem) return;
+    setSaving(true);
+    try {
+      await deleteConfigItem(selectedTable, selectedItem.id);
+      showToast('Item deleted successfully', 'success');
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+      loadItems();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to delete item', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
 
   const columns: Column<ConfigItem | WeightedConfigItem>[] = [

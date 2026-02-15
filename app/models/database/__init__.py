@@ -18,7 +18,7 @@ from app.models.database.config_tables import (
     ExpenditureIndicator,
     PMBWeight,
 )
-from app.models.database.audit import AuditLog
+from app.models.database.audit_log import AuditLog, AuditAction
 from app.models.database.help import HelpCategory, HelpTopic, HelpDescription
 
 __all__ = [
@@ -45,6 +45,7 @@ __all__ = [
     "ExpenditureIndicator",
     "PMBWeight",
     "AuditLog",
+    "AuditAction",
     "HelpCategory",
     "HelpTopic",
     "HelpDescription",

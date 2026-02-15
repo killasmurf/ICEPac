@@ -427,3 +427,49 @@ export function getRoleBadgeColor(role: string): string {
   };
   return colors[role] || '#6c757d';
 }
+
+// ============================================================
+// Dashboard Stats API
+// ============================================================
+
+export interface DashboardStats {
+  users: { total: number; active: number };
+  resources: { total: number; active: number };
+  suppliers: { total: number; active: number };
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const [users, resources, suppliers] = await Promise.all([
+    client.get('/admin/users', { params: { skip: 0, limit: 1 } }),
+    client.get('/admin/resources', { params: { skip: 0, limit: 1 } }),
+    client.get('/admin/suppliers', { params: { skip: 0, limit: 1 } }),
+  ]);
+
+  const [activeResources, activeSuppliers] = await Promise.all([
+    client.get('/admin/resources', { params: { skip: 0, limit: 1, active_only: true } }),
+    client.get('/admin/suppliers', { params: { skip: 0, limit: 1, active_only: true } }),
+  ]);
+
+  return {
+    users: { total: users.data.total, active: users.data.items.filter((u: User) => u.is_active).length || users.data.total },
+    resources: { total: resources.data.total, active: activeResources.data.total },
+    suppliers: { total: suppliers.data.total, active: activeSuppliers.data.total },
+  };
+}
+
+// ============================================================
+// Config Table Metadata
+// ============================================================
+
+export const CONFIG_TABLE_INFO: Record<ConfigTableName, { description: string; weighted: boolean }> = {
+  'cost-types': { description: 'Cost Types', weighted: false },
+  'expense-types': { description: 'Expense Types', weighted: false },
+  'regions': { description: 'Regions', weighted: false },
+  'business-areas': { description: 'Business Areas', weighted: false },
+  'estimating-techniques': { description: 'Estimating Techniques', weighted: false },
+  'risk-categories': { description: 'Risk Categories', weighted: false },
+  'expenditure-indicators': { description: 'Expenditure Indicators', weighted: false },
+  'probability-levels': { description: 'Probability Levels', weighted: true },
+  'severity-levels': { description: 'Severity Levels', weighted: true },
+  'pmb-weights': { description: 'PMB Weights', weighted: true },
+};

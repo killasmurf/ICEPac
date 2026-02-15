@@ -1,12 +1,13 @@
 /**
  * AuditLogs Component
- * 
+ *
  * Admin page for viewing system audit logs.
+ * Connected to real backend API endpoints.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DataGrid, { Column } from '../../components/admin/DataGrid';
-import { AuditLog } from '../../api/admin';
+import { getAuditLogs, AuditLog, AuditLogFilter } from '../../api/admin';
 
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
@@ -33,10 +34,8 @@ const styles: Record<string, React.CSSProperties> = {
   detailValue: { fontSize: '14px', color: '#0f172a', fontWeight: 500 },
   jsonView: { backgroundColor: '#f8fafc', borderRadius: '8px', padding: '16px', fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', overflow: 'auto', maxHeight: '200px', whiteSpace: 'pre-wrap' as const, wordBreak: 'break-all' as const },
   noData: { color: '#94a3b8', fontStyle: 'italic' },
-  stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '24px' },
-  statCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' },
-  statValue: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' },
-  statLabel: { fontSize: '13px', color: '#64748b' },
+  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  toastError: { backgroundColor: '#ef4444' },
 };
 
 const actionColors: Record<string, { bg: string; text: string }> = {
@@ -50,15 +49,8 @@ const actionColors: Record<string, { bg: string; text: string }> = {
   ROLE_CHANGE: { bg: '#cffafe', text: '#0e7490' },
 };
 
-const mockAuditLogs: AuditLog[] = [
-  { id: 1, user_id: 1, username: 'admin', action: 'CREATE', entity_type: 'Resource', entity_id: 157, old_values: null, new_values: { resource_code: 'ENG-SR', description: 'Senior Engineer' }, ip_address: '192.168.1.100', user_agent: 'Mozilla/5.0', created_at: '2024-01-27T10:30:00Z' },
-  { id: 2, user_id: 2, username: 'jsmith', action: 'UPDATE', entity_type: 'User', entity_id: 12, old_values: { role: 'user' }, new_values: { role: 'manager' }, ip_address: '192.168.1.101', user_agent: 'Mozilla/5.0', created_at: '2024-01-27T10:15:00Z' },
-  { id: 3, user_id: 1, username: 'admin', action: 'CREATE', entity_type: 'Supplier', entity_id: 49, old_values: null, new_values: { supplier_code: 'NEWCO', name: 'New Company Inc' }, ip_address: '192.168.1.100', user_agent: 'Mozilla/5.0', created_at: '2024-01-27T09:00:00Z' },
-  { id: 4, user_id: 3, username: 'mwilson', action: 'DELETE', entity_type: 'Resource', entity_id: 89, old_values: { resource_code: 'OLD-RES', description: 'Old Resource' }, new_values: null, ip_address: '192.168.1.102', user_agent: 'Mozilla/5.0', created_at: '2024-01-27T08:30:00Z' },
-  { id: 5, user_id: 1, username: 'admin', action: 'LOGIN', entity_type: 'User', entity_id: 1, old_values: null, new_values: null, ip_address: '192.168.1.100', user_agent: 'Mozilla/5.0', created_at: '2024-01-27T08:00:00Z' },
-  { id: 6, user_id: null, username: null, action: 'FAILED_LOGIN', entity_type: 'User', entity_id: null, old_values: null, new_values: { attempted_username: 'hacker' }, ip_address: '10.0.0.99', user_agent: 'curl/7.64.1', created_at: '2024-01-27T07:45:00Z' },
-  { id: 7, user_id: 1, username: 'admin', action: 'PASSWORD_CHANGE', entity_type: 'User', entity_id: 5, old_values: null, new_values: null, ip_address: '192.168.1.100', user_agent: 'Mozilla/5.0', created_at: '2024-01-26T16:00:00Z' },
-];
+const actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'FAILED_LOGIN', 'PASSWORD_CHANGE', 'ROLE_CHANGE'];
+const entities = ['User', 'Resource', 'Supplier'];
 
 function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -69,17 +61,29 @@ function AuditLogs() {
   const [entityFilter, setEntityFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'error' } | null>(null);
+
+  const showToast = (message: string) => { setToast({ message, type: 'error' }); setTimeout(() => setToast(null), 3000); };
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 300));
-    let filtered = [...mockAuditLogs];
-    if (actionFilter !== 'all') filtered = filtered.filter(l => l.action === actionFilter);
-    if (entityFilter !== 'all') filtered = filtered.filter(l => l.entity_type === entityFilter);
-    if (userFilter) filtered = filtered.filter(l => l.username?.toLowerCase().includes(userFilter.toLowerCase()));
-    setLogs(filtered.slice(skip, skip + 20));
-    setTotal(filtered.length);
-    setLoading(false);
+    try {
+      const filters: AuditLogFilter = {};
+      if (actionFilter !== 'all') filters.action = actionFilter;
+      if (entityFilter !== 'all') filters.entity_type = entityFilter;
+      const response = await getAuditLogs(skip, 20, filters);
+      let filtered = response.items;
+      // Client-side username filter (backend doesn't support it directly)
+      if (userFilter) {
+        filtered = filtered.filter(l => l.username?.toLowerCase().includes(userFilter.toLowerCase()));
+      }
+      setLogs(filtered);
+      setTotal(response.total);
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to load audit logs');
+    } finally {
+      setLoading(false);
+    }
   }, [skip, actionFilter, entityFilter, userFilter]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
@@ -98,28 +102,11 @@ function AuditLogs() {
     { key: 'ip_address', header: 'IP Address', sortable: true, width: '130px', render: log => <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', color: '#64748b' }}>{log.ip_address}</span> },
   ];
 
-  const actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'FAILED_LOGIN', 'PASSWORD_CHANGE', 'ROLE_CHANGE'];
-  const entities = [...new Set(mockAuditLogs.map(l => l.entity_type))];
-
-  const stats = {
-    total: mockAuditLogs.length,
-    creates: mockAuditLogs.filter(l => l.action === 'CREATE').length,
-    updates: mockAuditLogs.filter(l => l.action === 'UPDATE').length,
-    deletes: mockAuditLogs.filter(l => l.action === 'DELETE').length,
-  };
-
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h1 style={styles.title}>Audit Logs</h1>
         <p style={styles.subtitle}>System activity and change history</p>
-      </div>
-
-      <div style={styles.stats}>
-        <div style={styles.statCard}><div style={styles.statValue}>{stats.total}</div><div style={styles.statLabel}>Total Events</div></div>
-        <div style={styles.statCard}><div style={{ ...styles.statValue, color: '#16a34a' }}>{stats.creates}</div><div style={styles.statLabel}>Creates</div></div>
-        <div style={styles.statCard}><div style={{ ...styles.statValue, color: '#2563eb' }}>{stats.updates}</div><div style={styles.statLabel}>Updates</div></div>
-        <div style={styles.statCard}><div style={{ ...styles.statValue, color: '#dc2626' }}>{stats.deletes}</div><div style={styles.statLabel}>Deletes</div></div>
       </div>
 
       <div style={styles.toolbar}>
@@ -180,6 +167,8 @@ function AuditLogs() {
           </div>
         </div>
       )}
+
+      {toast && <div style={{...styles.toast, ...styles.toastError}}>{toast.message}</div>}
     </div>
   );
 }

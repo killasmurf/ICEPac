@@ -1,7 +1,8 @@
 /**
  * UserManagement Component
- * 
+ *
  * Admin page for managing system users with full CRUD operations.
+ * Connected to real backend API endpoints.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -94,9 +95,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '6px',
   },
-  formGroupFull: {
-    gridColumn: '1 / -1',
-  },
   label: {
     fontSize: '14px',
     fontWeight: 500,
@@ -109,10 +107,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     transition: 'border-color 0.15s, box-shadow 0.15s',
     outline: 'none',
-  },
-  inputFocus: {
-    borderColor: '#3b82f6',
-    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
   },
   select: {
     padding: '10px 14px',
@@ -150,15 +144,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// Mock data for development
-const mockUsers: User[] = [
-  { id: 1, email: 'admin@icepac.com', username: 'admin', full_name: 'System Admin', role: 'admin', is_active: true, is_verified: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-15T00:00:00Z', last_login: '2024-01-27T10:30:00Z' },
-  { id: 2, email: 'john.smith@icepac.com', username: 'jsmith', full_name: 'John Smith', role: 'manager', is_active: true, is_verified: true, created_at: '2024-01-05T00:00:00Z', updated_at: '2024-01-20T00:00:00Z', last_login: '2024-01-26T14:00:00Z' },
-  { id: 3, email: 'jane.doe@icepac.com', username: 'jdoe', full_name: 'Jane Doe', role: 'user', is_active: true, is_verified: true, created_at: '2024-01-10T00:00:00Z', updated_at: '2024-01-22T00:00:00Z', last_login: '2024-01-25T09:00:00Z' },
-  { id: 4, email: 'bob.wilson@icepac.com', username: 'bwilson', full_name: 'Bob Wilson', role: 'user', is_active: false, is_verified: true, created_at: '2024-01-12T00:00:00Z', updated_at: '2024-01-18T00:00:00Z', last_login: null },
-  { id: 5, email: 'alice.brown@icepac.com', username: 'abrown', full_name: 'Alice Brown', role: 'viewer', is_active: true, is_verified: false, created_at: '2024-01-15T00:00:00Z', updated_at: '2024-01-25T00:00:00Z', last_login: '2024-01-24T16:30:00Z' },
-];
-
 interface UserFormData {
   email: string;
   username: string;
@@ -187,7 +172,7 @@ function UserManagement() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  
+
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -196,41 +181,41 @@ function UserManagement() {
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  
+
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Load users
+  // Load users from API
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      // Use mock data for now
-      await new Promise(resolve => setTimeout(resolve, 300));
-      let filtered = [...mockUsers];
-      
+      const response = await getUsers(skip, limit);
+      let filtered = response.items;
+
+      // Client-side filtering (search/role/status filters)
       if (search) {
         const searchLower = search.toLowerCase();
-        filtered = filtered.filter(u => 
+        filtered = filtered.filter(u =>
           u.username.toLowerCase().includes(searchLower) ||
           u.email.toLowerCase().includes(searchLower) ||
           u.full_name?.toLowerCase().includes(searchLower)
         );
       }
-      
+
       if (roleFilter !== 'all') {
         filtered = filtered.filter(u => u.role === roleFilter);
       }
-      
+
       if (statusFilter === 'active') {
         filtered = filtered.filter(u => u.is_active);
       } else if (statusFilter === 'inactive') {
         filtered = filtered.filter(u => !u.is_active);
       }
-      
-      setUsers(filtered.slice(skip, skip + limit));
-      setTotal(filtered.length);
-    } catch (error) {
-      showToast('Failed to load users', 'error');
+
+      setUsers(filtered);
+      setTotal(response.total);
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to load users', 'error');
     } finally {
       setLoading(false);
     }
@@ -257,25 +242,25 @@ function UserManagement() {
   // Validate form
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     if (!formData.email) {
       errors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Invalid email format';
     }
-    
+
     if (!formData.username) {
       errors.username = 'Username is required';
     } else if (formData.username.length < 3) {
       errors.username = 'Username must be at least 3 characters';
     }
-    
+
     if (!selectedUser && !formData.password) {
       errors.password = 'Password is required';
     } else if (formData.password && formData.password.length < 8) {
       errors.password = 'Password must be at least 8 characters';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -283,17 +268,23 @@ function UserManagement() {
   // Handle create
   const handleCreate = async () => {
     if (!validateForm()) return;
-    
+
     setSaving(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const payload: UserCreate = {
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+        full_name: formData.full_name || undefined,
+        role: formData.role,
+      };
+      await createUser(payload);
       showToast('User created successfully', 'success');
       setShowCreateDialog(false);
       setFormData(initialFormData);
       loadUsers();
-    } catch (error) {
-      showToast('Failed to create user', 'error');
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to create user', 'error');
     } finally {
       setSaving(false);
     }
@@ -317,17 +308,24 @@ function UserManagement() {
   // Handle update
   const handleUpdate = async () => {
     if (!validateForm() || !selectedUser) return;
-    
+
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const payload: UserUpdate = {
+        email: formData.email,
+        username: formData.username,
+        full_name: formData.full_name || undefined,
+        role: formData.role,
+        is_active: formData.is_active,
+      };
+      await updateUser(selectedUser.id, payload);
       showToast('User updated successfully', 'success');
       setShowEditDialog(false);
       setSelectedUser(null);
       setFormData(initialFormData);
       loadUsers();
-    } catch (error) {
-      showToast('Failed to update user', 'error');
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to update user', 'error');
     } finally {
       setSaving(false);
     }
@@ -342,16 +340,16 @@ function UserManagement() {
   // Confirm delete
   const confirmDelete = async () => {
     if (!selectedUser) return;
-    
+
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await deleteUser(selectedUser.id);
       showToast('User deleted successfully', 'success');
       setShowDeleteDialog(false);
       setSelectedUser(null);
       loadUsers();
-    } catch (error) {
-      showToast('Failed to delete user', 'error');
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to delete user', 'error');
     } finally {
       setSaving(false);
     }
@@ -409,8 +407,8 @@ function UserManagement() {
       sortable: true,
       render: (user) => (
         <span style={{ color: '#64748b', fontSize: '13px' }}>
-          {user.last_login 
-            ? new Date(user.last_login).toLocaleDateString() 
+          {user.last_login
+            ? new Date(user.last_login).toLocaleDateString()
             : 'Never'}
         </span>
       ),

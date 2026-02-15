@@ -19,62 +19,76 @@ class TestHelpService:
 
     @pytest.fixture
     def help_service(self, mock_db):
-        """Create a HelpService instance with mocked DB."""
-        with patch('app.services.help_service.HelpTopic') as mock_help:
+        """Create a HelpService instance with mocked repos."""
+        with patch('app.services.help_service.HelpCategoryRepository') as mock_cat_repo, \
+             patch('app.services.help_service.HelpTopicRepository') as mock_topic_repo:
             service = HelpService(mock_db)
-            service.model = mock_help
+            service._mock_cat_repo = mock_cat_repo.return_value
+            service._mock_topic_repo = mock_topic_repo.return_value
             return service
 
-    def test_get_returns_topic(self, help_service, mock_db):
-        """Test that get returns a help topic when found."""
+    def test_get_topic_returns_topic(self, help_service):
+        """Test that get_topic returns a help topic when found."""
         mock_topic = MagicMock()
         mock_topic.id = 1
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_topic
+        help_service.topic_repo.get_with_descriptions.return_value = mock_topic
 
-        result = help_service.get(1)
+        result = help_service.get_topic(1)
 
         assert result == mock_topic
 
-    def test_get_returns_none_when_not_found(self, help_service, mock_db):
-        """Test that get returns None when topic not found."""
-        mock_db.query.return_value.filter.return_value.first.return_value = None
-
-        result = help_service.get(999)
-
-        assert result is None
-
-    def test_get_or_404_raises_when_not_found(self, help_service, mock_db):
-        """Test that get_or_404 raises HTTPException when not found."""
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+    def test_get_topic_raises_404_when_not_found(self, help_service):
+        """Test that get_topic raises HTTPException when not found."""
+        help_service.topic_repo.get_with_descriptions.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            help_service.get_or_404(999)
+            help_service.get_topic(999)
 
         assert exc_info.value.status_code == 404
 
-    def test_get_all(self, help_service, mock_db):
+    def test_get_topics(self, help_service):
         """Test getting all help topics."""
         mock_topics = [MagicMock() for _ in range(3)]
-        mock_db.query.return_value.order_by.return_value.all.return_value = mock_topics
+        help_service.topic_repo.get_active.return_value = mock_topics
 
-        result = help_service.get_all()
+        result = help_service.get_topics()
 
         assert len(result) == 3
 
-    def test_search(self, help_service, mock_db):
+    def test_get_categories(self, help_service):
+        """Test getting all categories."""
+        mock_cats = [MagicMock() for _ in range(2)]
+        help_service.category_repo.get_active.return_value = mock_cats
+
+        result = help_service.get_categories()
+
+        assert len(result) == 2
+
+    def test_search_topics(self, help_service):
         """Test searching help topics."""
         mock_topics = [MagicMock()]
-        mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = mock_topics
+        help_service.topic_repo.search.return_value = mock_topics
 
-        result = help_service.search("test")
+        result = help_service.search_topics("test")
 
         assert len(result) == 1
 
-    def test_get_by_category(self, help_service, mock_db):
+    def test_get_topics_by_category(self, help_service):
         """Test getting topics by category."""
+        mock_category = MagicMock()
+        help_service.category_repo.get.return_value = mock_category
         mock_topics = [MagicMock() for _ in range(2)]
-        mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = mock_topics
+        help_service.topic_repo.get_by_category.return_value = mock_topics
 
-        result = help_service.get_by_category("Getting Started")
+        result = help_service.get_topics_by_category(1)
 
         assert len(result) == 2
+
+    def test_get_topics_by_category_raises_404_for_unknown_category(self, help_service):
+        """Test that get_topics_by_category raises 404 for unknown category."""
+        help_service.category_repo.get.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            help_service.get_topics_by_category(999)
+
+        assert exc_info.value.status_code == 404
