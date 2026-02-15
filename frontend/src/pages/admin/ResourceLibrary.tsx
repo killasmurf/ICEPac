@@ -1,7 +1,8 @@
 /**
  * ResourceLibrary Component
- * 
+ *
  * Admin page for managing resources with full CRUD operations.
+ * Connected to real backend API endpoints.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,7 +11,10 @@ import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import SearchBar from '../../components/admin/SearchBar';
-import { Resource } from '../../api/admin';
+import {
+  getResources, createResource, updateResource, deleteResource,
+  Resource, ResourceCreate, ResourceUpdate,
+} from '../../api/admin';
 
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
@@ -35,20 +39,11 @@ const styles: Record<string, React.CSSProperties> = {
   costCell: { fontFamily: "'JetBrains Mono', monospace", fontWeight: 500, color: '#059669' },
 };
 
-const mockResources: Resource[] = [
-  { id: 1, resource_code: 'ENG-SR', description: 'Senior Engineer', eoc: 'LABOR', cost: 150.00, units: 'hour', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 2, resource_code: 'ENG-JR', description: 'Junior Engineer', eoc: 'LABOR', cost: 85.00, units: 'hour', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 3, resource_code: 'PM', description: 'Project Manager', eoc: 'LABOR', cost: 175.00, units: 'hour', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 4, resource_code: 'BA', description: 'Business Analyst', eoc: 'LABOR', cost: 125.00, units: 'hour', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 5, resource_code: 'QA', description: 'QA Engineer', eoc: 'LABOR', cost: 95.00, units: 'hour', is_active: false, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 6, resource_code: 'ARCH', description: 'Solution Architect', eoc: 'LABOR', cost: 200.00, units: 'hour', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 7, resource_code: 'EQUIP-PC', description: 'Workstation', eoc: 'EQUIPMENT', cost: 2500.00, units: 'each', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-];
+const eocOptions = ['LABOR', 'MATERIAL', 'EQUIPMENT', 'SUBCONTRACT', 'ODC'];
+const unitOptions = ['hour', 'day', 'week', 'month', 'each', 'lot'];
 
 interface FormData { resource_code: string; description: string; eoc: string; cost: string; units: string; is_active: boolean; }
 const initialFormData: FormData = { resource_code: '', description: '', eoc: 'LABOR', cost: '0', units: 'hour', is_active: true };
-const eocOptions = ['LABOR', 'MATERIAL', 'EQUIPMENT', 'SUBCONTRACT', 'ODC'];
-const unitOptions = ['hour', 'day', 'week', 'month', 'each', 'lot'];
 
 function ResourceLibrary() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,15 +65,26 @@ function ResourceLibrary() {
 
   const loadResources = useCallback(async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 300));
-    let filtered = [...mockResources];
-    if (search) { const s = search.toLowerCase(); filtered = filtered.filter(r => r.resource_code.toLowerCase().includes(s) || r.description.toLowerCase().includes(s)); }
-    if (eocFilter !== 'all') filtered = filtered.filter(r => r.eoc === eocFilter);
-    if (statusFilter === 'active') filtered = filtered.filter(r => r.is_active);
-    else if (statusFilter === 'inactive') filtered = filtered.filter(r => !r.is_active);
-    setResources(filtered.slice(skip, skip + 20));
-    setTotal(filtered.length);
-    setLoading(false);
+    try {
+      const activeOnly = statusFilter === 'active';
+      const response = await getResources(skip, 20, search || undefined, activeOnly);
+      let filtered = response.items;
+
+      // Client-side EOC filter (backend doesn't support it directly)
+      if (eocFilter !== 'all') {
+        filtered = filtered.filter(r => r.eoc === eocFilter);
+      }
+      if (statusFilter === 'inactive') {
+        filtered = filtered.filter(r => !r.is_active);
+      }
+
+      setResources(filtered);
+      setTotal(response.total);
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to load resources', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [skip, search, eocFilter, statusFilter]);
 
   useEffect(() => { loadResources(); }, [loadResources]);
@@ -89,15 +95,83 @@ function ResourceLibrary() {
     const errors: Record<string, string> = {};
     if (!formData.resource_code) errors.resource_code = 'Required';
     if (!formData.description) errors.description = 'Required';
+    if (formData.cost && parseFloat(formData.cost) < 0) errors.cost = 'Cost cannot be negative';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleCreate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Resource created', 'success'); setShowCreateDialog(false); setFormData(initialFormData); loadResources(); setSaving(false); };
-  const handleEdit = (r: Resource) => { setSelectedResource(r); setFormData({ resource_code: r.resource_code, description: r.description, eoc: r.eoc || 'LABOR', cost: r.cost.toString(), units: r.units || 'hour', is_active: r.is_active }); setFormErrors({}); setShowEditDialog(true); };
-  const handleUpdate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Resource updated', 'success'); setShowEditDialog(false); setSelectedResource(null); loadResources(); setSaving(false); };
+  const handleCreate = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    try {
+      const payload: ResourceCreate = {
+        resource_code: formData.resource_code,
+        description: formData.description,
+        eoc: formData.eoc,
+        cost: parseFloat(formData.cost) || 0,
+        units: formData.units,
+        is_active: formData.is_active,
+      };
+      await createResource(payload);
+      showToast('Resource created successfully', 'success');
+      setShowCreateDialog(false);
+      setFormData(initialFormData);
+      loadResources();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to create resource', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (r: Resource) => {
+    setSelectedResource(r);
+    setFormData({ resource_code: r.resource_code, description: r.description, eoc: r.eoc || 'LABOR', cost: r.cost.toString(), units: r.units || 'hour', is_active: r.is_active });
+    setFormErrors({});
+    setShowEditDialog(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!validateForm() || !selectedResource) return;
+    setSaving(true);
+    try {
+      const payload: ResourceUpdate = {
+        resource_code: formData.resource_code,
+        description: formData.description,
+        eoc: formData.eoc,
+        cost: parseFloat(formData.cost) || 0,
+        units: formData.units,
+        is_active: formData.is_active,
+      };
+      await updateResource(selectedResource.id, payload);
+      showToast('Resource updated successfully', 'success');
+      setShowEditDialog(false);
+      setSelectedResource(null);
+      loadResources();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to update resource', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = (r: Resource) => { setSelectedResource(r); setShowDeleteDialog(true); };
-  const confirmDelete = async () => { setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Resource deleted', 'success'); setShowDeleteDialog(false); setSelectedResource(null); loadResources(); setSaving(false); };
+  const confirmDelete = async () => {
+    if (!selectedResource) return;
+    setSaving(true);
+    try {
+      await deleteResource(selectedResource.id);
+      showToast('Resource deleted successfully', 'success');
+      setShowDeleteDialog(false);
+      setSelectedResource(null);
+      loadResources();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to delete resource', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
 
   const columns: Column<Resource>[] = [
@@ -144,7 +218,7 @@ function ResourceLibrary() {
           <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.resource_code} onChange={e => handleInputChange('resource_code', e.target.value.toUpperCase())} />{formErrors.resource_code && <span style={styles.error}>{formErrors.resource_code}</span>}</div>
           <div style={styles.formGroup}><label style={styles.label}>EOC</label><select style={styles.select} value={formData.eoc} onChange={e => handleInputChange('eoc', e.target.value)}>{eocOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
           <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} /></div>
+          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" min="0" step="0.01" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} />{formErrors.cost && <span style={styles.error}>{formErrors.cost}</span>}</div>
           <div style={styles.formGroup}><label style={styles.label}>Units</label><select style={styles.select} value={formData.units} onChange={e => handleInputChange('units', e.target.value)}>{unitOptions.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
         </div>
       </FormDialog>
@@ -154,7 +228,7 @@ function ResourceLibrary() {
           <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.resource_code} onChange={e => handleInputChange('resource_code', e.target.value.toUpperCase())} />{formErrors.resource_code && <span style={styles.error}>{formErrors.resource_code}</span>}</div>
           <div style={styles.formGroup}><label style={styles.label}>EOC</label><select style={styles.select} value={formData.eoc} onChange={e => handleInputChange('eoc', e.target.value)}>{eocOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
           <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} /></div>
+          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" min="0" step="0.01" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} />{formErrors.cost && <span style={styles.error}>{formErrors.cost}</span>}</div>
           <div style={styles.formGroup}><label style={styles.label}>Units</label><select style={styles.select} value={formData.units} onChange={e => handleInputChange('units', e.target.value)}>{unitOptions.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
           <div style={styles.formGroup}><label style={styles.label}>Status</label><select style={styles.select} value={formData.is_active ? 'active' : 'inactive'} onChange={e => handleInputChange('is_active', e.target.value === 'active')}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
         </div>

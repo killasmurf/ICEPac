@@ -1,7 +1,8 @@
 /**
  * SupplierManagement Component
- * 
+ *
  * Admin page for managing suppliers with full CRUD operations.
+ * Connected to real backend API endpoints.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,7 +11,10 @@ import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import SearchBar from '../../components/admin/SearchBar';
-import { Supplier } from '../../api/admin';
+import {
+  getSuppliers, createSupplier, updateSupplier, deleteSupplier,
+  Supplier, SupplierCreate, SupplierUpdate,
+} from '../../api/admin';
 
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
@@ -38,14 +42,6 @@ const styles: Record<string, React.CSSProperties> = {
   contactDetail: { fontSize: '13px', color: '#64748b' },
 };
 
-const mockSuppliers: Supplier[] = [
-  { id: 1, supplier_code: 'ACME', name: 'Acme Corporation', contact: 'John Smith', phone: '+1-555-0100', email: 'john@acme.com', notes: 'Primary hardware supplier', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-15' },
-  { id: 2, supplier_code: 'TECHSOL', name: 'Tech Solutions Inc', contact: 'Jane Doe', phone: '+1-555-0200', email: 'jane@techsol.com', notes: null, is_active: true, created_at: '2024-01-02', updated_at: '2024-01-16' },
-  { id: 3, supplier_code: 'GLOBSERV', name: 'Global Services Ltd', contact: 'Bob Wilson', phone: '+1-555-0300', email: 'bob@globserv.com', notes: 'International contractor', is_active: true, created_at: '2024-01-03', updated_at: '2024-01-17' },
-  { id: 4, supplier_code: 'DATAPRO', name: 'Data Professionals', contact: 'Alice Brown', phone: '+1-555-0400', email: 'alice@datapro.com', notes: null, is_active: false, created_at: '2024-01-04', updated_at: '2024-01-18' },
-  { id: 5, supplier_code: 'CLOUDNET', name: 'CloudNet Systems', contact: 'Mike Chen', phone: '+1-555-0500', email: 'mike@cloudnet.io', notes: 'Cloud infrastructure', is_active: true, created_at: '2024-01-05', updated_at: '2024-01-19' },
-];
-
 interface FormData { supplier_code: string; name: string; contact: string; phone: string; email: string; notes: string; is_active: boolean; }
 const initialFormData: FormData = { supplier_code: '', name: '', contact: '', phone: '', email: '', notes: '', is_active: true };
 
@@ -68,14 +64,20 @@ function SupplierManagement() {
 
   const loadSuppliers = useCallback(async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 300));
-    let filtered = [...mockSuppliers];
-    if (search) { const s = search.toLowerCase(); filtered = filtered.filter(r => r.supplier_code.toLowerCase().includes(s) || r.name.toLowerCase().includes(s) || r.contact?.toLowerCase().includes(s)); }
-    if (statusFilter === 'active') filtered = filtered.filter(r => r.is_active);
-    else if (statusFilter === 'inactive') filtered = filtered.filter(r => !r.is_active);
-    setSuppliers(filtered.slice(skip, skip + 20));
-    setTotal(filtered.length);
-    setLoading(false);
+    try {
+      const activeOnly = statusFilter === 'active';
+      const response = await getSuppliers(skip, 20, search || undefined, activeOnly);
+      let filtered = response.items;
+      if (statusFilter === 'inactive') {
+        filtered = filtered.filter(s => !s.is_active);
+      }
+      setSuppliers(filtered);
+      setTotal(response.total);
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to load suppliers', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [skip, search, statusFilter]);
 
   useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
@@ -91,11 +93,80 @@ function SupplierManagement() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleCreate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Supplier created', 'success'); setShowCreateDialog(false); setFormData(initialFormData); loadSuppliers(); setSaving(false); };
-  const handleEdit = (s: Supplier) => { setSelectedSupplier(s); setFormData({ supplier_code: s.supplier_code, name: s.name, contact: s.contact || '', phone: s.phone || '', email: s.email || '', notes: s.notes || '', is_active: s.is_active }); setFormErrors({}); setShowEditDialog(true); };
-  const handleUpdate = async () => { if (!validateForm()) return; setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Supplier updated', 'success'); setShowEditDialog(false); setSelectedSupplier(null); loadSuppliers(); setSaving(false); };
+  const handleCreate = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    try {
+      const payload: SupplierCreate = {
+        supplier_code: formData.supplier_code,
+        name: formData.name,
+        contact: formData.contact || undefined,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        notes: formData.notes || undefined,
+        is_active: formData.is_active,
+      };
+      await createSupplier(payload);
+      showToast('Supplier created successfully', 'success');
+      setShowCreateDialog(false);
+      setFormData(initialFormData);
+      loadSuppliers();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to create supplier', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (s: Supplier) => {
+    setSelectedSupplier(s);
+    setFormData({ supplier_code: s.supplier_code, name: s.name, contact: s.contact || '', phone: s.phone || '', email: s.email || '', notes: s.notes || '', is_active: s.is_active });
+    setFormErrors({});
+    setShowEditDialog(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!validateForm() || !selectedSupplier) return;
+    setSaving(true);
+    try {
+      const payload: SupplierUpdate = {
+        supplier_code: formData.supplier_code,
+        name: formData.name,
+        contact: formData.contact || undefined,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        notes: formData.notes || undefined,
+        is_active: formData.is_active,
+      };
+      await updateSupplier(selectedSupplier.id, payload);
+      showToast('Supplier updated successfully', 'success');
+      setShowEditDialog(false);
+      setSelectedSupplier(null);
+      loadSuppliers();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to update supplier', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = (s: Supplier) => { setSelectedSupplier(s); setShowDeleteDialog(true); };
-  const confirmDelete = async () => { setSaving(true); await new Promise(r => setTimeout(r, 500)); showToast('Supplier deleted', 'success'); setShowDeleteDialog(false); setSelectedSupplier(null); loadSuppliers(); setSaving(false); };
+  const confirmDelete = async () => {
+    if (!selectedSupplier) return;
+    setSaving(true);
+    try {
+      await deleteSupplier(selectedSupplier.id);
+      showToast('Supplier deleted successfully', 'success');
+      setShowDeleteDialog(false);
+      setSelectedSupplier(null);
+      loadSuppliers();
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to delete supplier', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
 
   const columns: Column<Supplier>[] = [
