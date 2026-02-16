@@ -1,14 +1,15 @@
 """
 Tests for the risk service.
 """
-import pytest
 from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
 
-from app.services.risk_service import RiskService
+import pytest
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 from app.models.database.risk import Risk
 from app.models.database.wbs import WBS
+from app.services.risk_service import RiskService
 
 
 class TestRiskService:
@@ -62,7 +63,9 @@ class TestRiskService:
 
     def test_get_by_wbs_returns_risks(self, risk_service, mock_db, mock_risk):
         """Test getting risks by WBS ID."""
-        with patch.object(risk_service.repository, 'get_by_wbs', return_value=[mock_risk]):
+        with patch.object(
+            risk_service.repository, "get_by_wbs", return_value=[mock_risk]
+        ):
             result = risk_service.get_by_wbs(1)
 
         assert len(result) == 1
@@ -70,7 +73,7 @@ class TestRiskService:
 
     def test_get_or_404_raises_when_not_found(self, risk_service, mock_db):
         """Test that get_or_404 raises HTTPException when not found."""
-        with patch.object(risk_service.repository, 'get', return_value=None):
+        with patch.object(risk_service.repository, "get", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
                 risk_service.get_or_404(999)
 
@@ -81,7 +84,7 @@ class TestRiskService:
         mock_data = MagicMock()
         mock_data.risk_category_code = "TECH"
 
-        with patch.object(risk_service.wbs_repo, 'get', return_value=None):
+        with patch.object(risk_service.wbs_repo, "get", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
                 risk_service.create(1, mock_data)
 
@@ -93,7 +96,7 @@ class TestRiskService:
         mock_data = MagicMock()
         mock_data.risk_category_code = "TECH"
 
-        with patch.object(risk_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(risk_service.wbs_repo, "get", return_value=mock_wbs):
             with pytest.raises(HTTPException) as exc_info:
                 risk_service.create(1, mock_data)
 
@@ -105,16 +108,21 @@ class TestRiskService:
         mock_data = MagicMock()
         mock_data.risk_category_code = "TECH"
 
-        with patch.object(risk_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(risk_service.wbs_repo, "get", return_value=mock_wbs):
             with pytest.raises(HTTPException) as exc_info:
                 risk_service.create(1, mock_data)
 
         assert exc_info.value.status_code == 409
 
     def test_compute_risk_exposure(
-        self, risk_service, mock_db, mock_risk, mock_probability_level, mock_severity_level
+        self,
+        risk_service,
+        mock_db,
+        mock_risk,
+        mock_probability_level,
+        mock_severity_level,
     ):
-        """Test risk exposure calculation: cost * probability_weight * severity_weight."""
+        """Test risk exposure: cost * prob_weight * sev_weight."""
         mock_db.scalars.return_value.first.side_effect = [
             mock_probability_level,
             mock_severity_level,
@@ -126,7 +134,9 @@ class TestRiskService:
         expected = 10000.0 * 0.5 * 1.5
         assert result == expected
 
-    def test_compute_risk_exposure_defaults_to_zero(self, risk_service, mock_db, mock_risk):
+    def test_compute_risk_exposure_defaults_to_zero(
+        self, risk_service, mock_db, mock_risk
+    ):
         """Test risk exposure defaults to 0 when weights not found."""
         mock_risk.probability_code = None
         mock_risk.severity_code = None
@@ -135,24 +145,28 @@ class TestRiskService:
 
         assert result == 0.0
 
-    def test_update_prevents_when_submitted(self, risk_service, mock_db, mock_wbs, mock_risk):
+    def test_update_prevents_when_submitted(
+        self, risk_service, mock_db, mock_wbs, mock_risk
+    ):
         """Test that update prevents changes when WBS is submitted."""
         mock_wbs.approval_status = "submitted"
         mock_data = MagicMock()
 
-        with patch.object(risk_service.repository, 'get', return_value=mock_risk):
-            with patch.object(risk_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(risk_service.repository, "get", return_value=mock_risk):
+            with patch.object(risk_service.wbs_repo, "get", return_value=mock_wbs):
                 with pytest.raises(HTTPException) as exc_info:
                     risk_service.update(1, mock_data)
 
         assert exc_info.value.status_code == 409
 
-    def test_delete_prevents_when_approved(self, risk_service, mock_db, mock_wbs, mock_risk):
+    def test_delete_prevents_when_approved(
+        self, risk_service, mock_db, mock_wbs, mock_risk
+    ):
         """Test that delete prevents changes when WBS is approved."""
         mock_wbs.approval_status = "approved"
 
-        with patch.object(risk_service.repository, 'get', return_value=mock_risk):
-            with patch.object(risk_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(risk_service.repository, "get", return_value=mock_risk):
+            with patch.object(risk_service.wbs_repo, "get", return_value=mock_wbs):
                 with pytest.raises(HTTPException) as exc_info:
                     risk_service.delete(1)
 

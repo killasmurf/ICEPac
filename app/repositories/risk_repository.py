@@ -1,6 +1,7 @@
 """Risk repository."""
 from typing import List
-from sqlalchemy import select, func
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.database.risk import Risk
@@ -25,11 +26,7 @@ class RiskRepository(BaseRepository[Risk]):
 
     def count_by_wbs(self, wbs_id: int) -> int:
         """Count risks for a WBS item."""
-        stmt = (
-            select(func.count())
-            .select_from(Risk)
-            .where(Risk.wbs_id == wbs_id)
-        )
+        stmt = select(func.count()).select_from(Risk).where(Risk.wbs_id == wbs_id)
         return self.db.scalar(stmt) or 0
 
     def get_by_project(self, project_id: int) -> List[Risk]:
@@ -54,10 +51,7 @@ class RiskRepository(BaseRepository[Risk]):
 
     def get_total_cost_by_wbs(self, wbs_id: int) -> float:
         """Get sum of risk_cost for a WBS item."""
-        stmt = (
-            select(func.sum(Risk.risk_cost))
-            .where(Risk.wbs_id == wbs_id)
-        )
+        stmt = select(func.sum(Risk.risk_cost)).where(Risk.wbs_id == wbs_id)
         return float(self.db.scalar(stmt) or 0)
 
     def get_total_cost_by_project(self, project_id: int) -> float:

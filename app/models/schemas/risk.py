@@ -2,11 +2,13 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class RiskBase(BaseModel):
     """Base schema for risk data."""
+
     risk_category_code: Optional[str] = Field(default=None, max_length=50)
     risk_cost: Decimal = Field(default=Decimal("0.00"), ge=0)
     probability_code: Optional[str] = Field(default=None, max_length=50)
@@ -16,11 +18,13 @@ class RiskBase(BaseModel):
 
 class RiskCreate(RiskBase):
     """Schema for creating a new risk."""
+
     pass
 
 
 class RiskUpdate(BaseModel):
     """Schema for updating a risk. All fields optional."""
+
     risk_category_code: Optional[str] = Field(default=None, max_length=50)
     risk_cost: Optional[Decimal] = Field(default=None, ge=0)
     probability_code: Optional[str] = Field(default=None, max_length=50)
@@ -30,6 +34,7 @@ class RiskUpdate(BaseModel):
 
 class RiskResponse(RiskBase):
     """Schema for risk response with computed fields."""
+
     id: int
     wbs_id: int
     date_identified: datetime
@@ -46,5 +51,6 @@ class RiskResponse(RiskBase):
 
 class RiskListResponse(BaseModel):
     """Schema for paginated list of risks."""
+
     items: list[RiskResponse]
     total: int

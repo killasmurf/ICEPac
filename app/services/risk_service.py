@@ -2,13 +2,13 @@
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.models.database.config_tables import ProbabilityLevel, SeverityLevel
 from app.models.database.risk import Risk
 from app.models.database.wbs import WBS
-from app.models.database.config_tables import ProbabilityLevel, SeverityLevel
-from app.models.schemas.risk import RiskCreate, RiskUpdate, RiskResponse
+from app.models.schemas.risk import RiskCreate, RiskUpdate
 from app.repositories.risk_repository import RiskRepository
 from app.repositories.wbs_repository import WBSRepository
 
@@ -101,9 +101,7 @@ class RiskService:
         prob_weight = float(probability.weight) if probability else 0.0
 
         # Get severity weight
-        sev_stmt = select(SeverityLevel).where(
-            SeverityLevel.code == risk.severity_code
-        )
+        sev_stmt = select(SeverityLevel).where(SeverityLevel.code == risk.severity_code)
         severity = self.db.scalars(sev_stmt).first()
         sev_weight = float(severity.weight) if severity else 0.0
 

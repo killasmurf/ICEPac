@@ -2,11 +2,13 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class AssignmentBase(BaseModel):
     """Base schema for assignment data."""
+
     resource_code: str = Field(..., min_length=1, max_length=50)
     supplier_code: Optional[str] = Field(default=None, max_length=50)
     cost_type_code: Optional[str] = Field(default=None, max_length=50)
@@ -27,11 +29,13 @@ class AssignmentBase(BaseModel):
 
 class AssignmentCreate(AssignmentBase):
     """Schema for creating a new assignment."""
+
     pass
 
 
 class AssignmentUpdate(BaseModel):
     """Schema for updating an assignment. All fields optional."""
+
     resource_code: Optional[str] = Field(default=None, min_length=1, max_length=50)
     supplier_code: Optional[str] = Field(default=None, max_length=50)
     cost_type_code: Optional[str] = Field(default=None, max_length=50)
@@ -50,6 +54,7 @@ class AssignmentUpdate(BaseModel):
 
 class AssignmentResponse(AssignmentBase):
     """Schema for assignment response with computed fields."""
+
     id: int
     wbs_id: int
 
@@ -65,5 +70,6 @@ class AssignmentResponse(AssignmentBase):
 
 class AssignmentListResponse(BaseModel):
     """Schema for paginated list of assignments."""
+
     items: list[AssignmentResponse]
     total: int

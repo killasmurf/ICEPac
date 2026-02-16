@@ -1,14 +1,15 @@
 """
 Tests for the assignment service.
 """
-import pytest
 from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
 
-from app.services.assignment_service import AssignmentService
+import pytest
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 from app.models.database.assignment import ResourceAssignment
 from app.models.database.wbs import WBS
+from app.services.assignment_service import AssignmentService
 
 
 class TestAssignmentService:
@@ -46,11 +47,15 @@ class TestAssignmentService:
         assignment.std_deviation = 16.67  # (200 - 100) / 6
         return assignment
 
-    def test_get_by_wbs_returns_assignments(self, assignment_service, mock_db, mock_assignment):
+    def test_get_by_wbs_returns_assignments(
+        self, assignment_service, mock_db, mock_assignment
+    ):
         """Test getting assignments by WBS ID."""
         mock_db.scalars.return_value.all.return_value = [mock_assignment]
 
-        with patch.object(assignment_service.repository, 'get_by_wbs', return_value=[mock_assignment]):
+        with patch.object(
+            assignment_service.repository, "get_by_wbs", return_value=[mock_assignment]
+        ):
             result = assignment_service.get_by_wbs(1)
 
         assert len(result) == 1
@@ -58,7 +63,7 @@ class TestAssignmentService:
 
     def test_get_or_404_raises_when_not_found(self, assignment_service, mock_db):
         """Test that get_or_404 raises HTTPException when not found."""
-        with patch.object(assignment_service.repository, 'get', return_value=None):
+        with patch.object(assignment_service.repository, "get", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
                 assignment_service.get_or_404(999)
 
@@ -69,19 +74,21 @@ class TestAssignmentService:
         mock_data = MagicMock()
         mock_data.resource_code = "RES001"
 
-        with patch.object(assignment_service.wbs_repo, 'get', return_value=None):
+        with patch.object(assignment_service.wbs_repo, "get", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
                 assignment_service.create(1, mock_data)
 
         assert exc_info.value.status_code == 404
 
-    def test_create_prevents_when_submitted(self, assignment_service, mock_db, mock_wbs):
+    def test_create_prevents_when_submitted(
+        self, assignment_service, mock_db, mock_wbs
+    ):
         """Test that create prevents changes when WBS is submitted."""
         mock_wbs.approval_status = "submitted"
         mock_data = MagicMock()
         mock_data.resource_code = "RES001"
 
-        with patch.object(assignment_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(assignment_service.wbs_repo, "get", return_value=mock_wbs):
             with pytest.raises(HTTPException) as exc_info:
                 assignment_service.create(1, mock_data)
 
@@ -93,13 +100,15 @@ class TestAssignmentService:
         mock_data = MagicMock()
         mock_data.resource_code = "RES001"
 
-        with patch.object(assignment_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(assignment_service.wbs_repo, "get", return_value=mock_wbs):
             with pytest.raises(HTTPException) as exc_info:
                 assignment_service.create(1, mock_data)
 
         assert exc_info.value.status_code == 409
 
-    def test_create_validates_resource_code(self, assignment_service, mock_db, mock_wbs):
+    def test_create_validates_resource_code(
+        self, assignment_service, mock_db, mock_wbs
+    ):
         """Test that create validates resource code exists."""
         mock_data = MagicMock()
         mock_data.resource_code = "INVALID"
@@ -108,32 +117,44 @@ class TestAssignmentService:
         # Mock WBS exists, but resource lookup returns None
         mock_db.scalars.return_value.first.return_value = None
 
-        with patch.object(assignment_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(assignment_service.wbs_repo, "get", return_value=mock_wbs):
             with pytest.raises(HTTPException) as exc_info:
                 assignment_service.create(1, mock_data)
 
         assert exc_info.value.status_code == 400
 
-    def test_update_prevents_when_submitted(self, assignment_service, mock_db, mock_wbs, mock_assignment):
+    def test_update_prevents_when_submitted(
+        self, assignment_service, mock_db, mock_wbs, mock_assignment
+    ):
         """Test that update prevents changes when WBS is submitted."""
         mock_wbs.approval_status = "submitted"
         mock_data = MagicMock()
 
         # Patch at the service level - get_or_404 calls repository.get
-        with patch.object(assignment_service, 'get_or_404', return_value=mock_assignment):
-            with patch.object(assignment_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(
+            assignment_service, "get_or_404", return_value=mock_assignment
+        ):
+            with patch.object(
+                assignment_service.wbs_repo, "get", return_value=mock_wbs
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     assignment_service.update(1, mock_data)
 
         assert exc_info.value.status_code == 409
 
-    def test_delete_prevents_when_approved(self, assignment_service, mock_db, mock_wbs, mock_assignment):
+    def test_delete_prevents_when_approved(
+        self, assignment_service, mock_db, mock_wbs, mock_assignment
+    ):
         """Test that delete prevents changes when WBS is approved."""
         mock_wbs.approval_status = "approved"
 
         # Patch at the service level - get_or_404 calls repository.get
-        with patch.object(assignment_service, 'get_or_404', return_value=mock_assignment):
-            with patch.object(assignment_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(
+            assignment_service, "get_or_404", return_value=mock_assignment
+        ):
+            with patch.object(
+                assignment_service.wbs_repo, "get", return_value=mock_wbs
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     assignment_service.delete(1)
 

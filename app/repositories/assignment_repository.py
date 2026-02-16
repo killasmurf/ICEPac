@@ -1,6 +1,7 @@
 """Resource Assignment repository."""
 from typing import List
-from sqlalchemy import select, func
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.database.assignment import ResourceAssignment
@@ -66,7 +67,7 @@ class AssignmentRepository(BaseRepository[ResourceAssignment]):
 
         for a in assignments:
             total_pert += a.pert_estimate
-            total_variance += a.std_deviation ** 2
+            total_variance += a.std_deviation**2
 
         return {
             "total_pert": total_pert,
@@ -74,9 +75,7 @@ class AssignmentRepository(BaseRepository[ResourceAssignment]):
             "count": len(assignments),
         }
 
-    def get_summary_by_field(
-        self, project_id: int, group_field: str
-    ) -> List[dict]:
+    def get_summary_by_field(self, project_id: int, group_field: str) -> List[dict]:
         """Group assignment PERT totals by a code field.
 
         Args:
