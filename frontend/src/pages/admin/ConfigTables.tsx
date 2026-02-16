@@ -164,7 +164,7 @@ function ConfigTables() {
   const columns: Column<ConfigItem | WeightedConfigItem>[] = [
     { key: 'code', header: 'Code', sortable: true, width: '150px', render: item => <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{item.code}</span> },
     { key: 'description', header: 'Description', sortable: true },
-    ...(isWeighted ? [{ key: 'weight' as const, header: 'Weight', sortable: true, width: '100px', render: (item: WeightedConfigItem) => <span style={styles.weightBadge}>{item.weight}</span> }] : []),
+    ...(isWeighted ? [{ key: 'weight' as const, header: 'Weight', sortable: true, width: '100px', render: (item: ConfigItem | WeightedConfigItem) => <span style={styles.weightBadge}>{(item as WeightedConfigItem).weight}</span> }] : []),
     { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: item => <StatusBadge isActive={item.is_active} /> },
   ];
 
