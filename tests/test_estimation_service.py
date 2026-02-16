@@ -1,14 +1,15 @@
 """
 Tests for the estimation service.
 """
-import pytest
-from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
 import math
+from unittest.mock import MagicMock, patch
 
-from app.services.estimation_service import EstimationService
-from app.models.database.wbs import WBS
+import pytest
+from sqlalchemy.orm import Session
+
 from app.models.database.project import Project
+from app.models.database.wbs import WBS
+from app.services.estimation_service import EstimationService
 
 
 class TestEstimationService:
@@ -50,7 +51,7 @@ class TestEstimationService:
             assignment = MagicMock()
             assignment.id = i + 1
             assignment.pert_estimate = 100.0  # Each assignment = 100
-            assignment.std_deviation = 10.0   # Each std dev = 10
+            assignment.std_deviation = 10.0  # Each std dev = 10
             assignments.append(assignment)
         return assignments
 
@@ -71,13 +72,19 @@ class TestEstimationService:
         self, estimation_service, mock_db, mock_wbs, mock_assignments
     ):
         """Test WBS cost summary calculation."""
-        with patch.object(estimation_service.wbs_repo, 'get', return_value=mock_wbs):
+        with patch.object(estimation_service.wbs_repo, "get", return_value=mock_wbs):
             with patch.object(
-                estimation_service.assignment_repo, 'get_by_wbs', return_value=mock_assignments
+                estimation_service.assignment_repo,
+                "get_by_wbs",
+                return_value=mock_assignments,
             ):
-                with patch.object(estimation_service.risk_repo, 'get_by_wbs', return_value=[]):
+                with patch.object(
+                    estimation_service.risk_repo, "get_by_wbs", return_value=[]
+                ):
                     with patch.object(
-                        estimation_service.risk_service, 'compute_risk_exposure', return_value=0
+                        estimation_service.risk_service,
+                        "compute_risk_exposure",
+                        return_value=0,
                     ):
                         result = estimation_service.get_wbs_cost_summary(1)
 
@@ -92,7 +99,7 @@ class TestEstimationService:
         # Combined variance = 100 + 100 + 100 = 300
         # Combined std dev = sqrt(300) ≈ 17.32
         std_devs = [10.0, 10.0, 10.0]
-        variances = [sd ** 2 for sd in std_devs]
+        variances = [sd**2 for sd in std_devs]
         combined_std_dev = math.sqrt(sum(variances))
 
         expected = math.sqrt(300)
@@ -124,10 +131,20 @@ class TestEstimationService:
             wbs.wbs_title = f"WBS {i + 1}"
             wbs.approval_status = "draft"
 
-        with patch.object(estimation_service.project_repo, 'get', return_value=mock_project):
-            with patch.object(estimation_service.wbs_repo, 'get_by_project', return_value=mock_wbs_list):
-                with patch.object(estimation_service.assignment_repo, 'get_by_wbs', return_value=[]):
-                    with patch.object(estimation_service.risk_repo, 'get_by_wbs', return_value=[]):
+        with patch.object(
+            estimation_service.project_repo, "get", return_value=mock_project
+        ):
+            with patch.object(
+                estimation_service.wbs_repo,
+                "get_by_project",
+                return_value=mock_wbs_list,
+            ):
+                with patch.object(
+                    estimation_service.assignment_repo, "get_by_wbs", return_value=[]
+                ):
+                    with patch.object(
+                        estimation_service.risk_repo, "get_by_wbs", return_value=[]
+                    ):
                         result = estimation_service.get_project_estimation(1)
 
         assert result.total_wbs_items == 3
@@ -189,8 +206,8 @@ class TestEstimationService:
         wrong_combined = std_dev_1 + std_dev_2  # = 12
 
         # Right way: sqrt(sum of variances)
-        var_1 = std_dev_1 ** 2  # = 36
-        var_2 = std_dev_2 ** 2  # = 36
+        var_1 = std_dev_1**2  # = 36
+        var_2 = std_dev_2**2  # = 36
         correct_combined = math.sqrt(var_1 + var_2)  # = sqrt(72) ≈ 8.49
 
         assert wrong_combined == 12.0

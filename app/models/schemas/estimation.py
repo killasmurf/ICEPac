@@ -1,11 +1,13 @@
 """Estimation and approval workflow schemas."""
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class WBSCostSummary(BaseModel):
     """Cost summary for a single WBS item."""
+
     wbs_id: int
     wbs_code: Optional[str] = None
     wbs_title: str
@@ -32,6 +34,7 @@ class WBSCostSummary(BaseModel):
 
 class CostBreakdownItem(BaseModel):
     """Single item in a cost breakdown (by cost type, region, etc.)."""
+
     code: str
     description: str
     total_pert: float = 0.0
@@ -40,6 +43,7 @@ class CostBreakdownItem(BaseModel):
 
 class SupplierBreakdownItem(BaseModel):
     """Single item in supplier breakdown."""
+
     code: str
     name: str
     total_pert: float = 0.0
@@ -48,6 +52,7 @@ class SupplierBreakdownItem(BaseModel):
 
 class ProjectEstimationSummary(BaseModel):
     """Full project estimation summary with breakdowns."""
+
     project_id: int
     project_name: str
 
@@ -78,12 +83,14 @@ class ProjectEstimationSummary(BaseModel):
 
 class ApprovalAction(BaseModel):
     """Schema for approval workflow actions."""
+
     action: str = Field(..., pattern="^(submit|approve|reject|reset)$")
     comment: Optional[str] = None
 
 
 class WBSApprovalResponse(BaseModel):
     """Schema for WBS approval status response."""
+
     wbs_id: int
     approval_status: str
     approver: Optional[str] = None
