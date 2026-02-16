@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -10,14 +10,18 @@ import {
   Tabs,
   Tab,
   Chip,
+  Drawer,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getProject, updateProject, Project, ProjectUpdateInput } from '../api/projects';
+import { getProject, updateProject, Project, ProjectUpdateInput, WBSItem } from '../api/projects';
+import { getResources, getSuppliers, getConfigItems } from '../api/admin';
 import ProjectUpload from '../components/project/ProjectUpload';
 import WBSTree from '../components/project/WBSTree';
+import EstimationSummary from '../components/estimation/EstimationSummary';
+import WBSDetailPanel from '../components/estimation/WBSDetailPanel';
 
 const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info'> = {
   draft: 'default',
@@ -39,6 +43,21 @@ const ProjectDetail: React.FC = () => {
   const [form, setForm] = useState<ProjectUpdateInput>({});
   const [activeTab, setActiveTab] = useState(0);
 
+  // Estimation panel state
+  const [selectedWBS, setSelectedWBS] = useState<WBSItem | null>(null);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+
+  // Lookup data for estimation forms
+  const [resources, setResources] = useState<{ code: string; description: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ code: string; name: string }[]>([]);
+  const [costTypes, setCostTypes] = useState<{ code: string; description: string }[]>([]);
+  const [regions, setRegions] = useState<{ code: string; description: string }[]>([]);
+  const [businessAreas, setBusinessAreas] = useState<{ code: string; description: string }[]>([]);
+  const [estimatingTechniques, setEstimatingTechniques] = useState<{ code: string; description: string }[]>([]);
+  const [riskCategories, setRiskCategories] = useState<{ code: string; description: string }[]>([]);
+  const [probabilityLevels, setProbabilityLevels] = useState<{ code: string; description: string; weight: number }[]>([]);
+  const [severityLevels, setSeverityLevels] = useState<{ code: string; description: string; weight: number }[]>([]);
+
   const loadProject = () => {
     if (!id) return;
     setLoading(true);
@@ -55,9 +74,59 @@ const ProjectDetail: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
+  const loadLookupData = useCallback(async () => {
+    try {
+      const [
+        resourcesRes,
+        suppliersRes,
+        costTypesRes,
+        regionsRes,
+        businessAreasRes,
+        estTechniquesRes,
+        riskCategoriesRes,
+        probabilityRes,
+        severityRes,
+      ] = await Promise.all([
+        getResources(0, 500, undefined, true),
+        getSuppliers(0, 500, undefined, true),
+        getConfigItems('cost-types', true),
+        getConfigItems('regions', true),
+        getConfigItems('business-areas', true),
+        getConfigItems('estimating-techniques', true),
+        getConfigItems('risk-categories', true),
+        getConfigItems('probability-levels', true),
+        getConfigItems('severity-levels', true),
+      ]);
+
+      setResources(resourcesRes.items.map((r) => ({ code: r.resource_code, description: r.description })));
+      setSuppliers(suppliersRes.items.map((s) => ({ code: s.supplier_code, name: s.name })));
+      setCostTypes(costTypesRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setRegions(regionsRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setBusinessAreas(businessAreasRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setEstimatingTechniques(estTechniquesRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setRiskCategories(riskCategoriesRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setProbabilityLevels(
+        probabilityRes.items.map((i: any) => ({ code: i.code, description: i.description, weight: i.weight || 0 }))
+      );
+      setSeverityLevels(
+        severityRes.items.map((i: any) => ({ code: i.code, description: i.description, weight: i.weight || 0 }))
+      );
+    } catch {
+      // Lookup data is optional – estimation panel will still work with empty dropdowns
+      console.warn('Failed to load some lookup data for estimation forms');
+    }
+  }, []);
+
   useEffect(() => {
     loadProject();
   }, [id]);
+
+  // Load lookup data once when entering estimation-related tabs
+  useEffect(() => {
+    if (activeTab === 1 || activeTab === 3) {
+      loadLookupData();
+    }
+  }, [activeTab, loadLookupData]);
 
   const handleSave = async () => {
     if (!id || !project) return;
@@ -76,6 +145,11 @@ const ProjectDetail: React.FC = () => {
   const handleImportComplete = () => {
     loadProject();
   };
+
+  const handleWBSClick = useCallback((node: WBSItem) => {
+    setSelectedWBS(node);
+    setDetailPanelOpen(true);
+  }, []);
 
   const formatDateTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
@@ -147,6 +221,7 @@ const ProjectDetail: React.FC = () => {
           <Tab label="Overview" />
           <Tab label={`WBS${project.task_count ? ` (${project.task_count})` : ''}`} />
           <Tab label="Import" />
+          <Tab label="Estimation" />
         </Tabs>
       </Box>
 
@@ -250,7 +325,7 @@ const ProjectDetail: React.FC = () => {
       {/* WBS Tab */}
       {activeTab === 1 && (
         <Paper>
-          <WBSTree projectId={Number(id)} />
+          <WBSTree projectId={Number(id)} onNodeClick={handleWBSClick} />
         </Paper>
       )}
 
@@ -260,6 +335,30 @@ const ProjectDetail: React.FC = () => {
           <ProjectUpload projectId={Number(id)} onImportComplete={handleImportComplete} />
         </Paper>
       )}
+
+      {/* Estimation Tab */}
+      {activeTab === 3 && (
+        <Paper sx={{ p: 3 }}>
+          <EstimationSummary projectId={Number(id)} />
+        </Paper>
+      )}
+
+      {/* WBS Detail Panel (drawer for assignments, risks, approval) */}
+      <WBSDetailPanel
+        open={detailPanelOpen}
+        onClose={() => setDetailPanelOpen(false)}
+        projectId={Number(id)}
+        wbs={selectedWBS}
+        resources={resources}
+        suppliers={suppliers}
+        costTypes={costTypes}
+        regions={regions}
+        businessAreas={businessAreas}
+        estimatingTechniques={estimatingTechniques}
+        riskCategories={riskCategories}
+        probabilityLevels={probabilityLevels}
+        severityLevels={severityLevels}
+      />
     </Box>
   );
 };

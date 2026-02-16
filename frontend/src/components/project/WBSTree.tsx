@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { getWBSTree, WBSTreeNode } from '../../api/projects';
+import { getWBSTree, WBSTreeNode, WBSItem } from '../../api/projects';
 
 // ============================================================
 // Types
@@ -15,6 +15,7 @@ import { getWBSTree, WBSTreeNode } from '../../api/projects';
 
 interface WBSTreeProps {
   projectId: number;
+  onNodeClick?: (node: WBSItem) => void;
 }
 
 // ============================================================
@@ -163,12 +164,22 @@ interface TreeNodeProps {
   depth: number;
   expandedIds: Set<number>;
   toggleExpand: (id: number) => void;
+  onNodeClick?: (node: WBSItem) => void;
 }
 
-const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggleExpand }) => {
+const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggleExpand, onNodeClick }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const indent = depth * 20;
+
+  const handleClick = () => {
+    if (hasChildren) {
+      toggleExpand(node.id);
+    }
+    if (onNodeClick) {
+      onNodeClick(node);
+    }
+  };
 
   return (
     <>
@@ -177,7 +188,7 @@ const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggle
           ...styles.nodeRow,
           ...(node.is_summary ? styles.summaryStyle : {}),
         }}
-        onClick={() => hasChildren && toggleExpand(node.id)}
+        onClick={handleClick}
       >
         {/* Expand/collapse icon */}
         <span style={{ ...styles.expandIcon, marginLeft: `${indent}px` }}>
@@ -221,6 +232,7 @@ const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggle
           depth={depth + 1}
           expandedIds={expandedIds}
           toggleExpand={toggleExpand}
+          onNodeClick={onNodeClick}
         />
       ))}
     </>
@@ -231,7 +243,7 @@ const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggle
 // Main Component
 // ============================================================
 
-const WBSTree: React.FC<WBSTreeProps> = ({ projectId }) => {
+const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick }) => {
   const [tree, setTree] = useState<WBSTreeNode[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -333,6 +345,7 @@ const WBSTree: React.FC<WBSTreeProps> = ({ projectId }) => {
           depth={0}
           expandedIds={expandedIds}
           toggleExpand={toggleExpand}
+          onNodeClick={onNodeClick}
         />
       ))}
     </div>
