@@ -153,7 +153,7 @@ function FormDialog({
 }: FormDialogProps) {
   const [isVisible, setIsVisible] = React.useState(false);
   const [closeHovered, setCloseHovered] = React.useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (open) {

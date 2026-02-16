@@ -71,7 +71,7 @@ function SearchBar({
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [clearHovered, setClearHovered] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<NodeJS.Timeout>(undefined);
 
   // Sync with external value
   useEffect(() => {
