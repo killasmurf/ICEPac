@@ -53,8 +53,10 @@ def process_mpp_import(self, import_job_id: int) -> Dict[str, Any]:
         logger.exception("Import task failed: job_id=%d", import_job_id)
         # Try to mark the job as failed
         try:
-            from app.models.database.import_job import ImportJob, ImportStatus
             from datetime import datetime
+
+            from app.models.database.import_job import ImportJob, ImportStatus
+
             job = db.get(ImportJob, import_job_id)
             if job and job.status != ImportStatus.FAILED:
                 job.status = ImportStatus.FAILED

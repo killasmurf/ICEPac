@@ -1,7 +1,8 @@
 """WBS repository."""
-from typing import Optional, List
+from typing import List, Optional
+
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, delete
 
 from app.models.database.wbs import WBS
 from app.repositories.base import BaseRepository
@@ -28,11 +29,7 @@ class WBSRepository(BaseRepository[WBS]):
 
     def count_by_project(self, project_id: int) -> int:
         """Count WBS items for a project."""
-        stmt = (
-            select(func.count())
-            .select_from(WBS)
-            .where(WBS.project_id == project_id)
-        )
+        stmt = select(func.count()).select_from(WBS).where(WBS.project_id == project_id)
         return self.db.scalar(stmt) or 0
 
     def get_root_items(self, project_id: int) -> List[WBS]:
@@ -46,21 +43,14 @@ class WBSRepository(BaseRepository[WBS]):
 
     def get_children(self, parent_id: int) -> List[WBS]:
         """Get direct children of a WBS item."""
-        stmt = (
-            select(WBS)
-            .where(WBS.parent_id == parent_id)
-            .order_by(WBS.id)
-        )
+        stmt = select(WBS).where(WBS.parent_id == parent_id).order_by(WBS.id)
         return list(self.db.scalars(stmt).all())
 
     def get_by_unique_id(self, project_id: int, task_unique_id: int) -> Optional[WBS]:
         """Get a WBS item by its MS Project unique ID within a project."""
-        stmt = (
-            select(WBS)
-            .where(
-                WBS.project_id == project_id,
-                WBS.task_unique_id == task_unique_id,
-            )
+        stmt = select(WBS).where(
+            WBS.project_id == project_id,
+            WBS.task_unique_id == task_unique_id,
         )
         return self.db.scalars(stmt).first()
 

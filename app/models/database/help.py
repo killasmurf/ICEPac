@@ -1,6 +1,7 @@
 """Help system database models."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -16,9 +17,13 @@ class HelpCategory(Base):
     display_order = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
-    topics = relationship("HelpTopic", back_populates="category", cascade="all, delete-orphan")
+    topics = relationship(
+        "HelpTopic", back_populates="category", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<HelpCategory(id={self.id}, name='{self.name}')>"
@@ -36,10 +41,14 @@ class HelpTopic(Base):
     display_order = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     category = relationship("HelpCategory", back_populates="topics")
-    descriptions = relationship("HelpDescription", back_populates="topic", cascade="all, delete-orphan")
+    descriptions = relationship(
+        "HelpDescription", back_populates="topic", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<HelpTopic(id={self.id}, title='{self.title}')>"
@@ -59,4 +68,7 @@ class HelpDescription(Base):
     topic = relationship("HelpTopic", back_populates="descriptions")
 
     def __repr__(self):
-        return f"<HelpDescription(id={self.id}, topic_id={self.topic_id}, section={self.section_number})>"
+        return (
+            f"<HelpDescription(id={self.id}, "
+            f"topic_id={self.topic_id}, section={self.section_number})>"
+        )

@@ -4,16 +4,17 @@ Tests for the enhanced MPP parser (app.services.mpp_parser).
 These tests use mock objects to simulate MPXJ/JPype behavior,
 so they run without requiring Java or the MPXJ JAR.
 """
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.services.mpp_parser import (
     MPPParser,
-    ParsedProject,
-    ParsedTask,
-    ParsedResource,
     ParsedAssignment,
+    ParsedProject,
+    ParsedResource,
+    ParsedTask,
 )
 
 
@@ -194,11 +195,17 @@ class TestMPPParserExtraction:
         return task
 
     def test_extract_tasks_basic(self, parser):
-        parent_task = self._make_mock_task(unique_id=1, name="Summary", wbs="1", outline_level=0, summary=True)
+        parent_task = self._make_mock_task(
+            unique_id=1, name="Summary", wbs="1", outline_level=0, summary=True
+        )
 
         child_task = self._make_mock_task(
-            unique_id=2, name="Child Task", wbs="1.1",
-            outline_level=1, parent=parent_task, milestone=True,
+            unique_id=2,
+            name="Child Task",
+            wbs="1.1",
+            outline_level=1,
+            parent=parent_task,
+            milestone=True,
         )
 
         project = MagicMock()

@@ -22,9 +22,11 @@ logger = logging.getLogger(__name__)
 # Parsed data structures (pure data, no DB coupling)
 # ============================================================
 
+
 @dataclass
 class ParsedTask:
     """A single task/WBS item extracted from an MS Project file."""
+
     unique_id: int
     name: str
     wbs_code: Optional[str] = None
@@ -63,6 +65,7 @@ class ParsedTask:
 @dataclass
 class ParsedResource:
     """A resource extracted from an MS Project file."""
+
     unique_id: int
     name: str
     resource_type: Optional[str] = None
@@ -74,6 +77,7 @@ class ParsedResource:
 @dataclass
 class ParsedAssignment:
     """A resource assignment extracted from an MS Project file."""
+
     task_unique_id: int
     resource_unique_id: int
     work: Optional[float] = None
@@ -84,6 +88,7 @@ class ParsedAssignment:
 @dataclass
 class ParsedProject:
     """Complete parsed project data."""
+
     name: str
     start_date: Optional[datetime] = None
     finish_date: Optional[datetime] = None
@@ -97,6 +102,7 @@ class ParsedProject:
 # ============================================================
 # Parser
 # ============================================================
+
 
 class MPPParser:
     """
@@ -152,7 +158,10 @@ class MPPParser:
 
         logger.info(
             "Parsed '%s': %d tasks, %d resources, %d assignments",
-            parsed.name, len(parsed.tasks), len(parsed.resources), len(parsed.assignments),
+            parsed.name,
+            len(parsed.tasks),
+            len(parsed.resources),
+            len(parsed.assignments),
         )
         return parsed
 
@@ -200,31 +209,42 @@ class MPPParser:
                 if names:
                     resource_names = ", ".join(names)
 
-            tasks.append(ParsedTask(
-                unique_id=uid,
-                name=self._str(task.getName()) or f"Task {uid}",
-                wbs_code=self._str(task.getWBS()),
-                outline_level=int(task.getOutlineLevel()) if task.getOutlineLevel() is not None else 0,
-                parent_unique_id=parent_uid,
-                start=self._to_datetime(task.getStart()),
-                finish=self._to_datetime(task.getFinish()),
-                baseline_start=self._to_datetime(task.getBaselineStart()),
-                baseline_finish=self._to_datetime(task.getBaselineFinish()),
-                late_start=self._to_datetime(task.getLateStart()),
-                late_finish=self._to_datetime(task.getLateFinish()),
-                actual_start=self._to_datetime(task.getActualStart()),
-                actual_finish=self._to_datetime(task.getActualFinish()),
-                duration=dur_val,
-                duration_units=dur_units,
-                percent_complete=self._to_float(task.getPercentageComplete()) or 0.0,
-                cost=self._to_float(task.getCost()) or 0.0,
-                baseline_cost=self._to_float(task.getBaselineCost()) or 0.0,
-                is_milestone=bool(task.getMilestone()) if task.getMilestone() is not None else False,
-                is_summary=bool(task.getSummary()) if task.getSummary() is not None else False,
-                is_critical=bool(task.getCritical()) if task.getCritical() is not None else False,
-                resource_names=resource_names,
-                notes=self._str(task.getNotes()),
-            ))
+            tasks.append(
+                ParsedTask(
+                    unique_id=uid,
+                    name=self._str(task.getName()) or f"Task {uid}",
+                    wbs_code=self._str(task.getWBS()),
+                    outline_level=int(task.getOutlineLevel())
+                    if task.getOutlineLevel() is not None
+                    else 0,
+                    parent_unique_id=parent_uid,
+                    start=self._to_datetime(task.getStart()),
+                    finish=self._to_datetime(task.getFinish()),
+                    baseline_start=self._to_datetime(task.getBaselineStart()),
+                    baseline_finish=self._to_datetime(task.getBaselineFinish()),
+                    late_start=self._to_datetime(task.getLateStart()),
+                    late_finish=self._to_datetime(task.getLateFinish()),
+                    actual_start=self._to_datetime(task.getActualStart()),
+                    actual_finish=self._to_datetime(task.getActualFinish()),
+                    duration=dur_val,
+                    duration_units=dur_units,
+                    percent_complete=self._to_float(task.getPercentageComplete())
+                    or 0.0,
+                    cost=self._to_float(task.getCost()) or 0.0,
+                    baseline_cost=self._to_float(task.getBaselineCost()) or 0.0,
+                    is_milestone=bool(task.getMilestone())
+                    if task.getMilestone() is not None
+                    else False,
+                    is_summary=bool(task.getSummary())
+                    if task.getSummary() is not None
+                    else False,
+                    is_critical=bool(task.getCritical())
+                    if task.getCritical() is not None
+                    else False,
+                    resource_names=resource_names,
+                    notes=self._str(task.getNotes()),
+                )
+            )
 
         return tasks
 
@@ -242,14 +262,16 @@ class MPPParser:
             if not name:
                 continue
 
-            resources.append(ParsedResource(
-                unique_id=uid,
-                name=name,
-                resource_type=self._str(resource.getType()),
-                email=self._str(resource.getEmailAddress()),
-                standard_rate=self._to_float(resource.getStandardRate()),
-                overtime_rate=self._to_float(resource.getOvertimeRate()),
-            ))
+            resources.append(
+                ParsedResource(
+                    unique_id=uid,
+                    name=name,
+                    resource_type=self._str(resource.getType()),
+                    email=self._str(resource.getEmailAddress()),
+                    standard_rate=self._to_float(resource.getStandardRate()),
+                    overtime_rate=self._to_float(resource.getOvertimeRate()),
+                )
+            )
 
         return resources
 
@@ -272,13 +294,15 @@ class MPPParser:
             if work_obj is not None:
                 work_val = self._to_float(work_obj.getDuration())
 
-            assignments.append(ParsedAssignment(
-                task_unique_id=int(task.getUniqueID()),
-                resource_unique_id=int(resource.getUniqueID()),
-                work=work_val,
-                units=self._to_float(ra.getUnits()),
-                cost=self._to_float(ra.getCost()) or 0.0,
-            ))
+            assignments.append(
+                ParsedAssignment(
+                    task_unique_id=int(task.getUniqueID()),
+                    resource_unique_id=int(resource.getUniqueID()),
+                    work=work_val,
+                    units=self._to_float(ra.getUnits()),
+                    cost=self._to_float(ra.getCost()) or 0.0,
+                )
+            )
 
         return assignments
 
@@ -302,7 +326,7 @@ class MPPParser:
         try:
             # MPXJ returns java.util.Date or LocalDateTime
             # Convert via epoch millis
-            if hasattr(java_date, 'getTime'):
+            if hasattr(java_date, "getTime"):
                 millis = java_date.getTime()
                 return datetime.utcfromtimestamp(millis / 1000.0)
             # Fallback: parse string representation
@@ -316,9 +340,9 @@ class MPPParser:
         if java_number is None:
             return None
         try:
-            if hasattr(java_number, 'floatValue'):
+            if hasattr(java_number, "floatValue"):
                 return float(java_number.floatValue())
-            if hasattr(java_number, 'doubleValue'):
+            if hasattr(java_number, "doubleValue"):
                 return float(java_number.doubleValue())
             return float(java_number)
         except (ValueError, TypeError):

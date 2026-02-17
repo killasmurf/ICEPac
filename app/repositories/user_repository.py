@@ -21,5 +21,5 @@ class UserRepository(BaseRepository[User]):
         return self.db.scalars(stmt).first()
 
     def get_active_users(self, skip: int = 0, limit: int = 100):
-        stmt = select(User).where(User.is_active == True).offset(skip).limit(limit)
+        stmt = select(User).where(User.is_active.is_(True)).offset(skip).limit(limit)
         return list(self.db.scalars(stmt).all())

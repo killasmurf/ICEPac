@@ -1,10 +1,11 @@
 """
 Tests for the help service.
 """
-import pytest
 from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
+
+import pytest
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.services.help_service import HelpService
 
@@ -20,8 +21,11 @@ class TestHelpService:
     @pytest.fixture
     def help_service(self, mock_db):
         """Create a HelpService instance with mocked repos."""
-        with patch('app.services.help_service.HelpCategoryRepository') as mock_cat_repo, \
-             patch('app.services.help_service.HelpTopicRepository') as mock_topic_repo:
+        with patch(
+            "app.services.help_service.HelpCategoryRepository"
+        ) as mock_cat_repo, patch(
+            "app.services.help_service.HelpTopicRepository"
+        ) as mock_topic_repo:
             service = HelpService(mock_db)
             service._mock_cat_repo = mock_cat_repo.return_value
             service._mock_topic_repo = mock_topic_repo.return_value

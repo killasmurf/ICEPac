@@ -1,19 +1,17 @@
 """Configuration table service for generic CRUD operations."""
-from typing import Type, Optional, List, Any
+from typing import Any, List, Optional, Type
 
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
 
 from app.core.database import Base
-from app.models.database.config_tables import (
-    CONFIG_MODELS, WEIGHTED_CONFIG_MODELS, ALL_CONFIG_MODELS
-)
+from app.models.database.config_tables import ALL_CONFIG_MODELS, WEIGHTED_CONFIG_MODELS
 
 
 class ConfigService:
     """Generic service for configuration table CRUD operations.
-    
+
     Provides a reusable service that works with any config table model.
     """
 
@@ -31,7 +29,7 @@ class ConfigService:
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model.__name__} with ID {item_id} not found"
+                detail=f"{self.model.__name__} with ID {item_id} not found",
             )
         return item
 
@@ -49,7 +47,7 @@ class ConfigService:
         """Get all active config items."""
         stmt = (
             select(self.model)
-            .where(self.model.is_active == True)
+            .where(self.model.is_active.is_(True))
             .order_by(self.model.code)
         )
         return list(self.db.scalars(stmt).all())
@@ -70,7 +68,10 @@ class ConfigService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"{self.model.__name__} with code '{data['code']}' already exists"
+                detail=(
+                    f"{self.model.__name__} with code "
+                    f"'{data['code']}' already exists"
+                ),
             )
 
         db_obj = self.model(**data)
@@ -82,7 +83,7 @@ class ConfigService:
     def update(self, item_id: int, data: dict) -> Any:
         """Update an existing config item."""
         item = self.get_or_404(item_id)
-        
+
         # Ensure code is uppercase if being updated
         if "code" in data and data["code"] is not None:
             data["code"] = data["code"].upper().strip()
@@ -92,7 +93,10 @@ class ConfigService:
                 if existing:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
-                        detail=f"{self.model.__name__} with code '{data['code']}' already exists"
+                        detail=(
+                            f"{self.model.__name__} with code "
+                            f"'{data['code']}' already exists"
+                        ),
                     )
 
         for field, value in data.items():
@@ -129,14 +133,14 @@ class ConfigService:
 
 def get_config_service(table_name: str, db: Session) -> ConfigService:
     """Factory function to get a ConfigService for a specific table.
-    
+
     Args:
         table_name: The URL-friendly table name (e.g., 'cost-types')
         db: Database session
-        
+
     Returns:
         ConfigService instance for the specified table
-        
+
     Raises:
         HTTPException: If table name is not recognized
     """
@@ -145,7 +149,7 @@ def get_config_service(table_name: str, db: Session) -> ConfigService:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown configuration table: '{table_name}'. "
-                   f"Valid tables: {list(ALL_CONFIG_MODELS.keys())}"
+            f"Valid tables: {list(ALL_CONFIG_MODELS.keys())}",
         )
     return ConfigService(model, db)
 

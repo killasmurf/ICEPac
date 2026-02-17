@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import create_access_token, create_refresh_token, decode_token
-from app.models.schemas.auth import TokenResponse, TokenRefreshRequest
+from app.models.schemas.auth import TokenRefreshRequest, TokenResponse
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/auth")
@@ -26,7 +26,9 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value}
+    )
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
@@ -39,14 +41,21 @@ async def refresh_token(
     """Refresh access token using a valid refresh token."""
     payload = decode_token(body.refresh_token)
     if payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     user_id = payload.get("sub")
     service = UserService(db)
     user = service.get(int(user_id))
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
 
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value}
+    )
     new_refresh_token = create_refresh_token(data={"sub": str(user.id)})
     return TokenResponse(access_token=access_token, refresh_token=new_refresh_token)

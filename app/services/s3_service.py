@@ -1,9 +1,11 @@
-import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
-from typing import Optional, BinaryIO
-from uuid import UUID
 import logging
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,10 +22,12 @@ class S3Service:
         session_kwargs = {"region_name": self.region}
 
         if settings.aws_access_key_id and settings.aws_secret_access_key:
-            session_kwargs.update({
-                "aws_access_key_id": settings.aws_access_key_id,
-                "aws_secret_access_key": settings.aws_secret_access_key
-            })
+            session_kwargs.update(
+                {
+                    "aws_access_key_id": settings.aws_access_key_id,
+                    "aws_secret_access_key": settings.aws_secret_access_key,
+                }
+            )
 
         self.s3_client = boto3.client("s3", **session_kwargs)
 
@@ -40,7 +44,7 @@ class S3Service:
         self,
         file_content: bytes,
         s3_key: str,
-        content_type: str = "application/octet-stream"
+        content_type: str = "application/octet-stream",
     ) -> bool:
         """
         Upload a file to S3
@@ -59,7 +63,7 @@ class S3Service:
                 Key=s3_key,
                 Body=file_content,
                 ContentType=content_type,
-                ServerSideEncryption="AES256"
+                ServerSideEncryption="AES256",
             )
             logger.info(f"Successfully uploaded file to S3: {s3_key}")
             return True
@@ -87,10 +91,7 @@ class S3Service:
             File content as bytes if successful, None otherwise
         """
         try:
-            response = self.s3_client.get_object(
-                Bucket=self.bucket_name,
-                Key=s3_key
-            )
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=s3_key)
             content = response["Body"].read()
             logger.info(f"Successfully downloaded file from S3: {s3_key}")
             return content
@@ -117,10 +118,7 @@ class S3Service:
             True if deletion successful, False otherwise
         """
         try:
-            self.s3_client.delete_object(
-                Bucket=self.bucket_name,
-                Key=s3_key
-            )
+            self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
             logger.info(f"Successfully deleted file from S3: {s3_key}")
             return True
 
@@ -133,9 +131,7 @@ class S3Service:
             return False
 
     async def generate_presigned_url(
-        self,
-        s3_key: str,
-        expiration: int = 3600
+        self, s3_key: str, expiration: int = 3600
     ) -> Optional[str]:
         """
         Generate a presigned URL for temporary file access
@@ -150,11 +146,8 @@ class S3Service:
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
-                Params={
-                    "Bucket": self.bucket_name,
-                    "Key": s3_key
-                },
-                ExpiresIn=expiration
+                Params={"Bucket": self.bucket_name, "Key": s3_key},
+                ExpiresIn=expiration,
             )
             logger.info(f"Generated presigned URL for: {s3_key}")
             return url

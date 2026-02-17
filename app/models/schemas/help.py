@@ -1,10 +1,11 @@
 """Help system schemas."""
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
-
 # --- HelpDescription schemas ---
+
 
 class HelpDescriptionResponse(BaseModel):
     id: int
@@ -17,6 +18,7 @@ class HelpDescriptionResponse(BaseModel):
 
 
 # --- HelpCategory schemas ---
+
 
 class HelpCategoryBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -43,6 +45,7 @@ class HelpCategoryResponse(HelpCategoryBase):
 
 
 # --- HelpTopic schemas ---
+
 
 class HelpTopicBase(BaseModel):
     category_id: int

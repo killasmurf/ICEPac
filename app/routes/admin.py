@@ -4,30 +4,41 @@ All admin routes require authentication and appropriate role permissions.
 """
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, Request, HTTPException, Body
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_any_role
-from app.models.schemas.user import (
-    UserCreate, UserUpdate, UserPasswordUpdate, UserResponse, UserListResponse,
+from app.models.schemas.audit_log import AuditLogListResponse, AuditLogResponse
+from app.models.schemas.config import (
+    CONFIG_TABLE_INFO,
+    ConfigItemListResponse,
+    ConfigItemResponse,
+    WeightedConfigItemResponse,
 )
 from app.models.schemas.resource import (
-    ResourceCreate, ResourceUpdate, ResourceResponse, ResourceListResponse,
-    SupplierCreate, SupplierUpdate, SupplierResponse, SupplierListResponse,
+    ResourceCreate,
+    ResourceListResponse,
+    ResourceResponse,
+    ResourceUpdate,
+    SupplierCreate,
+    SupplierListResponse,
+    SupplierResponse,
+    SupplierUpdate,
 )
-from app.models.schemas.config import (
-    ConfigItemCreate, ConfigItemUpdate, ConfigItemResponse, ConfigItemListResponse,
-    WeightedConfigItemCreate, WeightedConfigItemUpdate,
-    WeightedConfigItemResponse, WeightedConfigItemListResponse,
-    CONFIG_TABLE_INFO,
+from app.models.schemas.user import (
+    UserCreate,
+    UserListResponse,
+    UserPasswordUpdate,
+    UserResponse,
+    UserUpdate,
 )
-from app.models.schemas.audit_log import AuditLogResponse, AuditLogListResponse
-from app.services.user_service import UserService
+from app.services.audit_service import AuditService, serialize_for_audit
+from app.services.config_service import get_config_service, is_weighted_table
 from app.services.resource_service import ResourceService
 from app.services.supplier_service import SupplierService
-from app.services.config_service import get_config_service, is_weighted_table
-from app.services.audit_service import AuditService, serialize_for_audit
+from app.services.user_service import UserService
 
 router = APIRouter(
     prefix="/admin",
@@ -39,6 +50,7 @@ router = APIRouter(
 # ============================================================
 # User Management
 # ============================================================
+
 
 @router.get("/users", response_model=UserListResponse)
 async def list_users(
@@ -75,9 +87,11 @@ async def create_user(
     """Create a new user."""
     service = UserService(db)
     user = service.create(user_in)
-    
+
     audit = AuditService(db)
-    audit.log_create("User", user.id, serialize_for_audit(user), current_user.id, request)
+    audit.log_create(
+        "User", user.id, serialize_for_audit(user), current_user.id, request
+    )
     return user
 
 
@@ -94,9 +108,11 @@ async def update_user(
     old_user = service.get_or_404(user_id)
     old_values = serialize_for_audit(old_user)
     user = service.update(user_id, user_in)
-    
+
     audit = AuditService(db)
-    audit.log_update("User", user.id, old_values, serialize_for_audit(user), current_user.id, request)
+    audit.log_update(
+        "User", user.id, old_values, serialize_for_audit(user), current_user.id, request
+    )
     return user
 
 
@@ -111,7 +127,7 @@ async def update_password(
     """Change user password."""
     service = UserService(db)
     service.update_password(user_id, password_in)
-    
+
     audit = AuditService(db)
     audit.log_password_change(user_id, request)
     return {"detail": "Password updated"}
@@ -129,7 +145,7 @@ async def delete_user(
     user = service.get_or_404(user_id)
     old_values = serialize_for_audit(user)
     service.delete(user_id)
-    
+
     audit = AuditService(db)
     audit.log_delete("User", user_id, old_values, current_user.id, request)
 
@@ -137,6 +153,7 @@ async def delete_user(
 # ============================================================
 # Resource Library
 # ============================================================
+
 
 @router.get("/resources", response_model=ResourceListResponse)
 async def list_resources(
@@ -181,9 +198,11 @@ async def create_resource(
     """Create a new resource."""
     service = ResourceService(db)
     resource = service.create(resource_in)
-    
+
     audit = AuditService(db)
-    audit.log_create("Resource", resource.id, serialize_for_audit(resource), current_user.id, request)
+    audit.log_create(
+        "Resource", resource.id, serialize_for_audit(resource), current_user.id, request
+    )
     return resource
 
 
@@ -200,9 +219,16 @@ async def update_resource(
     old = service.get_or_404(resource_id)
     old_values = serialize_for_audit(old)
     resource = service.update(resource_id, resource_in)
-    
+
     audit = AuditService(db)
-    audit.log_update("Resource", resource.id, old_values, serialize_for_audit(resource), current_user.id, request)
+    audit.log_update(
+        "Resource",
+        resource.id,
+        old_values,
+        serialize_for_audit(resource),
+        current_user.id,
+        request,
+    )
     return resource
 
 
@@ -218,7 +244,7 @@ async def delete_resource(
     resource = service.get_or_404(resource_id)
     old_values = serialize_for_audit(resource)
     service.delete(resource_id)
-    
+
     audit = AuditService(db)
     audit.log_delete("Resource", resource_id, old_values, current_user.id, request)
 
@@ -226,6 +252,7 @@ async def delete_resource(
 # ============================================================
 # Supplier Management
 # ============================================================
+
 
 @router.get("/suppliers", response_model=SupplierListResponse)
 async def list_suppliers(
@@ -270,9 +297,11 @@ async def create_supplier(
     """Create a new supplier."""
     service = SupplierService(db)
     supplier = service.create(supplier_in)
-    
+
     audit = AuditService(db)
-    audit.log_create("Supplier", supplier.id, serialize_for_audit(supplier), current_user.id, request)
+    audit.log_create(
+        "Supplier", supplier.id, serialize_for_audit(supplier), current_user.id, request
+    )
     return supplier
 
 
@@ -289,9 +318,16 @@ async def update_supplier(
     old = service.get_or_404(supplier_id)
     old_values = serialize_for_audit(old)
     supplier = service.update(supplier_id, supplier_in)
-    
+
     audit = AuditService(db)
-    audit.log_update("Supplier", supplier.id, old_values, serialize_for_audit(supplier), current_user.id, request)
+    audit.log_update(
+        "Supplier",
+        supplier.id,
+        old_values,
+        serialize_for_audit(supplier),
+        current_user.id,
+        request,
+    )
     return supplier
 
 
@@ -307,7 +343,7 @@ async def delete_supplier(
     supplier = service.get_or_404(supplier_id)
     old_values = serialize_for_audit(supplier)
     service.delete(supplier_id)
-    
+
     audit = AuditService(db)
     audit.log_delete("Supplier", supplier_id, old_values, current_user.id, request)
 
@@ -315,6 +351,7 @@ async def delete_supplier(
 # ============================================================
 # Configuration Tables (Generic CRUD)
 # ============================================================
+
 
 @router.get("/config")
 async def list_config_tables(current_user=Depends(get_current_user)):
@@ -361,10 +398,12 @@ async def create_config_item(
     """Create a config item."""
     service = get_config_service(table_name, db)
     item = service.create(item_in)
-    
+
     audit = AuditService(db)
-    audit.log_create(table_name, item.id, serialize_for_audit(item), current_user.id, request)
-    
+    audit.log_create(
+        table_name, item.id, serialize_for_audit(item), current_user.id, request
+    )
+
     if is_weighted_table(table_name):
         return WeightedConfigItemResponse.model_validate(item)
     return ConfigItemResponse.model_validate(item)
@@ -384,10 +423,17 @@ async def update_config_item(
     old = service.get_or_404(item_id)
     old_values = serialize_for_audit(old)
     item = service.update(item_id, item_in)
-    
+
     audit = AuditService(db)
-    audit.log_update(table_name, item.id, old_values, serialize_for_audit(item), current_user.id, request)
-    
+    audit.log_update(
+        table_name,
+        item.id,
+        old_values,
+        serialize_for_audit(item),
+        current_user.id,
+        request,
+    )
+
     if is_weighted_table(table_name):
         return WeightedConfigItemResponse.model_validate(item)
     return ConfigItemResponse.model_validate(item)
@@ -406,7 +452,7 @@ async def delete_config_item(
     item = service.get_or_404(item_id)
     old_values = serialize_for_audit(item)
     service.delete(item_id)
-    
+
     audit = AuditService(db)
     audit.log_delete(table_name, item_id, old_values, current_user.id, request)
 
@@ -414,6 +460,7 @@ async def delete_config_item(
 # ============================================================
 # Audit Logs
 # ============================================================
+
 
 @router.get("/audit-logs", response_model=AuditLogListResponse)
 async def list_audit_logs(
@@ -430,17 +477,28 @@ async def list_audit_logs(
 ):
     """List audit logs with filtering (admin only)."""
     service = AuditService(db)
-    logs = service.get_logs(user_id, action, entity_type, entity_id, start_date, end_date, skip, limit)
-    total = service.count_logs(user_id, action, entity_type, entity_id, start_date, end_date)
-    
+    logs = service.get_logs(
+        user_id, action, entity_type, entity_id, start_date, end_date, skip, limit
+    )
+    total = service.count_logs(
+        user_id, action, entity_type, entity_id, start_date, end_date
+    )
+
     items = [
         AuditLogResponse(
-            id=log.id, user_id=log.user_id,
+            id=log.id,
+            user_id=log.user_id,
             username=log.user.username if log.user else None,
-            action=log.action, entity_type=log.entity_type, entity_id=log.entity_id,
-            old_values=log.old_values, new_values=log.new_values,
-            ip_address=log.ip_address, user_agent=log.user_agent, created_at=log.created_at
-        ) for log in logs
+            action=log.action,
+            entity_type=log.entity_type,
+            entity_id=log.entity_id,
+            old_values=log.old_values,
+            new_values=log.new_values,
+            ip_address=log.ip_address,
+            user_agent=log.user_agent,
+            created_at=log.created_at,
+        )
+        for log in logs
     ]
     return AuditLogListResponse(items=items, total=total, skip=skip, limit=limit)
 
@@ -457,9 +515,15 @@ async def get_audit_log(
     if not log:
         raise HTTPException(status_code=404, detail="Audit log not found")
     return AuditLogResponse(
-        id=log.id, user_id=log.user_id,
+        id=log.id,
+        user_id=log.user_id,
         username=log.user.username if log.user else None,
-        action=log.action, entity_type=log.entity_type, entity_id=log.entity_id,
-        old_values=log.old_values, new_values=log.new_values,
-        ip_address=log.ip_address, user_agent=log.user_agent, created_at=log.created_at
+        action=log.action,
+        entity_type=log.entity_type,
+        entity_id=log.entity_id,
+        old_values=log.old_values,
+        new_values=log.new_values,
+        ip_address=log.ip_address,
+        user_agent=log.user_agent,
+        created_at=log.created_at,
     )

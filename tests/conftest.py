@@ -1,8 +1,9 @@
 """
 Pytest configuration and fixtures for ICEPac tests.
 """
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 
@@ -16,6 +17,7 @@ def anyio_backend():
 def mock_db():
     """Create a mock database session."""
     from sqlalchemy.orm import Session
+
     return MagicMock(spec=Session)
 
 
@@ -34,9 +36,9 @@ def mock_current_user():
 @pytest.fixture
 def client():
     """Create a test client with mocked dependencies."""
-    from app.main import app
     from app.core.database import get_db
     from app.core.security import get_current_user
+    from app.main import app
 
     # Create mocks
     mock_session = MagicMock()
@@ -77,7 +79,7 @@ def sample_mpp_data():
                 "start": "2024-01-01T00:00:00",
                 "finish": "2024-01-05T17:00:00",
                 "percent_complete": 50.0,
-                "notes": "Test task"
+                "notes": "Test task",
             },
             {
                 "id": 2,
@@ -86,34 +88,30 @@ def sample_mpp_data():
                 "start": "2024-01-06T08:00:00",
                 "finish": "2024-01-15T17:00:00",
                 "percent_complete": 0.0,
-                "notes": None
-            }
+                "notes": None,
+            },
         ],
         "resources": [
             {
                 "id": 1,
                 "name": "John Doe",
                 "email_address": "john@example.com",
-                "type": "Work"
+                "type": "Work",
             },
             {
                 "id": 2,
                 "name": "Jane Smith",
                 "email_address": "jane@example.com",
-                "type": "Work"
-            }
-        ]
+                "type": "Work",
+            },
+        ],
     }
 
 
 @pytest.fixture
 def sample_project_create():
     """Sample project creation data."""
-    return {
-        "name": "Test Project",
-        "description": "A test project",
-        "code": "TEST-001"
-    }
+    return {"name": "Test Project", "description": "A test project", "code": "TEST-001"}
 
 
 @pytest.fixture
@@ -124,7 +122,7 @@ def sample_user_create():
         "username": "newuser",
         "password": "securepassword123",
         "first_name": "New",
-        "last_name": "User"
+        "last_name": "User",
     }
 
 
@@ -135,5 +133,5 @@ def sample_resource_create():
         "name": "Test Resource",
         "resource_type": "Labor",
         "rate": 75.00,
-        "rate_unit": "hour"
+        "rate_unit": "hour",
     }

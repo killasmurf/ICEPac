@@ -2,21 +2,24 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
 
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================
 # Standard Config Item Schemas (code + description)
 # ============================================================
 
+
 class ConfigItemBase(BaseModel):
     """Base schema for simple configuration items."""
+
     code: str = Field(..., min_length=1, max_length=50)
     description: str = Field(..., min_length=1, max_length=255)
 
 
 class ConfigItemCreate(ConfigItemBase):
     """Schema for creating a config item."""
+
     is_active: bool = True
 
     @field_validator("code")
@@ -28,6 +31,7 @@ class ConfigItemCreate(ConfigItemBase):
 
 class ConfigItemUpdate(BaseModel):
     """Schema for updating a config item (all fields optional)."""
+
     code: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, min_length=1, max_length=255)
     is_active: Optional[bool] = None
@@ -43,6 +47,7 @@ class ConfigItemUpdate(BaseModel):
 
 class ConfigItemResponse(ConfigItemBase):
     """Schema for config item API response."""
+
     id: int
     is_active: bool
     created_at: datetime
@@ -52,6 +57,7 @@ class ConfigItemResponse(ConfigItemBase):
 
 class ConfigItemListResponse(BaseModel):
     """List of configuration items."""
+
     items: list[ConfigItemResponse]
     total: int
 
@@ -60,8 +66,10 @@ class ConfigItemListResponse(BaseModel):
 # Weighted Config Item Schemas (code + description + weight)
 # ============================================================
 
+
 class WeightedConfigItemBase(BaseModel):
     """Base schema for weighted configuration items (probability, severity, etc.)."""
+
     code: str = Field(..., min_length=1, max_length=50)
     description: str = Field(..., min_length=1, max_length=255)
     weight: Decimal = Field(..., ge=0, le=100)
@@ -69,6 +77,7 @@ class WeightedConfigItemBase(BaseModel):
 
 class WeightedConfigItemCreate(WeightedConfigItemBase):
     """Schema for creating a weighted config item."""
+
     is_active: bool = True
 
     @field_validator("code")
@@ -80,6 +89,7 @@ class WeightedConfigItemCreate(WeightedConfigItemBase):
 
 class WeightedConfigItemUpdate(BaseModel):
     """Schema for updating a weighted config item (all fields optional)."""
+
     code: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, min_length=1, max_length=255)
     weight: Optional[Decimal] = Field(None, ge=0, le=100)
@@ -96,6 +106,7 @@ class WeightedConfigItemUpdate(BaseModel):
 
 class WeightedConfigItemResponse(WeightedConfigItemBase):
     """Schema for weighted config item API response."""
+
     id: int
     is_active: bool
     created_at: datetime
@@ -105,6 +116,7 @@ class WeightedConfigItemResponse(WeightedConfigItemBase):
 
 class WeightedConfigItemListResponse(BaseModel):
     """List of weighted configuration items."""
+
     items: list[WeightedConfigItemResponse]
     total: int
 

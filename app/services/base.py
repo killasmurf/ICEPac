@@ -1,5 +1,5 @@
 """Base service class."""
-from typing import Generic, TypeVar, Type, Optional, List
+from typing import Generic, List, Optional, Type, TypeVar
 
 from sqlalchemy.orm import Session
 

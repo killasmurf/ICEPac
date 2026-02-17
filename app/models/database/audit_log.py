@@ -1,6 +1,7 @@
 """Audit log database model for tracking all system changes."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -8,7 +9,7 @@ from app.core.database import Base
 
 class AuditLog(Base):
     """Audit log model for tracking system changes.
-    
+
     Records all CREATE, UPDATE, DELETE operations along with
     user authentication events (LOGIN, LOGOUT, FAILED_LOGIN).
     """
@@ -39,6 +40,7 @@ class AuditLog(Base):
 # Action constants
 class AuditAction:
     """Constants for audit log actions."""
+
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
