@@ -1,7 +1,8 @@
 """Base repository with common CRUD operations."""
-from typing import Generic, TypeVar, Type, Optional, List, Any
+from typing import Generic, List, Optional, Type, TypeVar
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
 
 from app.core.database import Base
 

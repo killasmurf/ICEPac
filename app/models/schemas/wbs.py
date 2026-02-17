@@ -1,11 +1,13 @@
 """WBS (Work Breakdown Structure) schemas."""
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel
 
 
 class WBSResponse(BaseModel):
     """Flat WBS item response."""
+
     id: int
     project_id: int
     task_unique_id: Optional[int] = None
@@ -50,11 +52,13 @@ class WBSResponse(BaseModel):
 
 class WBSTreeNode(WBSResponse):
     """WBS item with nested children for tree display."""
+
     children: list["WBSTreeNode"] = []
 
 
 class WBSListResponse(BaseModel):
     """Flat paginated WBS list."""
+
     items: list[WBSResponse]
     total: int
     skip: int
@@ -63,5 +67,6 @@ class WBSListResponse(BaseModel):
 
 class WBSTreeResponse(BaseModel):
     """Hierarchical WBS tree."""
+
     items: list[WBSTreeNode]
     total: int

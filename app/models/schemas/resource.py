@@ -2,15 +2,17 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
 
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================
 # Resource Schemas
 # ============================================================
 
+
 class ResourceBase(BaseModel):
     """Base resource schema."""
+
     resource_code: str = Field(..., min_length=1, max_length=50)
     description: str = Field(..., min_length=1, max_length=500)
     eoc: Optional[str] = Field(None, max_length=50)  # Element of Cost
@@ -20,6 +22,7 @@ class ResourceBase(BaseModel):
 
 class ResourceCreate(ResourceBase):
     """Schema for creating a resource."""
+
     is_active: bool = True
 
     @field_validator("resource_code")
@@ -31,6 +34,7 @@ class ResourceCreate(ResourceBase):
 
 class ResourceUpdate(BaseModel):
     """Schema for updating a resource (all fields optional)."""
+
     resource_code: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, min_length=1, max_length=500)
     eoc: Optional[str] = Field(None, max_length=50)
@@ -49,6 +53,7 @@ class ResourceUpdate(BaseModel):
 
 class ResourceResponse(ResourceBase):
     """Schema for resource API response."""
+
     id: int
     is_active: bool
     created_at: datetime
@@ -59,6 +64,7 @@ class ResourceResponse(ResourceBase):
 
 class ResourceListResponse(BaseModel):
     """Paginated list of resources."""
+
     items: list[ResourceResponse]
     total: int
     skip: int
@@ -69,8 +75,10 @@ class ResourceListResponse(BaseModel):
 # Supplier Schemas
 # ============================================================
 
+
 class SupplierBase(BaseModel):
     """Base supplier schema."""
+
     supplier_code: str = Field(..., min_length=1, max_length=50)
     name: str = Field(..., min_length=1, max_length=255)
     contact: Optional[str] = Field(None, max_length=255)
@@ -81,6 +89,7 @@ class SupplierBase(BaseModel):
 
 class SupplierCreate(SupplierBase):
     """Schema for creating a supplier."""
+
     is_active: bool = True
 
     @field_validator("supplier_code")
@@ -92,6 +101,7 @@ class SupplierCreate(SupplierBase):
 
 class SupplierUpdate(BaseModel):
     """Schema for updating a supplier (all fields optional)."""
+
     supplier_code: Optional[str] = Field(None, min_length=1, max_length=50)
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     contact: Optional[str] = Field(None, max_length=255)
@@ -111,6 +121,7 @@ class SupplierUpdate(BaseModel):
 
 class SupplierResponse(SupplierBase):
     """Schema for supplier API response."""
+
     id: int
     is_active: bool
     created_at: datetime
@@ -121,6 +132,7 @@ class SupplierResponse(SupplierBase):
 
 class SupplierListResponse(BaseModel):
     """Paginated list of suppliers."""
+
     items: list[SupplierResponse]
     total: int
     skip: int

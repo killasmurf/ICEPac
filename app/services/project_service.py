@@ -1,5 +1,5 @@
 """Project service."""
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -20,7 +20,9 @@ class ProjectService:
     def get_or_404(self, project_id: int) -> Project:
         project = self.repository.get(project_id)
         if not project:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+            )
         return project
 
     def get_multi(self, skip: int = 0, limit: int = 100) -> List[Project]:

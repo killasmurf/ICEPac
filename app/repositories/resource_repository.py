@@ -1,7 +1,8 @@
 """Resource repository for data access operations."""
-from typing import Optional, List
+from typing import List, Optional
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, func
 
 from app.models.database.resource import Resource
 from app.repositories.base import BaseRepository
@@ -22,7 +23,7 @@ class ResourceRepository(BaseRepository[Resource]):
         """Get active resources with pagination."""
         stmt = (
             select(Resource)
-            .where(Resource.is_active == True)
+            .where(Resource.is_active.is_(True))
             .order_by(Resource.resource_code)
             .offset(skip)
             .limit(limit)
@@ -31,7 +32,11 @@ class ResourceRepository(BaseRepository[Resource]):
 
     def count_active(self) -> int:
         """Count active resources."""
-        stmt = select(func.count()).select_from(Resource).where(Resource.is_active == True)
+        stmt = (
+            select(func.count())
+            .select_from(Resource)
+            .where(Resource.is_active.is_(True))
+        )
         return self.db.scalar(stmt) or 0
 
     def search(self, query: str, skip: int = 0, limit: int = 100) -> List[Resource]:

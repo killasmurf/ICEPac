@@ -1,7 +1,7 @@
 """Project repository."""
 from typing import List, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.database.project import Project
@@ -16,7 +16,7 @@ class ProjectRepository(BaseRepository[Project]):
         """Get non-archived projects."""
         stmt = (
             select(Project)
-            .where(Project.archived == False)
+            .where(Project.archived.is_(False))
             .order_by(Project.updated_at.desc())
             .offset(skip)
             .limit(limit)
@@ -25,7 +25,9 @@ class ProjectRepository(BaseRepository[Project]):
 
     def count_active(self) -> int:
         """Count non-archived projects."""
-        stmt = select(func.count()).select_from(Project).where(Project.archived == False)
+        stmt = (
+            select(func.count()).select_from(Project).where(Project.archived.is_(False))
+        )
         return self.db.scalar(stmt) or 0
 
     def search(self, query: str, skip: int = 0, limit: int = 100) -> List[Project]:
@@ -33,7 +35,7 @@ class ProjectRepository(BaseRepository[Project]):
         stmt = (
             select(Project)
             .where(
-                Project.archived == False,
+                Project.archived.is_(False),
                 Project.project_name.ilike(f"%{query}%")
                 | Project.description.ilike(f"%{query}%"),
             )
@@ -49,7 +51,7 @@ class ProjectRepository(BaseRepository[Project]):
             select(func.count())
             .select_from(Project)
             .where(
-                Project.archived == False,
+                Project.archived.is_(False),
                 Project.project_name.ilike(f"%{query}%")
                 | Project.description.ilike(f"%{query}%"),
             )

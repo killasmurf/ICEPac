@@ -1,8 +1,8 @@
+import json
 import logging
 import sys
-from typing import Any
-import json
 from datetime import datetime
+from typing import Any
 
 
 class JSONFormatter(logging.Formatter):
@@ -16,7 +16,7 @@ class JSONFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
         }
 
         # Add exception info if present
@@ -30,10 +30,7 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
-def setup_logging(
-    log_level: str = "INFO",
-    json_format: bool = False
-) -> None:
+def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     """
     Configure application logging
 
@@ -52,7 +49,7 @@ def setup_logging(
     else:
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
     handler.setFormatter(formatter)

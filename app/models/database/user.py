@@ -1,14 +1,17 @@
 """User database model."""
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
-from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Integer, String
 
 from app.core.database import Base
 
 
 class UserRole(str, enum.Enum):
     """User role enumeration."""
+
     ADMIN = "admin"
     MANAGER = "manager"
     USER = "user"
@@ -29,8 +32,13 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
     last_login = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return f"<User(id={self.id}, username='{self.username}', email='{self.email}', role='{self.role}')>"
+        return (
+            f"<User(id={self.id}, username='{self.username}', "
+            f"email='{self.email}', role='{self.role}')>"
+        )

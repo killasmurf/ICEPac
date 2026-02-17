@@ -1,11 +1,13 @@
 """Audit log schemas for API requests and responses."""
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 
 class AuditLogBase(BaseModel):
     """Base audit log schema."""
+
     action: str = Field(..., max_length=50)
     entity_type: str = Field(..., max_length=100)
     entity_id: Optional[int] = None
@@ -17,11 +19,13 @@ class AuditLogBase(BaseModel):
 
 class AuditLogCreate(AuditLogBase):
     """Schema for creating an audit log entry."""
+
     user_id: Optional[int] = None
 
 
 class AuditLogResponse(AuditLogBase):
     """Schema for audit log API response."""
+
     id: int
     user_id: Optional[int] = None
     username: Optional[str] = None  # Populated from relationship
@@ -32,6 +36,7 @@ class AuditLogResponse(AuditLogBase):
 
 class AuditLogListResponse(BaseModel):
     """Paginated list of audit logs."""
+
     items: list[AuditLogResponse]
     total: int
     skip: int
@@ -40,6 +45,7 @@ class AuditLogListResponse(BaseModel):
 
 class AuditLogFilter(BaseModel):
     """Filter parameters for audit log queries."""
+
     user_id: Optional[int] = None
     action: Optional[str] = None
     entity_type: Optional[str] = None

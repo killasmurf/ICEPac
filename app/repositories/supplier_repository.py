@@ -1,7 +1,8 @@
 """Supplier repository for data access operations."""
-from typing import Optional, List
+from typing import List, Optional
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, func
 
 from app.models.database.resource import Supplier
 from app.repositories.base import BaseRepository
@@ -22,7 +23,7 @@ class SupplierRepository(BaseRepository[Supplier]):
         """Get active suppliers with pagination."""
         stmt = (
             select(Supplier)
-            .where(Supplier.is_active == True)
+            .where(Supplier.is_active.is_(True))
             .order_by(Supplier.name)
             .offset(skip)
             .limit(limit)
@@ -31,7 +32,11 @@ class SupplierRepository(BaseRepository[Supplier]):
 
     def count_active(self) -> int:
         """Count active suppliers."""
-        stmt = select(func.count()).select_from(Supplier).where(Supplier.is_active == True)
+        stmt = (
+            select(func.count())
+            .select_from(Supplier)
+            .where(Supplier.is_active.is_(True))
+        )
         return self.db.scalar(stmt) or 0
 
     def search(self, query: str, skip: int = 0, limit: int = 100) -> List[Supplier]:

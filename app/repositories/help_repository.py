@@ -1,10 +1,10 @@
 """Help system repositories."""
 from typing import List, Optional
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.database.help import HelpCategory, HelpTopic, HelpDescription
+from app.models.database.help import HelpCategory, HelpTopic
 from app.repositories.base import BaseRepository
 
 
@@ -16,7 +16,7 @@ class HelpCategoryRepository(BaseRepository[HelpCategory]):
         """Get all active categories ordered by display_order."""
         stmt = (
             select(HelpCategory)
-            .where(HelpCategory.is_active == True)
+            .where(HelpCategory.is_active.is_(True))
             .order_by(HelpCategory.display_order)
         )
         return list(self.db.scalars(stmt).all())
@@ -44,7 +44,7 @@ class HelpTopicRepository(BaseRepository[HelpTopic]):
         stmt = (
             select(HelpTopic)
             .options(joinedload(HelpTopic.descriptions))
-            .where(HelpTopic.is_active == True)
+            .where(HelpTopic.is_active.is_(True))
             .order_by(HelpTopic.display_order)
             .offset(skip)
             .limit(limit)
@@ -53,15 +53,24 @@ class HelpTopicRepository(BaseRepository[HelpTopic]):
 
     def count_active(self) -> int:
         """Count active topics."""
-        stmt = select(func.count()).select_from(HelpTopic).where(HelpTopic.is_active == True)
+        stmt = (
+            select(func.count())
+            .select_from(HelpTopic)
+            .where(HelpTopic.is_active.is_(True))
+        )
         return self.db.scalar(stmt) or 0
 
-    def get_by_category(self, category_id: int, skip: int = 0, limit: int = 100) -> List[HelpTopic]:
+    def get_by_category(
+        self, category_id: int, skip: int = 0, limit: int = 100
+    ) -> List[HelpTopic]:
         """Get active topics for a specific category."""
         stmt = (
             select(HelpTopic)
             .options(joinedload(HelpTopic.descriptions))
-            .where(HelpTopic.category_id == category_id, HelpTopic.is_active == True)
+            .where(
+                HelpTopic.category_id == category_id,
+                HelpTopic.is_active.is_(True),
+            )
             .order_by(HelpTopic.display_order)
             .offset(skip)
             .limit(limit)
@@ -73,7 +82,10 @@ class HelpTopicRepository(BaseRepository[HelpTopic]):
         stmt = (
             select(func.count())
             .select_from(HelpTopic)
-            .where(HelpTopic.category_id == category_id, HelpTopic.is_active == True)
+            .where(
+                HelpTopic.category_id == category_id,
+                HelpTopic.is_active.is_(True),
+            )
         )
         return self.db.scalar(stmt) or 0
 
@@ -82,7 +94,7 @@ class HelpTopicRepository(BaseRepository[HelpTopic]):
         stmt = (
             select(HelpTopic)
             .where(
-                HelpTopic.is_active == True,
+                HelpTopic.is_active.is_(True),
                 or_(
                     HelpTopic.title.ilike(f"%{query}%"),
                     HelpTopic.content.ilike(f"%{query}%"),
@@ -100,7 +112,7 @@ class HelpTopicRepository(BaseRepository[HelpTopic]):
             select(func.count())
             .select_from(HelpTopic)
             .where(
-                HelpTopic.is_active == True,
+                HelpTopic.is_active.is_(True),
                 or_(
                     HelpTopic.title.ilike(f"%{query}%"),
                     HelpTopic.content.ilike(f"%{query}%"),

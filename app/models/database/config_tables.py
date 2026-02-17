@@ -5,17 +5,19 @@ tblEstimatingTechnique, tblRiskCategory, tblProbabilityOccurrence,
 tblSeverityOccurrence, tblExpInd, tblPMBWeight.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, Boolean
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String
 
 from app.core.database import Base
-
 
 # ============================================================
 # Base classes for config tables
 # ============================================================
 
+
 class ConfigTableMixin:
     """Mixin for standard configuration tables."""
+
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(String(255), nullable=False)
@@ -25,6 +27,7 @@ class ConfigTableMixin:
 
 class WeightedConfigTableMixin(ConfigTableMixin):
     """Mixin for weighted configuration tables (probability, severity, etc.)."""
+
     weight = Column(Numeric(5, 2), nullable=False)
 
 
@@ -32,8 +35,10 @@ class WeightedConfigTableMixin(ConfigTableMixin):
 # Standard Configuration Tables
 # ============================================================
 
+
 class CostType(ConfigTableMixin, Base):
     """Cost type classification - maps to legacy tblCostType."""
+
     __tablename__ = "cost_types"
 
     def __repr__(self):
@@ -42,6 +47,7 @@ class CostType(ConfigTableMixin, Base):
 
 class ExpenseType(ConfigTableMixin, Base):
     """Expense type - maps to legacy tblExpType."""
+
     __tablename__ = "expense_types"
 
     def __repr__(self):
@@ -50,6 +56,7 @@ class ExpenseType(ConfigTableMixin, Base):
 
 class Region(ConfigTableMixin, Base):
     """Geographic region - maps to legacy tblRegion."""
+
     __tablename__ = "regions"
 
     def __repr__(self):
@@ -58,6 +65,7 @@ class Region(ConfigTableMixin, Base):
 
 class BusinessArea(ConfigTableMixin, Base):
     """Business area - maps to legacy tblBus_Area."""
+
     __tablename__ = "business_areas"
 
     def __repr__(self):
@@ -66,6 +74,7 @@ class BusinessArea(ConfigTableMixin, Base):
 
 class EstimatingTechnique(ConfigTableMixin, Base):
     """Estimating technique - maps to legacy tblEstimatingTechnique."""
+
     __tablename__ = "estimating_techniques"
 
     def __repr__(self):
@@ -74,6 +83,7 @@ class EstimatingTechnique(ConfigTableMixin, Base):
 
 class RiskCategory(ConfigTableMixin, Base):
     """Risk category - maps to legacy tblRiskCategory."""
+
     __tablename__ = "risk_categories"
 
     def __repr__(self):
@@ -82,6 +92,7 @@ class RiskCategory(ConfigTableMixin, Base):
 
 class ExpenditureIndicator(ConfigTableMixin, Base):
     """Expenditure indicator - maps to legacy tblExpInd."""
+
     __tablename__ = "expenditure_indicators"
 
     def __repr__(self):
@@ -92,8 +103,13 @@ class ExpenditureIndicator(ConfigTableMixin, Base):
 # Weighted Configuration Tables
 # ============================================================
 
+
 class ProbabilityLevel(Base):
-    """Probability level for risk assessment - maps to legacy tblProbabilityOccurrence."""
+    """Probability level for risk assessment.
+
+    Maps to legacy tblProbabilityOccurrence.
+    """
+
     __tablename__ = "probability_levels"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -109,6 +125,7 @@ class ProbabilityLevel(Base):
 
 class SeverityLevel(Base):
     """Severity level for risk assessment - maps to legacy tblSeverityOccurrence."""
+
     __tablename__ = "severity_levels"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -124,6 +141,7 @@ class SeverityLevel(Base):
 
 class PMBWeight(Base):
     """Project Management Baseline weight - maps to legacy tblPMBWeight."""
+
     __tablename__ = "pmb_weights"
 
     id = Column(Integer, primary_key=True, index=True)

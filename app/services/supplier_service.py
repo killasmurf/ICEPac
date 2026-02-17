@@ -1,5 +1,5 @@
 """Supplier service with business logic."""
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ class SupplierService:
         if not supplier:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Supplier with ID {supplier_id} not found"
+                detail=f"Supplier with ID {supplier_id} not found",
             )
         return supplier
 
@@ -65,7 +65,10 @@ class SupplierService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Supplier with code '{supplier_in.supplier_code}' already exists"
+                detail=(
+                    f"Supplier with code "
+                    f"'{supplier_in.supplier_code}' already exists"
+                ),
             )
 
         data = supplier_in.model_dump()
@@ -77,12 +80,18 @@ class SupplierService:
         update_data = supplier_in.model_dump(exclude_unset=True)
 
         # Check for duplicate code if changing
-        if "supplier_code" in update_data and update_data["supplier_code"] != supplier.supplier_code:
+        if (
+            "supplier_code" in update_data
+            and update_data["supplier_code"] != supplier.supplier_code
+        ):
             existing = self.repository.get_by_code(update_data["supplier_code"])
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Supplier with code '{update_data['supplier_code']}' already exists"
+                    detail=(
+                        f"Supplier with code "
+                        f"'{update_data['supplier_code']}' already exists"
+                    ),
                 )
 
         return self.repository.update(supplier, update_data)

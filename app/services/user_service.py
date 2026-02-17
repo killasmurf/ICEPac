@@ -1,13 +1,13 @@
 """User service with business logic."""
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password
 from app.models.database.user import User
-from app.models.schemas.user import UserCreate, UserUpdate, UserPasswordUpdate
+from app.models.schemas.user import UserCreate, UserPasswordUpdate, UserUpdate
 from app.repositories.user_repository import UserRepository
 
 
@@ -22,7 +22,9 @@ class UserService:
     def get_or_404(self, user_id: int) -> User:
         user = self.repository.get(user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
         return user
 
     def get_by_username(self, username: str) -> Optional[User]:
@@ -37,9 +39,13 @@ class UserService:
     def create(self, user_in: UserCreate) -> User:
         # Check for duplicates
         if self.repository.get_by_email(user_in.email):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            )
         if self.repository.get_by_username(user_in.username):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Username already taken"
+            )
 
         user_data = user_in.model_dump(exclude={"password"})
         user_data["hashed_password"] = get_password_hash(user_in.password)
@@ -52,18 +58,31 @@ class UserService:
         # Check uniqueness if email/username changing
         if "email" in update_data and update_data["email"] != user.email:
             if self.repository.get_by_email(update_data["email"]):
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Email already registered",
+                )
         if "username" in update_data and update_data["username"] != user.username:
             if self.repository.get_by_username(update_data["username"]):
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Username already taken",
+                )
 
         return self.repository.update(user, update_data)
 
-    def update_password(self, user_id: int, password_update: UserPasswordUpdate) -> User:
+    def update_password(
+        self, user_id: int, password_update: UserPasswordUpdate
+    ) -> User:
         user = self.get_or_404(user_id)
         if not verify_password(password_update.current_password, user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect current password")
-        return self.repository.update(user, {"hashed_password": get_password_hash(password_update.new_password)})
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect current password",
+            )
+        return self.repository.update(
+            user, {"hashed_password": get_password_hash(password_update.new_password)}
+        )
 
     def delete(self, user_id: int) -> bool:
         self.get_or_404(user_id)

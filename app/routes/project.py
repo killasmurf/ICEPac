@@ -1,19 +1,24 @@
 """Project routes."""
-from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_any_role
-from app.models.schemas.project import (
-    ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse,
-)
 from app.models.schemas.import_job import (
-    ImportJobResponse, ImportJobListResponse, ImportStartResponse,
+    ImportJobListResponse,
+    ImportJobResponse,
+    ImportStartResponse,
 )
-from app.models.schemas.wbs import WBSListResponse, WBSTreeResponse, WBSTreeNode, WBSResponse
-from app.services.project_service import ProjectService
-from app.services.import_service import ImportService
+from app.models.schemas.project import (
+    ProjectCreate,
+    ProjectListResponse,
+    ProjectResponse,
+    ProjectUpdate,
+)
+from app.models.schemas.wbs import WBSListResponse, WBSTreeNode, WBSTreeResponse
 from app.repositories.wbs_repository import WBSRepository
+from app.services.import_service import ImportService
+from app.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects")
 
@@ -21,6 +26,7 @@ router = APIRouter(prefix="/projects")
 # ============================================================
 # Project CRUD
 # ============================================================
+
 
 @router.get("", response_model=ProjectListResponse)
 async def list_projects(
@@ -90,7 +96,10 @@ async def delete_project(
 # Import endpoints
 # ============================================================
 
-@router.post("/{project_id}/import", response_model=ImportStartResponse, status_code=202)
+
+@router.post(
+    "/{project_id}/import", response_model=ImportStartResponse, status_code=202
+)
 async def import_project_file(
     project_id: int,
     file: UploadFile = File(...),
@@ -137,6 +146,7 @@ async def get_import_status(
 # ============================================================
 # WBS endpoints
 # ============================================================
+
 
 @router.get("/{project_id}/wbs", response_model=WBSListResponse)
 async def list_wbs(
@@ -191,6 +201,7 @@ async def get_wbs_tree(
 # ============================================================
 # Legacy upload endpoint (kept for backward compatibility)
 # ============================================================
+
 
 @router.post("/upload")
 async def upload_project_file(

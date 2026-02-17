@@ -1,10 +1,11 @@
 """
 Tests for the config service.
 """
-import pytest
 from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
+
+import pytest
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.services.config_service import ConfigService
 
@@ -60,7 +61,7 @@ class TestConfigService:
 
         assert exc_info.value.status_code == 404
 
-    @patch('app.services.config_service.select')
+    @patch("app.services.config_service.select")
     def test_get_by_code(self, mock_select, config_service, mock_db):
         """Test getting an item by code."""
         mock_item = MagicMock()
@@ -71,7 +72,7 @@ class TestConfigService:
 
         assert result == mock_item
 
-    @patch('app.services.config_service.select')
+    @patch("app.services.config_service.select")
     def test_get_all(self, mock_select, config_service, mock_db):
         """Test getting all items."""
         mock_items = [MagicMock() for _ in range(3)]
@@ -81,7 +82,7 @@ class TestConfigService:
 
         assert len(result) == 3
 
-    @patch('app.services.config_service.select')
+    @patch("app.services.config_service.select")
     def test_get_active(self, mock_select, config_service, mock_db):
         """Test getting only active items."""
         mock_items = [MagicMock() for _ in range(2)]
@@ -91,8 +92,8 @@ class TestConfigService:
 
         assert len(result) == 2
 
-    @patch('app.services.config_service.select')
-    @patch('app.services.config_service.func')
+    @patch("app.services.config_service.select")
+    @patch("app.services.config_service.func")
     def test_count(self, mock_func, mock_select, config_service, mock_db):
         """Test counting items."""
         mock_db.scalar.return_value = 5
@@ -101,17 +102,17 @@ class TestConfigService:
 
         assert result == 5
 
-    @patch('app.services.config_service.select')
+    @patch("app.services.config_service.select")
     def test_create(self, mock_select, config_service, mock_db):
         """Test creating an item."""
         mock_db.scalar.return_value = None  # No existing item with same code
 
-        result = config_service.create({"code": "NEW", "description": "New Item"})
+        config_service.create({"code": "NEW", "description": "New Item"})
 
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    @patch('app.services.config_service.select')
+    @patch("app.services.config_service.select")
     def test_create_duplicate_code_raises(self, mock_select, config_service, mock_db):
         """Test that creating with duplicate code raises error."""
         existing = MagicMock()

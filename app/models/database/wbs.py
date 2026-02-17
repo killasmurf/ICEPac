@@ -1,6 +1,17 @@
 """Work Breakdown Structure database model."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Numeric, Float, Boolean, ForeignKey
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -63,14 +74,22 @@ class WBS(Base):
     estimate_revision = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Relationships
     project = relationship("Project", back_populates="wbs_items")
     parent = relationship("WBS", remote_side=[id], back_populates="children")
-    children = relationship("WBS", back_populates="parent", cascade="all, delete-orphan")
-    assignments = relationship("ResourceAssignment", back_populates="wbs_item", cascade="all, delete-orphan")
-    risks = relationship("Risk", back_populates="wbs_item", cascade="all, delete-orphan")
+    children = relationship(
+        "WBS", back_populates="parent", cascade="all, delete-orphan"
+    )
+    assignments = relationship(
+        "ResourceAssignment", back_populates="wbs_item", cascade="all, delete-orphan"
+    )
+    risks = relationship(
+        "Risk", back_populates="wbs_item", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<WBS(id={self.id}, code='{self.wbs_code}', title='{self.wbs_title}')>"

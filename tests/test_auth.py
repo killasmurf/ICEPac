@@ -1,8 +1,9 @@
 """
 Tests for authentication endpoints.
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -27,6 +28,7 @@ class TestAuthEndpoints:
     def client(self):
         """Create a test client."""
         from app.main import app
+
         return TestClient(app)
 
     def test_health_endpoint(self, client):
@@ -44,8 +46,8 @@ class TestAuthEndpoints:
         assert "app" in data
         assert "version" in data
 
-    @patch('app.routes.auth.UserService')
-    @patch('app.routes.auth.create_access_token')
+    @patch("app.routes.auth.UserService")
+    @patch("app.routes.auth.create_access_token")
     def test_login_success(self, mock_token, mock_user_service, client, mock_user):
         """Test successful login."""
         mock_service = MagicMock()
@@ -55,13 +57,13 @@ class TestAuthEndpoints:
 
         response = client.post(
             "/api/v1/auth/login",
-            data={"username": "test@example.com", "password": "password123"}
+            data={"username": "test@example.com", "password": "password123"},
         )
 
         # Even if auth fails due to mocking issues, test the endpoint exists
         assert response.status_code in [200, 401, 422]
 
-    @patch('app.routes.auth.UserService')
+    @patch("app.routes.auth.UserService")
     def test_login_invalid_credentials(self, mock_user_service, client):
         """Test login with invalid credentials."""
         mock_service = MagicMock()
@@ -70,7 +72,7 @@ class TestAuthEndpoints:
 
         response = client.post(
             "/api/v1/auth/login",
-            data={"username": "wrong@example.com", "password": "wrongpassword"}
+            data={"username": "wrong@example.com", "password": "wrongpassword"},
         )
 
         # Should return 401 unauthorized

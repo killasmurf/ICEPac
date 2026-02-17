@@ -1,6 +1,5 @@
 """Global error handling middleware."""
 import logging
-import traceback
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse

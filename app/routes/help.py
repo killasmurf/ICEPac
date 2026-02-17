@@ -5,9 +5,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import require_any_role
 from app.models.schemas.help import (
-    HelpCategoryCreate, HelpCategoryUpdate, HelpCategoryResponse,
-    HelpTopicCreate, HelpTopicUpdate, HelpTopicResponse, HelpTopicListResponse,
-    HelpSearchResult,
+    HelpCategoryCreate,
+    HelpCategoryResponse,
+    HelpCategoryUpdate,
+    HelpTopicCreate,
+    HelpTopicListResponse,
+    HelpTopicResponse,
+    HelpTopicUpdate,
 )
 from app.services.help_service import HelpService
 
@@ -15,6 +19,7 @@ router = APIRouter(prefix="/help")
 
 
 # --- Public endpoints (no auth required) ---
+
 
 @router.get("/topics", response_model=HelpTopicListResponse)
 async def list_topics(
@@ -77,6 +82,7 @@ async def get_category_topics(
 
 
 # --- Admin endpoints (auth required) ---
+
 
 @router.post("/topics", response_model=HelpTopicResponse, status_code=201)
 async def create_topic(

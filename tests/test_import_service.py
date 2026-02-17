@@ -3,14 +3,20 @@ Tests for the import service (app.services.import_service).
 
 Uses mocked S3, parser, and database to test the import lifecycle.
 """
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from app.services.import_service import ImportService
+import pytest
+
 from app.models.database.import_job import ImportJob, ImportStatus
-from app.models.database.project import Project, ProjectStatus, ProjectSourceFormat
-from app.services.mpp_parser import ParsedProject, ParsedTask, ParsedResource, ParsedAssignment
+from app.models.database.project import Project, ProjectStatus
+from app.services.import_service import ImportService
+from app.services.mpp_parser import (
+    ParsedAssignment,
+    ParsedProject,
+    ParsedResource,
+    ParsedTask,
+)
 
 
 class TestImportServiceProcessImport:
@@ -24,9 +30,13 @@ class TestImportServiceProcessImport:
 
     @pytest.fixture
     def service(self, mock_db):
-        with patch("app.services.import_service.ImportJobRepository") as MockImportRepo, \
-             patch("app.services.import_service.WBSRepository") as MockWBSRepo, \
-             patch("app.services.import_service.ProjectRepository") as MockProjectRepo:
+        with patch(
+            "app.services.import_service.ImportJobRepository"
+        ) as MockImportRepo, patch(
+            "app.services.import_service.WBSRepository"
+        ) as MockWBSRepo, patch(
+            "app.services.import_service.ProjectRepository"
+        ) as MockProjectRepo:
             svc = ImportService(mock_db)
             svc.import_repo = MockImportRepo.return_value
             svc.wbs_repo = MockWBSRepo.return_value
@@ -58,13 +68,17 @@ class TestImportServiceProcessImport:
             finish_date=datetime(2024, 12, 31),
             tasks=[
                 ParsedTask(
-                    unique_id=1, name="Summary Task",
-                    wbs_code="1", outline_level=0,
+                    unique_id=1,
+                    name="Summary Task",
+                    wbs_code="1",
+                    outline_level=0,
                     is_summary=True,
                 ),
                 ParsedTask(
-                    unique_id=2, name="Child Task",
-                    wbs_code="1.1", outline_level=1,
+                    unique_id=2,
+                    name="Child Task",
+                    wbs_code="1.1",
+                    outline_level=1,
                     parent_unique_id=1,
                     percent_complete=50.0,
                     is_critical=True,
@@ -97,24 +111,31 @@ class TestImportServiceProcessImport:
 
         # Mock WBS creation (flush gives ID)
         wbs_id_counter = [0]
+
         def mock_flush():
             pass
+
         mock_db.flush = mock_flush
 
         # Create mock WBS objects that get IDs after add
-        from app.models.database.wbs import WBS
         mock_wbs_items = []
+
         def mock_add(item):
             wbs_id_counter[0] += 1
             item.id = wbs_id_counter[0]
             mock_wbs_items.append(item)
+
         mock_db.add = mock_add
-        mock_db.get = lambda model, id: next((w for w in mock_wbs_items if w.id == id), None)
+        mock_db.get = lambda model, id: next(
+            (w for w in mock_wbs_items if w.id == id), None
+        )
 
         service.process_import(job.id)
 
         # Verify parser was called
-        mock_parser_instance.parse.assert_called_once_with(b"fake file contents", "test.mpp")
+        mock_parser_instance.parse.assert_called_once_with(
+            b"fake file contents", "test.mpp"
+        )
 
         # Verify old WBS items were deleted
         service.wbs_repo.delete_by_project.assert_called_once_with(1)
@@ -198,9 +219,11 @@ class TestImportServiceStatus:
     @pytest.fixture
     def service(self):
         mock_db = MagicMock()
-        with patch("app.services.import_service.ImportJobRepository") as MockImportRepo, \
-             patch("app.services.import_service.WBSRepository"), \
-             patch("app.services.import_service.ProjectRepository"):
+        with patch(
+            "app.services.import_service.ImportJobRepository"
+        ) as MockImportRepo, patch("app.services.import_service.WBSRepository"), patch(
+            "app.services.import_service.ProjectRepository"
+        ):
             svc = ImportService(mock_db)
             svc.import_repo = MockImportRepo.return_value
             return svc

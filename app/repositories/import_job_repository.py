@@ -1,7 +1,8 @@
 """Import job repository."""
-from typing import Optional, List
+from typing import List, Optional
+
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, desc
 
 from app.models.database.import_job import ImportJob
 from app.repositories.base import BaseRepository

@@ -6,20 +6,20 @@ WBS record creation, and import status tracking.
 """
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import UploadFile, HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.database.import_job import ImportJob, ImportStatus
-from app.models.database.project import Project, ProjectStatus, ProjectSourceFormat
+from app.models.database.project import Project, ProjectSourceFormat, ProjectStatus
 from app.models.database.wbs import WBS
 from app.repositories.import_job_repository import ImportJobRepository
-from app.repositories.wbs_repository import WBSRepository
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.wbs_repository import WBSRepository
 from app.services.mpp_parser import MPPParser, ParsedProject
-from app.utils.validators import validate_file, sanitize_filename, get_content_type
+from app.utils.validators import get_content_type, sanitize_filename, validate_file
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,9 @@ class ImportService:
         # 1. Validate project exists
         project = self.project_repo.get(project_id)
         if not project:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+            )
 
         # 2. Validate file
         file_contents = await file.read()
@@ -67,14 +69,20 @@ class ImportService:
 
         # 3. Determine source format
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        format_map = {"mpp": ProjectSourceFormat.MPP, "mpx": ProjectSourceFormat.MPX, "xml": ProjectSourceFormat.XML}
+        format_map = {
+            "mpp": ProjectSourceFormat.MPP,
+            "mpx": ProjectSourceFormat.MPX,
+            "xml": ProjectSourceFormat.XML,
+        }
         source_format = format_map.get(ext, ProjectSourceFormat.MPP)
 
         # 4. Upload to S3
-        s3_key = f"projects/{project_id}/{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        s3_key = f"projects/{project_id}/{timestamp}_{filename}"
         content_type = get_content_type(filename)
 
         from app.services.s3_service import s3_service
+
         upload_ok = await s3_service.upload_file(file_contents, s3_key, content_type)
         if not upload_ok:
             raise HTTPException(
@@ -83,32 +91,40 @@ class ImportService:
             )
 
         # 5. Update project metadata
-        self.project_repo.update(project, {
-            "source_file": filename,
-            "source_format": source_format,
-            "s3_key": s3_key,
-            "status": ProjectStatus.IMPORTING,
-        })
+        self.project_repo.update(
+            project,
+            {
+                "source_file": filename,
+                "source_format": source_format,
+                "s3_key": s3_key,
+                "status": ProjectStatus.IMPORTING,
+            },
+        )
 
         # 6. Create ImportJob record
-        job = self.import_repo.create({
-            "project_id": project_id,
-            "user_id": user_id,
-            "filename": filename,
-            "s3_key": s3_key,
-            "file_size": file_size,
-            "status": ImportStatus.PENDING,
-            "progress": 0.0,
-        })
+        job = self.import_repo.create(
+            {
+                "project_id": project_id,
+                "user_id": user_id,
+                "filename": filename,
+                "s3_key": s3_key,
+                "file_size": file_size,
+                "status": ImportStatus.PENDING,
+                "progress": 0.0,
+            }
+        )
 
         # 7. Dispatch Celery task
         from app.tasks.mpp_tasks import process_mpp_import
+
         result = process_mpp_import.delay(job.id)
 
         # Store Celery task ID
         self.import_repo.update(job, {"celery_task_id": result.id})
 
-        logger.info("Import started: job=%d, project=%d, file=%s", job.id, project_id, filename)
+        logger.info(
+            "Import started: job=%d, project=%d, file=%s", job.id, project_id, filename
+        )
         return job
 
     # ============================================================
@@ -133,7 +149,9 @@ class ImportService:
 
         try:
             # Update status: started
-            self._update_progress(job, ImportStatus.PARSING, 10, started_at=datetime.utcnow())
+            self._update_progress(
+                job, ImportStatus.PARSING, 10, started_at=datetime.utcnow()
+            )
 
             # Download file from S3
             self._update_progress(job, ImportStatus.PARSING, 15)
@@ -155,19 +173,24 @@ class ImportService:
             self._create_wbs_records(job, project, parsed)
 
             # Update project metadata
-            self.project_repo.update(project, {
-                "status": ProjectStatus.IMPORTED,
-                "start_date": parsed.start_date,
-                "finish_date": parsed.finish_date,
-                "baseline_start": parsed.baseline_start,
-                "baseline_finish": parsed.baseline_finish,
-                "task_count": len(parsed.tasks),
-                "resource_count": len(parsed.resources),
-            })
+            self.project_repo.update(
+                project,
+                {
+                    "status": ProjectStatus.IMPORTED,
+                    "start_date": parsed.start_date,
+                    "finish_date": parsed.finish_date,
+                    "baseline_start": parsed.baseline_start,
+                    "baseline_finish": parsed.baseline_finish,
+                    "task_count": len(parsed.tasks),
+                    "resource_count": len(parsed.resources),
+                },
+            )
 
             # Mark job completed
             self._update_progress(
-                job, ImportStatus.COMPLETED, 100,
+                job,
+                ImportStatus.COMPLETED,
+                100,
                 completed_at=datetime.utcnow(),
                 task_count=len(parsed.tasks),
                 resource_count=len(parsed.resources),
@@ -176,7 +199,10 @@ class ImportService:
 
             logger.info(
                 "Import completed: job=%d, tasks=%d, resources=%d, assignments=%d",
-                job_id, len(parsed.tasks), len(parsed.resources), len(parsed.assignments),
+                job_id,
+                len(parsed.tasks),
+                len(parsed.resources),
+                len(parsed.assignments),
             )
 
         except Exception as e:
@@ -203,6 +229,7 @@ class ImportService:
     def _download_from_s3(self, s3_key: str) -> Optional[bytes]:
         """Synchronous S3 download for Celery worker context."""
         import boto3
+
         try:
             session_kwargs = {"region_name": settings.AWS_REGION}
             if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
@@ -269,7 +296,10 @@ class ImportService:
 
         # Pass 2: Link parents
         for task in parsed.tasks:
-            if task.parent_unique_id is not None and task.parent_unique_id in unique_id_to_db_id:
+            if (
+                task.parent_unique_id is not None
+                and task.parent_unique_id in unique_id_to_db_id
+            ):
                 db_id = unique_id_to_db_id[task.unique_id]
                 parent_db_id = unique_id_to_db_id[task.parent_unique_id]
                 db_item = self.db.get(WBS, db_id)
@@ -292,9 +322,12 @@ class ImportService:
 
     def _fail_job(self, job: ImportJob, error_message: str) -> None:
         """Mark an import job as failed."""
-        self.import_repo.update(job, {
-            "status": ImportStatus.FAILED,
-            "error_message": error_message,
-            "completed_at": datetime.utcnow(),
-        })
+        self.import_repo.update(
+            job,
+            {
+                "status": ImportStatus.FAILED,
+                "error_message": error_message,
+                "completed_at": datetime.utcnow(),
+            },
+        )
         logger.error("Import job %d failed: %s", job.id, error_message)

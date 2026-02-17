@@ -1,5 +1,5 @@
 """Resource service with business logic."""
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ class ResourceService:
         if not resource:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Resource with ID {resource_id} not found"
+                detail=f"Resource with ID {resource_id} not found",
             )
         return resource
 
@@ -65,7 +65,10 @@ class ResourceService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Resource with code '{resource_in.resource_code}' already exists"
+                detail=(
+                    f"Resource with code "
+                    f"'{resource_in.resource_code}' already exists"
+                ),
             )
 
         data = resource_in.model_dump()
@@ -77,12 +80,18 @@ class ResourceService:
         update_data = resource_in.model_dump(exclude_unset=True)
 
         # Check for duplicate code if changing
-        if "resource_code" in update_data and update_data["resource_code"] != resource.resource_code:
+        if (
+            "resource_code" in update_data
+            and update_data["resource_code"] != resource.resource_code
+        ):
             existing = self.repository.get_by_code(update_data["resource_code"])
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Resource with code '{update_data['resource_code']}' already exists"
+                    detail=(
+                        f"Resource with code "
+                        f"'{update_data['resource_code']}' already exists"
+                    ),
                 )
 
         return self.repository.update(resource, update_data)

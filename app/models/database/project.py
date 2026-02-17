@@ -1,8 +1,10 @@
 """Project database model."""
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+
+from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -10,6 +12,7 @@ from app.core.database import Base
 
 class ProjectStatus(str, enum.Enum):
     """Project lifecycle status."""
+
     DRAFT = "draft"
     IMPORTING = "importing"
     IMPORTED = "imported"
@@ -20,6 +23,7 @@ class ProjectStatus(str, enum.Enum):
 
 class ProjectSourceFormat(str, enum.Enum):
     """Source file format."""
+
     MPP = "mpp"
     MPX = "mpx"
     XML = "xml"
@@ -37,7 +41,9 @@ class Project(Base):
     description = Column(Text, nullable=True)
     archived = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Source file tracking (Phase 3)
     source_file = Column(String(500), nullable=True)
@@ -60,8 +66,12 @@ class Project(Base):
 
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id])
-    wbs_items = relationship("WBS", back_populates="project", cascade="all, delete-orphan")
-    import_jobs = relationship("ImportJob", back_populates="project", cascade="all, delete-orphan")
+    wbs_items = relationship(
+        "WBS", back_populates="project", cascade="all, delete-orphan"
+    )
+    import_jobs = relationship(
+        "ImportJob", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.project_name}')>"
