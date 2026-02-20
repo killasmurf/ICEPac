@@ -366,7 +366,6 @@ POST   /api/v1/reports/boe
 
 ## Contributing
 
-<<<<<<< HEAD
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Process
@@ -441,6 +440,3 @@ MIT License - see [LICENSE](LICENSE) for details
 - [API Documentation](http://localhost:8000/docs) (when running)
 - [Modernization Plan](MODERNIZATION_PLAN.md)
 - [Executive Summary](EXECUTIVE_SUMMARY.md)
-=======
-Contributions are welcome! Please feel free to submit a Pull Request.
->>>>>>> 5c1a81a3f8c35e2b5304f2886c15a3e97a56b34a

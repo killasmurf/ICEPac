@@ -5,6 +5,65 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.database import Base, get_db
+from app.main import app
+
+# ---------------------------------------------------------------------------
+# Real SQLite engine for integration-style unit tests
+# ---------------------------------------------------------------------------
+
+TEST_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+
+
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(scope="function")
+def db() -> Session:
+    """Fresh SQLite database session for each test."""
+    Base.metadata.create_all(bind=engine)
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def client(db: Session) -> TestClient:
+    """TestClient with real SQLite DB injected via dependency override."""
+
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Async backend
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -13,11 +72,14 @@ def anyio_backend():
     return "asyncio"
 
 
+# ---------------------------------------------------------------------------
+# Mock fixtures (for pure unit tests that don't need a real DB)
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def mock_db():
     """Create a mock database session."""
-    from sqlalchemy.orm import Session
-
     return MagicMock(spec=Session)
 
 
@@ -34,13 +96,10 @@ def mock_current_user():
 
 
 @pytest.fixture
-def client():
-    """Create a test client with mocked dependencies."""
-    from app.core.database import get_db
+def mock_client():
+    """Create a test client with fully mocked dependencies."""
     from app.core.security import get_current_user
-    from app.main import app
 
-    # Create mocks
     mock_session = MagicMock()
     mock_user = MagicMock()
     mock_user.id = 1
@@ -60,6 +119,20 @@ def client():
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Shared data fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sample_tasks():
+    return [
+        {"id": 1, "name": "Design Phase", "start": None, "finish": None},
+        {"id": 2, "name": "Build Phase", "start": None, "finish": None},
+        {"id": 3, "name": "Test Phase", "start": None, "finish": None},
+    ]
 
 
 @pytest.fixture
