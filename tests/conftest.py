@@ -1,107 +1,68 @@
+"""Shared pytest fixtures for the ICEPac test suite."""
 import pytest
-import asyncio
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker, Session
 
+from app.core.database import Base, get_db
 from app.main import app
-from app.database import get_db
-from app.models.project import Base
 
+# ---------------------------------------------------------------------------
+# In-memory SQLite engine for fast, isolated tests
+# ---------------------------------------------------------------------------
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
-TEST_DATABASE_URL = "postgresql+asyncpg://icepac:icepac_dev_password@localhost:5432/icepac_test"
-
-# Create test engine
-test_engine = create_async_engine(
+engine = create_engine(
     TEST_DATABASE_URL,
-    poolclass=NullPool,
-    echo=False
+    connect_args={"check_same_thread": False},
 )
 
-TestSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+# SQLite doesn't enforce FK constraints by default — enable them
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an event loop for the test session"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create a fresh database session for each test"""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with TestSessionLocal() as session:
+def db() -> Session:
+    """Fresh SQLite database session for each test."""
+    Base.metadata.create_all(bind=engine)
+    session = TestingSessionLocal()
+    try:
         yield session
-        await session.rollback()
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="function")
-def client(db_session: AsyncSession):
-    """Create a test client with database session override"""
+def client(db: Session) -> TestClient:
+    """TestClient with DB session injected via dependency override."""
 
-    async def override_get_db():
-        yield db_session
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
 
     app.dependency_overrides[get_db] = override_get_db
-
-    with TestClient(app) as test_client:
-        yield test_client
-
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
     app.dependency_overrides.clear()
 
 
+# ---------------------------------------------------------------------------
+# Shared data fixtures
+# ---------------------------------------------------------------------------
+
 @pytest.fixture
-def sample_mpp_data():
-    """Sample MPP project data for testing"""
-    return {
-        "name": "Test Project",
-        "start_date": "2024-01-01T00:00:00",
-        "finish_date": "2024-12-31T23:59:59",
-        "duration": 365.0,
-        "percent_complete": 25.0,
-        "tasks": [
-            {
-                "id": 1,
-                "name": "Task 1",
-                "duration": 5.0,
-                "start": "2024-01-01T00:00:00",
-                "finish": "2024-01-05T17:00:00",
-                "percent_complete": 50.0,
-                "notes": "Test task"
-            },
-            {
-                "id": 2,
-                "name": "Task 2",
-                "duration": 10.0,
-                "start": "2024-01-06T08:00:00",
-                "finish": "2024-01-15T17:00:00",
-                "percent_complete": 0.0,
-                "notes": None
-            }
-        ],
-        "resources": [
-            {
-                "id": 1,
-                "name": "John Doe",
-                "email_address": "john@example.com",
-                "type": "Work"
-            },
-            {
-                "id": 2,
-                "name": "Jane Smith",
-                "email_address": "jane@example.com",
-                "type": "Work"
-            }
-        ]
-    }
+def sample_tasks():
+    return [
+        {"id": 1, "name": "Design Phase", "start": None, "finish": None},
+        {"id": 2, "name": "Build Phase", "start": None, "finish": None},
+        {"id": 3, "name": "Test Phase", "start": None, "finish": None},
+    ]

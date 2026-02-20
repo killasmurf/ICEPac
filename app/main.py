@@ -115,10 +115,12 @@ async def root():
 
 from app.routes import auth, admin  # noqa: E402
 from app.routes.project import router as project_router  # noqa: E402
+from app.routes.estimation import router as estimation_router  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
 app.include_router(project_router, prefix=settings.API_V1_PREFIX)
+app.include_router(estimation_router, prefix=settings.API_V1_PREFIX)
 
 
 if __name__ == "__main__":
