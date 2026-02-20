@@ -99,82 +99,77 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ):
     """
-    Get current authenticated user.
-
-    This is a dependency that can be used in endpoints to require authentication.
+    Get the currently authenticated user from the database.
 
     Usage:
         @app.get("/me")
         def read_current_user(current_user = Depends(get_current_user)):
             return current_user
     """
+    from app.models.database.user import User
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
-        payload = decode_token(token)
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
+    payload = decode_token(token)  # raises 401 on invalid/expired token
+    user_id: str = payload.get("sub")
+    if user_id is None:
         raise credentials_exception
 
-    # TODO: Fetch user from database
-    # user = get_user_by_id(db, user_id=int(user_id))
-    # if user is None:
-    #     raise credentials_exception
-    # return user
-
-    # For now, return a mock user
-    return {"id": user_id, "username": "test_user"}
+    user = db.get(User, int(user_id))
+    if user is None:
+        raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user account",
+        )
+    return user
 
 
 def require_role(required_role: str):
     """
-    Dependency to require a specific role.
+    Dependency factory that enforces a single required role.
 
     Usage:
-        @app.get("/admin")
-        def admin_only(
-            current_user = Depends(get_current_user),
-            _: None = Depends(require_role("Admin"))
-        ):
-            return {"message": "Welcome, admin!"}
+        @app.get("/admin-only")
+        def admin_only(current_user = Depends(require_role("admin"))):
+            ...
     """
-    async def role_checker(current_user = Depends(get_current_user)):
-        # TODO: Check user role from database
-        # if current_user.role != required_role:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions"
-        #     )
-        pass
+    from app.models.database.user import UserRole
+
+    async def role_checker(current_user=Depends(get_current_user)):
+        if current_user.role != UserRole(required_role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{required_role}' required",
+            )
+        return current_user
 
     return role_checker
 
 
 def require_any_role(*roles: str):
     """
-    Dependency to require any of the specified roles.
+    Dependency factory that enforces at least one of the given roles.
 
     Usage:
-        @app.get("/managers")
-        def managers_only(
-            current_user = Depends(get_current_user),
-            _: None = Depends(require_any_role("Admin", "ProjectManager"))
-        ):
-            return {"message": "Welcome, manager!"}
+        @app.get("/manage")
+        def manage(current_user = Depends(require_any_role("admin", "manager"))):
+            ...
     """
-    async def role_checker(current_user = Depends(get_current_user)):
-        # TODO: Check if user has any of the required roles
-        # if current_user.role not in roles:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions"
-        #     )
-        pass
+    from app.models.database.user import UserRole
+
+    async def role_checker(current_user=Depends(get_current_user)):
+        allowed = {UserRole(r) for r in roles}
+        if current_user.role not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"One of roles {list(roles)} required",
+            )
+        return current_user
 
     return role_checker
