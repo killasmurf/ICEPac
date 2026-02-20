@@ -1,172 +1,301 @@
-"""Estimation service: resource assignments, risks, and PERT summaries."""
-from decimal import Decimal
-from typing import List, Optional
+"""Estimation service - core cost estimation engine."""
+import math
+from typing import List
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.database.assignment import ResourceAssignment
-from app.models.database.risk import Risk
+from app.models.database.config_tables import CostType, Region
+from app.models.database.resource import Resource, Supplier
 from app.models.schemas.estimation import (
-    AssignmentCreate, AssignmentUpdate,
-    ProjectEstimateSummary, RiskCreate, RiskUpdate, WBSEstimateSummary,
+    CostBreakdownItem,
+    ProjectEstimationSummary,
+    SupplierBreakdownItem,
+    WBSCostSummary,
 )
-from app.repositories.assignment_repository import AssignmentRepository, RiskRepository
-from app.repositories.project_repository import ProjectRepository, WBSRepository
+from app.repositories.assignment_repository import AssignmentRepository
+from app.repositories.project_repository import ProjectRepository
+from app.repositories.risk_repository import RiskRepository
+from app.repositories.wbs_repository import WBSRepository
+from app.services.risk_service import RiskService
 
 
 class EstimationService:
+    """Service for computing project cost estimates."""
+
+    # Z-score for 80% confidence interval
+    Z_80 = 1.28
+
     def __init__(self, db: Session):
         self.db = db
-        self.project_repo = ProjectRepository(db)
-        self.wbs_repo = WBSRepository(db)
         self.assignment_repo = AssignmentRepository(db)
         self.risk_repo = RiskRepository(db)
+        self.wbs_repo = WBSRepository(db)
+        self.project_repo = ProjectRepository(db)
+        self.risk_service = RiskService(db)
 
-    # ------------------------------------------------------------------
-    # Guard helpers
-    # ------------------------------------------------------------------
+    def get_wbs_cost_summary(self, wbs_id: int) -> WBSCostSummary:
+        """Compute cost summary for a single WBS item.
 
-    def _require_project(self, project_id: int):
-        if not self.project_repo.get(project_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-    def _require_wbs(self, project_id: int, wbs_id: int):
-        self._require_project(project_id)
+        Includes:
+        - Sum of PERT estimates from assignments
+        - Combined standard deviation
+        - 80% confidence interval
+        - Sum of risk exposures
+        - Risk-adjusted estimate
+        """
         wbs = self.wbs_repo.get(wbs_id)
-        if not wbs or wbs.project_id != project_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="WBS item not found")
-        return wbs
+        if not wbs:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="WBS item not found",
+            )
 
-    def _require_assignment(self, wbs_id: int, assignment_id: int) -> ResourceAssignment:
-        a = self.assignment_repo.get(assignment_id)
-        if not a or a.wbs_id != wbs_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-        return a
+        # Get assignments and compute totals
+        assignments = self.assignment_repo.get_by_wbs(wbs_id)
+        total_pert = sum(a.pert_estimate for a in assignments)
+        variances = [a.std_deviation**2 for a in assignments]
+        total_std = math.sqrt(sum(variances)) if variances else 0.0
 
-    def _require_risk(self, wbs_id: int, risk_id: int) -> Risk:
-        r = self.risk_repo.get(risk_id)
-        if not r or r.wbs_id != wbs_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Risk not found")
-        return r
+        # Compute confidence interval
+        ci_low, ci_high = self._compute_confidence_interval(total_pert, total_std)
 
-    # ------------------------------------------------------------------
-    # Assignments
-    # ------------------------------------------------------------------
+        # Get risks and compute exposure
+        risks = self.risk_repo.get_by_wbs(wbs_id)
+        total_exposure = sum(self.risk_service.compute_risk_exposure(r) for r in risks)
 
-    def list_assignments(self, project_id: int, wbs_id: int) -> List[ResourceAssignment]:
-        self._require_wbs(project_id, wbs_id)
-        return self.assignment_repo.get_by_wbs(wbs_id)
+        return WBSCostSummary(
+            wbs_id=wbs.id,
+            wbs_code=wbs.wbs_code,
+            wbs_title=wbs.wbs_title,
+            assignment_count=len(assignments),
+            total_pert_estimate=total_pert,
+            total_std_deviation=total_std,
+            confidence_80_low=ci_low,
+            confidence_80_high=ci_high,
+            risk_count=len(risks),
+            total_risk_exposure=total_exposure,
+            risk_adjusted_estimate=total_pert + total_exposure,
+            approval_status=wbs.approval_status,
+        )
 
-    def create_assignment(
-        self, project_id: int, wbs_id: int, data: AssignmentCreate
-    ) -> ResourceAssignment:
-        self._require_wbs(project_id, wbs_id)
-        row = data.model_dump()
-        row["wbs_id"] = wbs_id
-        return self.assignment_repo.create(row)
+    def get_project_estimation(self, project_id: int) -> ProjectEstimationSummary:
+        """Compute full project cost estimation with breakdowns.
 
-    def update_assignment(
-        self, project_id: int, wbs_id: int, assignment_id: int, data: AssignmentUpdate
-    ) -> ResourceAssignment:
-        self._require_wbs(project_id, wbs_id)
-        assignment = self._require_assignment(wbs_id, assignment_id)
-        return self.assignment_repo.update(assignment, data.model_dump(exclude_unset=True))
-
-    def delete_assignment(self, project_id: int, wbs_id: int, assignment_id: int) -> None:
-        self._require_wbs(project_id, wbs_id)
-        self._require_assignment(wbs_id, assignment_id)
-        self.assignment_repo.delete(assignment_id)
-
-    # ------------------------------------------------------------------
-    # Risks
-    # ------------------------------------------------------------------
-
-    def list_risks(self, project_id: int, wbs_id: int) -> List[Risk]:
-        self._require_wbs(project_id, wbs_id)
-        return self.risk_repo.get_by_wbs(wbs_id)
-
-    def create_risk(self, project_id: int, wbs_id: int, data: RiskCreate) -> Risk:
-        self._require_wbs(project_id, wbs_id)
-        row = data.model_dump()
-        row["wbs_id"] = wbs_id
-        if row.get("date_identified") is None:
-            from datetime import datetime
-            row["date_identified"] = datetime.utcnow()
-        return self.risk_repo.create(row)
-
-    def update_risk(
-        self, project_id: int, wbs_id: int, risk_id: int, data: RiskUpdate
-    ) -> Risk:
-        self._require_wbs(project_id, wbs_id)
-        risk = self._require_risk(wbs_id, risk_id)
-        return self.risk_repo.update(risk, data.model_dump(exclude_unset=True))
-
-    def delete_risk(self, project_id: int, wbs_id: int, risk_id: int) -> None:
-        self._require_wbs(project_id, wbs_id)
-        self._require_risk(wbs_id, risk_id)
-        self.risk_repo.delete(risk_id)
-
-    # ------------------------------------------------------------------
-    # Project-level estimate summary (PERT roll-up)
-    # ------------------------------------------------------------------
-
-    def project_estimate_summary(self, project_id: int) -> ProjectEstimateSummary:
+        Includes:
+        - Total PERT estimate across all WBS items
+        - Combined standard deviation
+        - 80% confidence interval
+        - Total risk exposure
+        - Risk-adjusted estimate
+        - Breakdowns by cost type, region, resource, supplier
+        """
         project = self.project_repo.get(project_id)
         if not project:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found",
+            )
 
-        wbs_items = self.wbs_repo.get_by_project(project_id, limit=10_000)
+        # Get all WBS items
+        wbs_items = self.wbs_repo.get_by_project(project_id, skip=0, limit=10000)
 
-        total_best = Decimal("0")
-        total_likely = Decimal("0")
-        total_worst = Decimal("0")
-        total_pert = 0.0
-        total_std_dev = 0.0
-        total_risk_cost = Decimal("0")
-        wbs_summaries: List[WBSEstimateSummary] = []
+        # Get all assignments and risks
+        assignments = self.assignment_repo.get_by_project(project_id)
+        risks = self.risk_repo.get_by_project(project_id)
 
+        # Compute totals
+        total_pert = sum(a.pert_estimate for a in assignments)
+        variances = [a.std_deviation**2 for a in assignments]
+        total_std = math.sqrt(sum(variances)) if variances else 0.0
+        ci_low, ci_high = self._compute_confidence_interval(total_pert, total_std)
+
+        # Compute total risk exposure
+        total_exposure = sum(self.risk_service.compute_risk_exposure(r) for r in risks)
+
+        # Compute breakdowns
+        by_cost_type = self._compute_cost_type_breakdown(assignments)
+        by_region = self._compute_region_breakdown(assignments)
+        by_resource = self._compute_resource_breakdown(assignments)
+        by_supplier = self._compute_supplier_breakdown(assignments)
+
+        # Compute WBS-level summaries
+        wbs_summaries = []
         for wbs in wbs_items:
-            assignments = self.assignment_repo.get_by_wbs(wbs.id)
-            risks = self.risk_repo.get_by_wbs(wbs.id)
+            wbs_assignments = [a for a in assignments if a.wbs_id == wbs.id]
+            wbs_risks = [r for r in risks if r.wbs_id == wbs.id]
 
-            wb_best = sum((a.best_estimate or Decimal("0")) for a in assignments)
-            wb_likely = sum((a.likely_estimate or Decimal("0")) for a in assignments)
-            wb_worst = sum((a.worst_estimate or Decimal("0")) for a in assignments)
-            wb_pert = sum(a.pert_estimate for a in assignments)
-            wb_std = sum(a.std_deviation for a in assignments)
-            wb_risk = sum((r.risk_cost or Decimal("0")) for r in risks)
+            wbs_pert = sum(a.pert_estimate for a in wbs_assignments)
+            wbs_variances = [a.std_deviation**2 for a in wbs_assignments]
+            wbs_std = math.sqrt(sum(wbs_variances)) if wbs_variances else 0.0
+            wbs_ci_low, wbs_ci_high = self._compute_confidence_interval(
+                wbs_pert, wbs_std
+            )
+            wbs_exposure = sum(
+                self.risk_service.compute_risk_exposure(r) for r in wbs_risks
+            )
 
-            wbs_summaries.append(WBSEstimateSummary(
-                wbs_id=wbs.id,
-                wbs_title=wbs.wbs_title,
-                wbs_code=wbs.wbs_code,
-                assignment_count=len(assignments),
-                total_best=wb_best,
-                total_likely=wb_likely,
-                total_worst=wb_worst,
-                total_pert=wb_pert,
-                total_std_deviation=wb_std,
-                risk_count=len(risks),
-                total_risk_cost=wb_risk,
-            ))
+            wbs_summaries.append(
+                WBSCostSummary(
+                    wbs_id=wbs.id,
+                    wbs_code=wbs.wbs_code,
+                    wbs_title=wbs.wbs_title,
+                    assignment_count=len(wbs_assignments),
+                    total_pert_estimate=wbs_pert,
+                    total_std_deviation=wbs_std,
+                    confidence_80_low=wbs_ci_low,
+                    confidence_80_high=wbs_ci_high,
+                    risk_count=len(wbs_risks),
+                    total_risk_exposure=wbs_exposure,
+                    risk_adjusted_estimate=wbs_pert + wbs_exposure,
+                    approval_status=wbs.approval_status,
+                )
+            )
 
-            total_best += wb_best
-            total_likely += wb_likely
-            total_worst += wb_worst
-            total_pert += wb_pert
-            total_std_dev += wb_std
-            total_risk_cost += wb_risk
-
-        return ProjectEstimateSummary(
+        return ProjectEstimationSummary(
             project_id=project.id,
             project_name=project.project_name,
-            wbs_count=len(wbs_items),
-            total_best=total_best,
-            total_likely=total_likely,
-            total_worst=total_worst,
-            total_pert=total_pert,
-            total_std_deviation=total_std_dev,
-            total_risk_cost=total_risk_cost,
+            total_wbs_items=len(wbs_items),
+            total_assignments=len(assignments),
+            total_pert_estimate=total_pert,
+            total_std_deviation=total_std,
+            confidence_80_low=ci_low,
+            confidence_80_high=ci_high,
+            total_risks=len(risks),
+            total_risk_exposure=total_exposure,
+            risk_adjusted_estimate=total_pert + total_exposure,
+            by_cost_type=by_cost_type,
+            by_region=by_region,
+            by_resource=by_resource,
+            by_supplier=by_supplier,
             wbs_summaries=wbs_summaries,
         )
+
+    def _compute_confidence_interval(
+        self, pert_total: float, std_dev: float
+    ) -> tuple[float, float]:
+        """Compute 80% confidence interval.
+
+        Using Central Limit Theorem:
+        - Low = PERT - z * std_dev
+        - High = PERT + z * std_dev
+
+        Where z = 1.28 for 80% confidence.
+        """
+        margin = self.Z_80 * std_dev
+        return (pert_total - margin, pert_total + margin)
+
+    def _compute_cost_type_breakdown(
+        self, assignments: list
+    ) -> List[CostBreakdownItem]:
+        """Group assignments by cost type and sum PERT."""
+        groups = {}
+        for a in assignments:
+            code = a.cost_type_code or "UNASSIGNED"
+            if code not in groups:
+                groups[code] = {"code": code, "total_pert": 0.0, "count": 0}
+            groups[code]["total_pert"] += a.pert_estimate
+            groups[code]["count"] += 1
+
+        # Lookup descriptions
+        result = []
+        for code, data in groups.items():
+            if code != "UNASSIGNED":
+                stmt = select(CostType).where(CostType.code == code)
+                ct = self.db.scalars(stmt).first()
+                desc = ct.description if ct else code
+            else:
+                desc = "Unassigned"
+            result.append(
+                CostBreakdownItem(
+                    code=code,
+                    description=desc,
+                    total_pert=data["total_pert"],
+                    assignment_count=data["count"],
+                )
+            )
+        return sorted(result, key=lambda x: x.total_pert, reverse=True)
+
+    def _compute_region_breakdown(self, assignments: list) -> List[CostBreakdownItem]:
+        """Group assignments by region and sum PERT."""
+        groups = {}
+        for a in assignments:
+            code = a.region_code or "UNASSIGNED"
+            if code not in groups:
+                groups[code] = {"code": code, "total_pert": 0.0, "count": 0}
+            groups[code]["total_pert"] += a.pert_estimate
+            groups[code]["count"] += 1
+
+        result = []
+        for code, data in groups.items():
+            if code != "UNASSIGNED":
+                stmt = select(Region).where(Region.code == code)
+                r = self.db.scalars(stmt).first()
+                desc = r.description if r else code
+            else:
+                desc = "Unassigned"
+            result.append(
+                CostBreakdownItem(
+                    code=code,
+                    description=desc,
+                    total_pert=data["total_pert"],
+                    assignment_count=data["count"],
+                )
+            )
+        return sorted(result, key=lambda x: x.total_pert, reverse=True)
+
+    def _compute_resource_breakdown(self, assignments: list) -> List[CostBreakdownItem]:
+        """Group assignments by resource and sum PERT."""
+        groups = {}
+        for a in assignments:
+            code = a.resource_code
+            if code not in groups:
+                groups[code] = {"code": code, "total_pert": 0.0, "count": 0}
+            groups[code]["total_pert"] += a.pert_estimate
+            groups[code]["count"] += 1
+
+        result = []
+        for code, data in groups.items():
+            stmt = select(Resource).where(Resource.resource_code == code)
+            r = self.db.scalars(stmt).first()
+            desc = r.description if r else code
+            result.append(
+                CostBreakdownItem(
+                    code=code,
+                    description=desc,
+                    total_pert=data["total_pert"],
+                    assignment_count=data["count"],
+                )
+            )
+        return sorted(result, key=lambda x: x.total_pert, reverse=True)
+
+    def _compute_supplier_breakdown(
+        self, assignments: list
+    ) -> List[SupplierBreakdownItem]:
+        """Group assignments by supplier and sum PERT."""
+        groups = {}
+        for a in assignments:
+            code = a.supplier_code or "UNASSIGNED"
+            if code not in groups:
+                groups[code] = {"code": code, "total_pert": 0.0, "count": 0}
+            groups[code]["total_pert"] += a.pert_estimate
+            groups[code]["count"] += 1
+
+        result = []
+        for code, data in groups.items():
+            if code != "UNASSIGNED":
+                stmt = select(Supplier).where(Supplier.supplier_code == code)
+                s = self.db.scalars(stmt).first()
+                name = s.name if s else code
+            else:
+                name = "Unassigned"
+            result.append(
+                SupplierBreakdownItem(
+                    code=code,
+                    name=name,
+                    total_pert=data["total_pert"],
+                    assignment_count=data["count"],
+                )
+            )
+        return sorted(result, key=lambda x: x.total_pert, reverse=True)

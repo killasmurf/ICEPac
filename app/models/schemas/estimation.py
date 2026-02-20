@@ -1,131 +1,100 @@
-"""Schemas for resource assignments, risks, and estimate summaries."""
+"""Estimation and approval workflow schemas."""
 from datetime import datetime
-from decimal import Decimal
-from typing import Optional, List
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
-# ---------------------------------------------------------------------------
-# Resource Assignment Schemas
-# ---------------------------------------------------------------------------
+class WBSCostSummary(BaseModel):
+    """Cost summary for a single WBS item."""
 
-class AssignmentBase(BaseModel):
-    resource_code: str = Field(max_length=50)
-    supplier_code: Optional[str] = Field(default=None, max_length=50)
-    cost_type_code: Optional[str] = Field(default=None, max_length=50)
-    region_code: Optional[str] = Field(default=None, max_length=50)
-    bus_area_code: Optional[str] = Field(default=None, max_length=50)
-    estimating_technique_code: Optional[str] = Field(default=None, max_length=50)
-    best_estimate: Decimal = Field(default=Decimal("0"), ge=0)
-    likely_estimate: Decimal = Field(default=Decimal("0"), ge=0)
-    worst_estimate: Decimal = Field(default=Decimal("0"), ge=0)
-    duty_pct: Decimal = Field(default=Decimal("100"), ge=0, le=100)
-    import_content_pct: Decimal = Field(default=Decimal("0"), ge=0, le=100)
-    aii_pct: Decimal = Field(default=Decimal("0"), ge=0, le=100)
-
-
-class AssignmentCreate(AssignmentBase):
-    pass
-
-
-class AssignmentUpdate(BaseModel):
-    supplier_code: Optional[str] = Field(default=None, max_length=50)
-    cost_type_code: Optional[str] = Field(default=None, max_length=50)
-    region_code: Optional[str] = Field(default=None, max_length=50)
-    bus_area_code: Optional[str] = Field(default=None, max_length=50)
-    estimating_technique_code: Optional[str] = Field(default=None, max_length=50)
-    best_estimate: Optional[Decimal] = Field(default=None, ge=0)
-    likely_estimate: Optional[Decimal] = Field(default=None, ge=0)
-    worst_estimate: Optional[Decimal] = Field(default=None, ge=0)
-    duty_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
-    import_content_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
-    aii_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
-
-
-class AssignmentResponse(AssignmentBase):
-    id: int
     wbs_id: int
-    pert_estimate: float
-    std_deviation: float
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class AssignmentListResponse(BaseModel):
-    items: List[AssignmentResponse]
-    total: int
-
-
-# ---------------------------------------------------------------------------
-# Risk Schemas
-# ---------------------------------------------------------------------------
-
-class RiskBase(BaseModel):
-    risk_category_code: Optional[str] = Field(default=None, max_length=50)
-    risk_cost: Decimal = Field(default=Decimal("0"), ge=0)
-    probability_code: Optional[str] = Field(default=None, max_length=50)
-    severity_code: Optional[str] = Field(default=None, max_length=50)
-    mitigation_plan: Optional[str] = None
-    date_identified: Optional[datetime] = None
-
-
-class RiskCreate(RiskBase):
-    pass
-
-
-class RiskUpdate(BaseModel):
-    risk_category_code: Optional[str] = Field(default=None, max_length=50)
-    risk_cost: Optional[Decimal] = Field(default=None, ge=0)
-    probability_code: Optional[str] = Field(default=None, max_length=50)
-    severity_code: Optional[str] = Field(default=None, max_length=50)
-    mitigation_plan: Optional[str] = None
-    date_identified: Optional[datetime] = None
-
-
-class RiskResponse(RiskBase):
-    id: int
-    wbs_id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class RiskListResponse(BaseModel):
-    items: List[RiskResponse]
-    total: int
-
-
-# ---------------------------------------------------------------------------
-# Estimate Summary Schemas
-# ---------------------------------------------------------------------------
-
-class WBSEstimateSummary(BaseModel):
-    """PERT totals for a single WBS item."""
-    wbs_id: int
-    wbs_title: str
     wbs_code: Optional[str] = None
-    assignment_count: int
-    total_best: Decimal
-    total_likely: Decimal
-    total_worst: Decimal
-    total_pert: float
-    total_std_deviation: float
-    risk_count: int
-    total_risk_cost: Decimal
+    wbs_title: str
+
+    # Assignment aggregates
+    assignment_count: int = 0
+    total_pert_estimate: float = 0.0
+    total_std_deviation: float = 0.0
+
+    # Confidence intervals (80% using z=1.28)
+    confidence_80_low: float = 0.0
+    confidence_80_high: float = 0.0
+
+    # Risk aggregates
+    risk_count: int = 0
+    total_risk_exposure: float = 0.0
+
+    # Risk-adjusted estimate
+    risk_adjusted_estimate: float = 0.0
+
+    # Approval status
+    approval_status: str = "draft"
 
 
-class ProjectEstimateSummary(BaseModel):
-    """Roll-up of all WBS estimates for a project."""
+class CostBreakdownItem(BaseModel):
+    """Single item in a cost breakdown (by cost type, region, etc.)."""
+
+    code: str
+    description: str
+    total_pert: float = 0.0
+    assignment_count: int = 0
+
+
+class SupplierBreakdownItem(BaseModel):
+    """Single item in supplier breakdown."""
+
+    code: str
+    name: str
+    total_pert: float = 0.0
+    assignment_count: int = 0
+
+
+class ProjectEstimationSummary(BaseModel):
+    """Full project estimation summary with breakdowns."""
+
     project_id: int
     project_name: str
-    wbs_count: int
-    total_best: Decimal
-    total_likely: Decimal
-    total_worst: Decimal
-    total_pert: float
-    total_std_deviation: float
-    total_risk_cost: Decimal
-    wbs_summaries: List[WBSEstimateSummary] = []
+
+    # Totals
+    total_wbs_items: int = 0
+    total_assignments: int = 0
+    total_pert_estimate: float = 0.0
+    total_std_deviation: float = 0.0
+
+    # Confidence intervals
+    confidence_80_low: float = 0.0
+    confidence_80_high: float = 0.0
+
+    # Risks
+    total_risks: int = 0
+    total_risk_exposure: float = 0.0
+    risk_adjusted_estimate: float = 0.0
+
+    # Breakdowns
+    by_cost_type: list[CostBreakdownItem] = []
+    by_region: list[CostBreakdownItem] = []
+    by_resource: list[CostBreakdownItem] = []
+    by_supplier: list[SupplierBreakdownItem] = []
+
+    # WBS-level summaries
+    wbs_summaries: list[WBSCostSummary] = []
+
+
+class ApprovalAction(BaseModel):
+    """Schema for approval workflow actions."""
+
+    action: str = Field(..., pattern="^(submit|approve|reject|reset)$")
+    comment: Optional[str] = None
+
+
+class WBSApprovalResponse(BaseModel):
+    """Schema for WBS approval status response."""
+
+    wbs_id: int
+    approval_status: str
+    approver: Optional[str] = None
+    approver_date: Optional[datetime] = None
+    estimate_revision: int = 0
+
+    model_config = {"from_attributes": True}

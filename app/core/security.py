@@ -2,11 +2,12 @@
 Security utilities for authentication and authorization.
 """
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from typing import Any, Dict, Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -29,7 +30,9 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
     """
     Create a JWT access token.
 
@@ -44,10 +47,14 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -64,7 +71,9 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -88,18 +97,19 @@ def decode_token(token: str) -> Dict[str, Any]:
     )
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         return payload
     except JWTError:
         raise credentials_exception
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ):
     """
-    Get the currently authenticated user from the database.
+    Get current authenticated user from the database.
 
     Usage:
         @app.get("/me")
@@ -114,9 +124,12 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = decode_token(token)  # raises 401 on invalid/expired token
-    user_id: str = payload.get("sub")
-    if user_id is None:
+    try:
+        payload = decode_token(token)
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
         raise credentials_exception
 
     user = db.get(User, int(user_id))
@@ -125,51 +138,52 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user account",
+            detail="User account is inactive",
         )
     return user
 
 
 def require_role(required_role: str):
     """
-    Dependency factory that enforces a single required role.
+    Dependency to require a specific role.
 
     Usage:
-        @app.get("/admin-only")
-        def admin_only(current_user = Depends(require_role("admin"))):
-            ...
+        @app.get("/admin")
+        def admin_only(
+            current_user = Depends(get_current_user),
+            _: None = Depends(require_role("admin"))
+        ):
+            return {"message": "Welcome, admin!"}
     """
-    from app.models.database.user import UserRole
 
     async def role_checker(current_user=Depends(get_current_user)):
-        if current_user.role != UserRole(required_role):
+        if current_user.role.value != required_role:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{required_role}' required",
+                detail="Insufficient permissions",
             )
-        return current_user
 
     return role_checker
 
 
 def require_any_role(*roles: str):
     """
-    Dependency factory that enforces at least one of the given roles.
+    Dependency to require any of the specified roles.
 
     Usage:
-        @app.get("/manage")
-        def manage(current_user = Depends(require_any_role("admin", "manager"))):
-            ...
+        @app.get("/managers")
+        def managers_only(
+            current_user = Depends(get_current_user),
+            _: None = Depends(require_any_role("admin", "manager"))
+        ):
+            return {"message": "Welcome, manager!"}
     """
-    from app.models.database.user import UserRole
 
     async def role_checker(current_user=Depends(get_current_user)):
-        allowed = {UserRole(r) for r in roles}
-        if current_user.role not in allowed:
+        if current_user.role.value not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"One of roles {list(roles)} required",
+                detail="Insufficient permissions",
             )
-        return current_user
 
     return role_checker

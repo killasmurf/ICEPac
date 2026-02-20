@@ -1,14 +1,18 @@
-from typing import AsyncGenerator
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import sessionmaker
-from app.models.project import Base
 import os
+from typing import AsyncGenerator
+
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.models.project import Base
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://icepac:icepac_dev_password@localhost:5432/icepac")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://icepac:icepac_dev_password@localhost:5432/icepac"
+)
 
 # Convert to async database URL if not already
 if DATABASE_URL.startswith("postgresql://"):
@@ -22,16 +26,12 @@ sync_engine = create_engine(
     echo=False,
     pool_pre_ping=True,
     pool_size=10,
-    max_overflow=20
+    max_overflow=20,
 )
 
 # Async engine for application
 async_engine = create_async_engine(
-    ASYNC_DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    ASYNC_DATABASE_URL, echo=False, pool_pre_ping=True, pool_size=10, max_overflow=20
 )
 
 # Session makers
@@ -40,14 +40,10 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
-    autocommit=False
+    autocommit=False,
 )
 
-SessionLocal = sessionmaker(
-    sync_engine,
-    autoflush=False,
-    autocommit=False
-)
+SessionLocal = sessionmaker(sync_engine, autoflush=False, autocommit=False)
 
 
 def init_db():

@@ -2,14 +2,13 @@
 ICEPac FastAPI Application
 Cost Estimation & Project Risk Management System
 """
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import logging
 
 from app.core.config import settings
-from app.core.database import engine, init_db
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 
@@ -28,7 +27,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.DEBUG}")
     yield
     logger.info(f"Shutting down {settings.APP_NAME}")
-    engine.dispose()
 
 
 # Create FastAPI application
@@ -54,46 +52,13 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 
 
-# ---------------------------------------------------------------------------
-# System endpoints
-# ---------------------------------------------------------------------------
-
 @app.get("/health", tags=["System"])
-def health_check():
-    """
-    Health check — verifies database connectivity and (optionally) Redis.
-    Returns 200 if all required services are up, 503 otherwise.
-    """
-    from sqlalchemy import text
-    from fastapi import Response
-    import redis as redis_lib
-
-    checks: dict = {}
-    healthy = True
-
-    # Database
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        checks["database"] = "ok"
-    except Exception as exc:
-        checks["database"] = f"error: {exc}"
-        healthy = False
-
-    # Redis (optional — degraded but not fatal)
-    try:
-        r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=2)
-        r.ping()
-        checks["redis"] = "ok"
-    except Exception as exc:
-        checks["redis"] = f"unavailable: {exc}"
-        # Redis is not critical for basic operation
-
+async def health_check():
+    """Health check endpoint."""
     return {
-        "status": "healthy" if healthy else "unhealthy",
+        "status": "healthy",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "checks": checks,
     }
 
 
@@ -109,20 +74,19 @@ async def root():
     }
 
 
-# ---------------------------------------------------------------------------
-# Routers
-# ---------------------------------------------------------------------------
-
-from app.routes import auth, admin  # noqa: E402
-from app.routes.project import router as project_router  # noqa: E402
-from app.routes.estimation import router as estimation_router  # noqa: E402
+# Include routers
+from app.routes import admin, auth, estimation, help, project  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
-app.include_router(project_router, prefix=settings.API_V1_PREFIX)
-app.include_router(estimation_router, prefix=settings.API_V1_PREFIX)
+app.include_router(help.router, prefix=settings.API_V1_PREFIX, tags=["Help"])
+app.include_router(project.router, prefix=settings.API_V1_PREFIX, tags=["Projects"])
+app.include_router(
+    estimation.router, prefix=settings.API_V1_PREFIX, tags=["Estimation"]
+)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

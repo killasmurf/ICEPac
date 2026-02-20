@@ -1,240 +1,236 @@
-"""Project routes — full CRUD + MPP file import."""
-import logging
-from typing import Optional
-
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+"""Project routes."""
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.models.database.user import User
+from app.core.security import get_current_user, require_any_role
+from app.models.schemas.import_job import (
+    ImportJobListResponse,
+    ImportJobResponse,
+    ImportStartResponse,
+)
 from app.models.schemas.project import (
-    MPPUploadResponse,
     ProjectCreate,
-    ProjectDetailResponse,
     ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
-    WBSCreate,
-    WBSListResponse,
-    WBSResponse,
-    WBSUpdate,
 )
-from app.services.mpp_reader import MPPReader
+from app.models.schemas.wbs import WBSListResponse, WBSTreeNode, WBSTreeResponse
+from app.repositories.wbs_repository import WBSRepository
+from app.services.import_service import ImportService
 from app.services.project_service import ProjectService
 
-router = APIRouter(prefix="/projects", tags=["Projects"])
-logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/projects")
 
 
-# ---------------------------------------------------------------------------
-# Helper dependency
-# ---------------------------------------------------------------------------
-
-def _get_service(db: Session = Depends(get_db)) -> ProjectService:
-    return ProjectService(db)
-
-
-# ---------------------------------------------------------------------------
+# ============================================================
 # Project CRUD
-# ---------------------------------------------------------------------------
+# ============================================================
+
 
 @router.get("", response_model=ProjectListResponse)
-def list_projects(
+async def list_projects(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
-    include_archived: bool = Query(False),
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=1000),
+    search: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """List projects (active by default)."""
-    active_only = not include_archived
-    items = svc.get_multi(skip=skip, limit=limit, active_only=active_only)
-    total = svc.count(active_only=active_only)
-
-    responses = []
-    for p in items:
-        r = ProjectResponse.model_validate(p)
-        r.wbs_count = svc.count_wbs_by_project(p.id)
-        responses.append(r)
-
-    return ProjectListResponse(items=responses, total=total, skip=skip, limit=limit)
+    """List active projects with optional search."""
+    service = ProjectService(db)
+    if search:
+        items = service.search(search, skip=skip, limit=limit)
+        total = service.count_search(search)
+    else:
+        items = service.get_multi(skip=skip, limit=limit)
+        total = service.count()
+    return ProjectListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-def create_project(
+@router.get("/{project_id}", response_model=ProjectResponse)
+async def get_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get a single project by ID."""
+    service = ProjectService(db)
+    return service.get_or_404(project_id)
+
+
+@router.post("", response_model=ProjectResponse, status_code=201)
+async def create_project(
     project_in: ProjectCreate,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _=Depends(require_any_role("admin", "manager")),
 ):
     """Create a new project."""
-    project = svc.create(project_in)
-    logger.info("Created project id=%s name='%s'", project.id, project.project_name)
-    r = ProjectResponse.model_validate(project)
-    r.wbs_count = 0
-    return r
-
-
-@router.get("/{project_id}", response_model=ProjectDetailResponse)
-def get_project(
-    project_id: int,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
-):
-    """Retrieve a project with its WBS items."""
-    project = svc.get_with_wbs(project_id)
-    r = ProjectDetailResponse.model_validate(project)
-    r.wbs_count = len(project.wbs_items)
-    r.wbs_items = [WBSResponse.model_validate(w) for w in project.wbs_items]
-    return r
+    service = ProjectService(db)
+    return service.create(project_in)
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
-def update_project(
+async def update_project(
     project_id: int,
     project_in: ProjectUpdate,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _=Depends(require_any_role("admin", "manager")),
 ):
-    """Update project metadata."""
-    project = svc.update(project_id, project_in)
-    r = ProjectResponse.model_validate(project)
-    r.wbs_count = svc.count_wbs_by_project(project_id)
-    return r
+    """Update a project."""
+    service = ProjectService(db)
+    return service.update(project_id, project_in)
 
 
-@router.post("/{project_id}/archive", response_model=ProjectResponse)
-def archive_project(
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(
     project_id: int,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _=Depends(require_any_role("admin", "manager")),
 ):
-    """Archive (soft-delete) a project."""
-    project = svc.archive(project_id)
-    r = ProjectResponse.model_validate(project)
-    r.wbs_count = svc.count_wbs_by_project(project_id)
-    return r
+    """Archive a project (soft delete)."""
+    service = ProjectService(db)
+    service.delete(project_id)
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(
+# ============================================================
+# Import endpoints
+# ============================================================
+
+
+@router.post(
+    "/{project_id}/import", response_model=ImportStartResponse, status_code=202
+)
+async def import_project_file(
     project_id: int,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """Permanently delete a project and all its WBS items."""
-    svc.delete(project_id)
-    logger.info("Deleted project id=%s", project_id)
+    """Upload an MS Project file and start async import."""
+    service = ImportService(db)
+    job = await service.start_import(project_id, file, current_user.id)
+    return ImportStartResponse(
+        job_id=job.id,
+        status=job.status.value,
+        message=f"Import started for '{job.filename}'",
+    )
 
 
-# ---------------------------------------------------------------------------
-# WBS sub-resource
-# ---------------------------------------------------------------------------
+@router.get("/{project_id}/imports", response_model=ImportJobListResponse)
+async def list_imports(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List all import jobs for a project."""
+    service = ImportService(db)
+    jobs = service.get_project_imports(project_id)
+    return ImportJobListResponse(items=jobs, total=len(jobs))
+
+
+@router.get("/{project_id}/imports/{job_id}", response_model=ImportJobResponse)
+async def get_import_status(
+    project_id: int,
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Poll import job status."""
+    service = ImportService(db)
+    job = service.get_import_status(job_id)
+    if not job or job.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Import job not found")
+    return job
+
+
+# ============================================================
+# WBS endpoints
+# ============================================================
+
 
 @router.get("/{project_id}/wbs", response_model=WBSListResponse)
-def list_wbs(
+async def list_wbs(
     project_id: int,
     skip: int = Query(0, ge=0),
-    limit: int = Query(500, ge=1, le=1000),
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    limit: int = Query(1000, ge=1, le=5000),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """List WBS items for a project."""
-    items = svc.get_wbs_by_project(project_id, skip=skip, limit=limit)
-    total = svc.count_wbs_by_project(project_id)
-    return WBSListResponse(
-        items=[WBSResponse.model_validate(w) for w in items],
-        total=total,
-        skip=skip,
-        limit=limit,
-    )
+    """Get flat paginated WBS list for a project."""
+    # Verify project exists
+    ProjectService(db).get_or_404(project_id)
+    repo = WBSRepository(db)
+    items = repo.get_by_project(project_id, skip=skip, limit=limit)
+    total = repo.count_by_project(project_id)
+    return WBSListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.post("/{project_id}/wbs", response_model=WBSResponse, status_code=status.HTTP_201_CREATED)
-def create_wbs(
+@router.get("/{project_id}/wbs/tree", response_model=WBSTreeResponse)
+async def get_wbs_tree(
     project_id: int,
-    wbs_in: WBSCreate,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """Add a WBS item to a project."""
-    wbs = svc.create_wbs(project_id, wbs_in)
-    return WBSResponse.model_validate(wbs)
+    """Get hierarchical WBS tree for a project."""
+    ProjectService(db).get_or_404(project_id)
+    repo = WBSRepository(db)
+
+    # Fetch all items flat, build tree in memory
+    all_items = repo.get_by_project(project_id, skip=0, limit=10000)
+    total = len(all_items)
+
+    # Build lookup by ID
+    nodes = {}
+    for item in all_items:
+        node = WBSTreeNode.model_validate(item)
+        node.children = []
+        nodes[item.id] = node
+
+    # Link parents
+    roots = []
+    for item in all_items:
+        node = nodes[item.id]
+        if item.parent_id and item.parent_id in nodes:
+            nodes[item.parent_id].children.append(node)
+        else:
+            roots.append(node)
+
+    return WBSTreeResponse(items=roots, total=total)
 
 
-@router.put("/{project_id}/wbs/{wbs_id}", response_model=WBSResponse)
-def update_wbs(
-    project_id: int,
-    wbs_id: int,
-    wbs_in: WBSUpdate,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
-):
-    """Update a WBS item."""
-    wbs = svc.get_wbs_or_404(wbs_id)
-    if wbs.project_id != project_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="WBS item not found")
-    wbs = svc.update_wbs(wbs_id, wbs_in)
-    return WBSResponse.model_validate(wbs)
+# ============================================================
+# Legacy upload endpoint (kept for backward compatibility)
+# ============================================================
 
 
-@router.delete("/{project_id}/wbs/{wbs_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_wbs(
-    project_id: int,
-    wbs_id: int,
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a WBS item."""
-    wbs = svc.get_wbs_or_404(wbs_id)
-    if wbs.project_id != project_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="WBS item not found")
-    svc.delete_wbs(wbs_id)
-
-
-# ---------------------------------------------------------------------------
-# MPP file upload / import
-# ---------------------------------------------------------------------------
-
-@router.post("/upload", response_model=MPPUploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_mpp(
+@router.post("/upload")
+async def upload_project_file(
     file: UploadFile = File(...),
-    project_name: Optional[str] = Query(default=None, max_length=255),
-    svc: ProjectService = Depends(_get_service),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _=Depends(require_any_role("admin", "manager")),
 ):
-    """
-    Upload a Microsoft Project file (.mpp / .mpx / .xml), parse it,
-    and persist the project + WBS items to the database.
-    """
-    filename = file.filename or ""
-    if not any(filename.lower().endswith(ext) for ext in (".mpp", ".mpx", ".xml")):
+    """Upload and parse a Microsoft Project file (legacy sync endpoint)."""
+    if not file.filename.endswith((".mpp", ".mpx", ".xml")):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported file type. Allowed: .mpp, .mpx, .xml",
+            status_code=400,
+            detail="Invalid file type. Supported: .mpp, .mpx, .xml",
         )
-
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty")
 
     try:
+        from app.services.mpp_reader import MPPReader
+
+        contents = await file.read()
         reader = MPPReader()
-        parsed = reader.parse(contents, filename)
-    except Exception as exc:
-        logger.error("MPP parse error for '%s': %s", filename, exc)
+        project_data = reader.parse(contents, file.filename)
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "data": project_data,
+        }
+    except ImportError:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to parse file: {exc}",
+            status_code=503,
+            detail="MPP parsing not available (Java/MPXJ not configured)",
         )
-
-    name = project_name or parsed.get("name") or filename
-    project, wbs_count = svc.import_from_mpp(name, parsed.get("tasks", []))
-    logger.info("Imported project id=%s '%s' with %d WBS items", project.id, name, wbs_count)
-
-    return MPPUploadResponse(
-        project_id=project.id,
-        project_name=project.project_name,
-        wbs_items_imported=wbs_count,
-        message=f"Successfully imported '{project.project_name}' with {wbs_count} WBS items.",
-    )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

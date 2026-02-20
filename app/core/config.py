@@ -1,10 +1,11 @@
 """
 Application configuration using Pydantic Settings.
 """
+from functools import lru_cache
 from typing import List, Optional, Union
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 
 
 class Settings(BaseSettings):
@@ -26,7 +27,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:8000"]
+    ALLOWED_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ]
 
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost/icepac"
