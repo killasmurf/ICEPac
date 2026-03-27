@@ -1,7 +1,7 @@
 """Phase 2: Admin Circuit Tables
 
 Revision ID: 002_admin_tables
-Revises: 001_help_system
+Revises: b7e2f3a1c9d4
 Create Date: 2026-01-26
 
 This migration creates the admin system tables:
@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic
 revision = '002_admin_tables'
-down_revision = '001_help_system'
+down_revision = 'b7e2f3a1c9d4'
 branch_labels = None
 depends_on = None
 
