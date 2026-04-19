@@ -5,10 +5,10 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.database.audit_log import AuditLog
 from app.models.database.wbs import WBS
-from app.repositories.assignment_repository import AssignmentRepository
+from app.models.database.audit_log import AuditLog, AuditAction
 from app.repositories.wbs_repository import WBSRepository
+from app.repositories.assignment_repository import AssignmentRepository
 
 
 class ApprovalService:
@@ -44,7 +44,9 @@ class ApprovalService:
             )
         return wbs
 
-    def submit_for_approval(self, wbs_id: int, user_id: int, username: str) -> WBS:
+    def submit_for_approval(
+        self, wbs_id: int, user_id: int, username: str
+    ) -> WBS:
         """Submit a WBS item for approval.
 
         Transition: draft -> submitted
@@ -80,7 +82,9 @@ class ApprovalService:
 
         return wbs
 
-    def approve(self, wbs_id: int, user_id: int, username: str) -> WBS:
+    def approve(
+        self, wbs_id: int, user_id: int, username: str
+    ) -> WBS:
         """Approve a WBS item.
 
         Transition: submitted -> approved
@@ -137,7 +141,9 @@ class ApprovalService:
 
         return wbs
 
-    def reset_to_draft(self, wbs_id: int, user_id: int, username: str) -> WBS:
+    def reset_to_draft(
+        self, wbs_id: int, user_id: int, username: str
+    ) -> WBS:
         """Reset a rejected WBS item to draft for re-editing.
 
         Transition: rejected -> draft
@@ -180,8 +186,7 @@ class ApprovalService:
         if target_status not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot transition from "
-                f"'{current_status}' to '{target_status}'",
+                detail=f"Cannot transition from '{current_status}' to '{target_status}'",
             )
 
         return wbs

@@ -122,7 +122,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           {/* Resource Selection */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -140,7 +140,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Supplier Selection */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -158,7 +158,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Cost Type */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -176,7 +176,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Region */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -194,7 +194,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Business Area */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -212,7 +212,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Estimating Technique */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -229,7 +229,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             </TextField>
           </Grid>
 
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle1" gutterBottom>
               Three-Point Estimation
@@ -237,7 +237,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Three-Point Estimates */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -248,7 +248,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -259,7 +259,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -271,7 +271,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Live Preview */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 PERT Estimate: <strong>${pert.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
@@ -281,7 +281,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             </Box>
           </Grid>
 
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle1" gutterBottom>
               Additional Factors
@@ -289,7 +289,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Percentages */}
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -300,7 +300,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -311,7 +311,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"

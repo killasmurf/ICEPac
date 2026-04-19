@@ -1,23 +1,29 @@
 """Estimation service - core cost estimation engine."""
 import math
-from typing import List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
-from app.models.database.config_tables import CostType, Region
-from app.models.database.resource import Resource, Supplier
+from app.models.database.wbs import WBS
+from app.models.database.project import Project
+from app.models.database.config_tables import (
+    CostType,
+    Region,
+    BusinessArea,
+)
+from app.models.database.resource import Supplier
 from app.models.schemas.estimation import (
-    CostBreakdownItem,
-    ProjectEstimationSummary,
-    SupplierBreakdownItem,
     WBSCostSummary,
+    ProjectEstimationSummary,
+    CostBreakdownItem,
+    SupplierBreakdownItem,
 )
 from app.repositories.assignment_repository import AssignmentRepository
-from app.repositories.project_repository import ProjectRepository
 from app.repositories.risk_repository import RiskRepository
 from app.repositories.wbs_repository import WBSRepository
+from app.repositories.project_repository import ProjectRepository
 from app.services.risk_service import RiskService
 
 
@@ -55,7 +61,7 @@ class EstimationService:
         # Get assignments and compute totals
         assignments = self.assignment_repo.get_by_wbs(wbs_id)
         total_pert = sum(a.pert_estimate for a in assignments)
-        variances = [a.std_deviation**2 for a in assignments]
+        variances = [a.std_deviation ** 2 for a in assignments]
         total_std = math.sqrt(sum(variances)) if variances else 0.0
 
         # Compute confidence interval
@@ -63,7 +69,9 @@ class EstimationService:
 
         # Get risks and compute exposure
         risks = self.risk_repo.get_by_wbs(wbs_id)
-        total_exposure = sum(self.risk_service.compute_risk_exposure(r) for r in risks)
+        total_exposure = sum(
+            self.risk_service.compute_risk_exposure(r) for r in risks
+        )
 
         return WBSCostSummary(
             wbs_id=wbs.id,
@@ -107,12 +115,14 @@ class EstimationService:
 
         # Compute totals
         total_pert = sum(a.pert_estimate for a in assignments)
-        variances = [a.std_deviation**2 for a in assignments]
+        variances = [a.std_deviation ** 2 for a in assignments]
         total_std = math.sqrt(sum(variances)) if variances else 0.0
         ci_low, ci_high = self._compute_confidence_interval(total_pert, total_std)
 
         # Compute total risk exposure
-        total_exposure = sum(self.risk_service.compute_risk_exposure(r) for r in risks)
+        total_exposure = sum(
+            self.risk_service.compute_risk_exposure(r) for r in risks
+        )
 
         # Compute breakdowns
         by_cost_type = self._compute_cost_type_breakdown(assignments)
@@ -127,11 +137,9 @@ class EstimationService:
             wbs_risks = [r for r in risks if r.wbs_id == wbs.id]
 
             wbs_pert = sum(a.pert_estimate for a in wbs_assignments)
-            wbs_variances = [a.std_deviation**2 for a in wbs_assignments]
+            wbs_variances = [a.std_deviation ** 2 for a in wbs_assignments]
             wbs_std = math.sqrt(sum(wbs_variances)) if wbs_variances else 0.0
-            wbs_ci_low, wbs_ci_high = self._compute_confidence_interval(
-                wbs_pert, wbs_std
-            )
+            wbs_ci_low, wbs_ci_high = self._compute_confidence_interval(wbs_pert, wbs_std)
             wbs_exposure = sum(
                 self.risk_service.compute_risk_exposure(r) for r in wbs_risks
             )
@@ -217,7 +225,9 @@ class EstimationService:
             )
         return sorted(result, key=lambda x: x.total_pert, reverse=True)
 
-    def _compute_region_breakdown(self, assignments: list) -> List[CostBreakdownItem]:
+    def _compute_region_breakdown(
+        self, assignments: list
+    ) -> List[CostBreakdownItem]:
         """Group assignments by region and sum PERT."""
         groups = {}
         for a in assignments:
@@ -245,7 +255,9 @@ class EstimationService:
             )
         return sorted(result, key=lambda x: x.total_pert, reverse=True)
 
-    def _compute_resource_breakdown(self, assignments: list) -> List[CostBreakdownItem]:
+    def _compute_resource_breakdown(
+        self, assignments: list
+    ) -> List[CostBreakdownItem]:
         """Group assignments by resource and sum PERT."""
         groups = {}
         for a in assignments:
@@ -256,6 +268,8 @@ class EstimationService:
             groups[code]["count"] += 1
 
         result = []
+        from app.models.database.resource import Resource
+
         for code, data in groups.items():
             stmt = select(Resource).where(Resource.resource_code == code)
             r = self.db.scalars(stmt).first()
@@ -283,6 +297,8 @@ class EstimationService:
             groups[code]["count"] += 1
 
         result = []
+        from app.models.database.resource import Supplier
+
         for code, data in groups.items():
             if code != "UNASSIGNED":
                 stmt = select(Supplier).where(Supplier.supplier_code == code)

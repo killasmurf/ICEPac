@@ -89,7 +89,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           {/* Risk Category */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <TextField
               select
               fullWidth
@@ -107,7 +107,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           </Grid>
 
           {/* Risk Cost */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
               type="number"
@@ -120,7 +120,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           </Grid>
 
           {/* Probability */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -138,7 +138,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           </Grid>
 
           {/* Severity */}
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs={12} sm={6}>
             <TextField
               select
               fullWidth
@@ -156,7 +156,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           </Grid>
 
           {/* Live Preview */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Box sx={{ bgcolor: 'warning.50', p: 2, borderRadius: 1, border: '1px solid', borderColor: 'warning.200' }}>
               <Typography variant="body2" color="text.secondary">
                 Risk Exposure: <strong>${riskExposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
@@ -168,7 +168,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           </Grid>
 
           {/* Mitigation Plan */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
               multiline

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Read(//c/Users/Adam Murphy/AI/icepac/**)",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''phase2'' -Directory | Select-Object Name\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''phase2-frontend'' -Directory | Select-Object Name\")",
+      "Bash(echo:*)",
+      "Bash(wc:*)",
+      "Bash(docker-compose run:*)"
+    ]
+  }
+}

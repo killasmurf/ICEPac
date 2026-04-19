@@ -2,8 +2,8 @@
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.models.database.assignment import ResourceAssignment
 from app.models.database.resource import Resource
@@ -43,7 +43,9 @@ class AssignmentService:
         """Count assignments for a WBS item."""
         return self.repository.count_by_wbs(wbs_id)
 
-    def create(self, wbs_id: int, data: AssignmentCreate) -> ResourceAssignment:
+    def create(
+        self, wbs_id: int, data: AssignmentCreate
+    ) -> ResourceAssignment:
         """Create a new assignment for a WBS item.
 
         Validates:
@@ -52,7 +54,7 @@ class AssignmentService:
         - Resource code exists in resources table
         """
         # Validate WBS exists and is editable
-        self._validate_wbs_editable(wbs_id)
+        wbs = self._validate_wbs_editable(wbs_id)
 
         # Validate resource exists
         self._validate_resource_code(data.resource_code)
@@ -62,7 +64,9 @@ class AssignmentService:
         assignment_data["wbs_id"] = wbs_id
         return self.repository.create(assignment_data)
 
-    def update(self, assignment_id: int, data: AssignmentUpdate) -> ResourceAssignment:
+    def update(
+        self, assignment_id: int, data: AssignmentUpdate
+    ) -> ResourceAssignment:
         """Update an assignment.
 
         Validates:

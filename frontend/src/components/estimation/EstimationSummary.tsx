@@ -149,21 +149,21 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
     <Box>
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Total PERT Estimate"
             value={formatCurrency(summary.total_pert_estimate)}
             subtitle={`${summary.total_assignments} assignments`}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="80% Confidence Range"
             value={`${formatCurrency(summary.confidence_80_low)} - ${formatCurrency(summary.confidence_80_high)}`}
             subtitle={`Std Dev: ${formatCurrency(summary.total_std_deviation)}`}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Risk Exposure"
             value={formatCurrency(summary.total_risk_exposure)}
@@ -171,7 +171,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
             color="warning.main"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Risk-Adjusted Estimate"
             value={formatCurrency(summary.risk_adjusted_estimate)}

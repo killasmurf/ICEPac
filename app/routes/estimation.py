@@ -3,31 +3,31 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_any_role
 from app.models.schemas.assignment import (
     AssignmentCreate,
-    AssignmentListResponse,
-    AssignmentResponse,
     AssignmentUpdate,
-)
-from app.models.schemas.estimation import (
-    ApprovalAction,
-    ProjectEstimationSummary,
-    WBSApprovalResponse,
-    WBSCostSummary,
+    AssignmentResponse,
+    AssignmentListResponse,
 )
 from app.models.schemas.risk import (
     RiskCreate,
-    RiskListResponse,
-    RiskResponse,
     RiskUpdate,
+    RiskResponse,
+    RiskListResponse,
 )
-from app.repositories.wbs_repository import WBSRepository
-from app.services.approval_service import ApprovalService
+from app.models.schemas.estimation import (
+    WBSCostSummary,
+    ProjectEstimationSummary,
+    ApprovalAction,
+    WBSApprovalResponse,
+)
 from app.services.assignment_service import AssignmentService
-from app.services.estimation_service import EstimationService
-from app.services.project_service import ProjectService
 from app.services.risk_service import RiskService
+from app.services.estimation_service import EstimationService
+from app.services.approval_service import ApprovalService
+from app.services.project_service import ProjectService
+from app.repositories.wbs_repository import WBSRepository
 
 router = APIRouter(prefix="/projects")
 
@@ -35,7 +35,6 @@ router = APIRouter(prefix="/projects")
 # =============================================================================
 # Helper: Validate project and WBS exist
 # =============================================================================
-
 
 def _validate_project_wbs(db: Session, project_id: int, wbs_id: int):
     """Validate project and WBS exist and WBS belongs to project."""
@@ -53,7 +52,6 @@ def _validate_project_wbs(db: Session, project_id: int, wbs_id: int):
 # =============================================================================
 # Assignment CRUD
 # =============================================================================
-
 
 @router.get(
     "/{project_id}/wbs/{wbs_id}/assignments",
@@ -159,7 +157,6 @@ async def delete_assignment(
 # =============================================================================
 # Risk CRUD
 # =============================================================================
-
 
 @router.get(
     "/{project_id}/wbs/{wbs_id}/risks",
@@ -283,7 +280,6 @@ async def delete_risk(
 # Estimation Summaries
 # =============================================================================
 
-
 @router.get(
     "/{project_id}/estimation",
     response_model=ProjectEstimationSummary,
@@ -319,7 +315,6 @@ async def get_wbs_estimation(
 # =============================================================================
 # Approval Workflow
 # =============================================================================
-
 
 @router.get(
     "/{project_id}/wbs/{wbs_id}/approval",
@@ -380,7 +375,9 @@ async def process_approval_action(
             wbs_id, current_user.id, current_user.username, action.comment
         )
     elif action.action == "reset":
-        wbs = service.reset_to_draft(wbs_id, current_user.id, current_user.username)
+        wbs = service.reset_to_draft(
+            wbs_id, current_user.id, current_user.username
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
