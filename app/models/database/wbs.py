@@ -73,6 +73,10 @@ class WBS(Base):
     approver_date = Column(DateTime, nullable=True)
     estimate_revision = Column(Integer, default=0)
 
+    # Approval workflow (Phase 4)
+    # Valid values: draft, submitted, approved, rejected
+    approval_status = Column(String(20), default="draft", nullable=False)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

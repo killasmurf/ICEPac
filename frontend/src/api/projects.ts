@@ -109,6 +109,14 @@ export interface WBSItem {
   is_critical: boolean;
   resource_names: string | null;
   notes: string | null;
+  // Estimation (BOE) fields
+  requirements: string | null;
+  assumptions: string | null;
+  // Approval workflow (Phase 4)
+  approver: string | null;
+  approver_date: string | null;
+  estimate_revision: number;
+  approval_status: string;
   created_at: string;
   updated_at: string;
 }

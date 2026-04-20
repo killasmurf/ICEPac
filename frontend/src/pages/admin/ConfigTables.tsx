@@ -1,227 +1,152 @@
 /**
- * ConfigTables Component
- *
- * Admin page for managing configuration/lookup tables.
- * Connected to real backend API endpoints.
+ * ConfigTables - Dynamic configuration table management.
+ * Supports 10 config tables including weighted tables (probability, severity, PMB).
  */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import {
-  getConfigItems, createConfigItem, updateConfigItem, deleteConfigItem,
-  ConfigItem, WeightedConfigItem, ConfigTableName, CONFIG_TABLE_INFO,
-  ConfigItemCreate, WeightedConfigItemCreate, ConfigItemUpdate, WeightedConfigItemUpdate,
-} from '../../api/admin';
+import { ConfigItem, ConfigTableInfo } from '../../api/admin';
 
-const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: '1400px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
-  title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' },
-  subtitle: { fontSize: '15px', color: '#64748b' },
-  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
-  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' },
-  tableSelector: { display: 'flex', gap: '12px', alignItems: 'center' },
-  tableSelect: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: 500, color: '#0f172a', backgroundColor: '#fff', cursor: 'pointer', minWidth: '220px' },
-  tableCard: { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
-  formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  formGroupFull: { gridColumn: '1 / -1' },
-  label: { fontSize: '14px', fontWeight: 500, color: '#374151' },
-  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none' },
-  select: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
-  error: { color: '#dc2626', fontSize: '13px', marginTop: '4px' },
-  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-  toastSuccess: { backgroundColor: '#10b981' },
-  toastError: { backgroundColor: '#ef4444' },
-  tableInfo: { padding: '16px 20px', backgroundColor: '#fef3c7', borderBottom: '1px solid #fcd34d', display: 'flex', alignItems: 'center', gap: '12px' },
-  tableInfoIcon: { color: '#d97706' },
-  tableInfoText: { fontSize: '14px', color: '#92400e' },
-  weightBadge: { padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '13px', fontWeight: 500 },
+const TABLE_INFO: ConfigTableInfo[] = [
+  { name: 'cost_types', label: 'Cost Types', description: 'Element of Cost classifications', weighted: false },
+  { name: 'expense_types', label: 'Expense Types', description: 'Expense type categories', weighted: false },
+  { name: 'regions', label: 'Regions', description: 'Geographic regions', weighted: false },
+  { name: 'business_areas', label: 'Business Areas', description: 'Business area classifications', weighted: false },
+  { name: 'estimating_techniques', label: 'Estimating Techniques', description: 'Available estimation methods', weighted: false },
+  { name: 'risk_categories', label: 'Risk Categories', description: 'Risk classification categories', weighted: false },
+  { name: 'expenditure_indicators', label: 'Expenditure Indicators', description: 'Expenditure indicator types', weighted: false },
+  { name: 'probability_levels', label: 'Probability Levels', description: 'Probability with weights', weighted: true },
+  { name: 'severity_levels', label: 'Severity Levels', description: 'Severity with weights', weighted: true },
+  { name: 'pmb_weights', label: 'PMB Weights', description: 'PMB weight configuration', weighted: true },
+];
+
+const MOCK_DATA: Record<string, ConfigItem[]> = {
+  cost_types: [
+    { id: 1, name: 'Labor', code: 'LBR', description: 'Direct labor costs', is_active: true, sort_order: 1, created_at: '2026-01-01', updated_at: '2026-01-01' },
+    { id: 2, name: 'Materials', code: 'MAT', description: 'Materials and supplies', is_active: true, sort_order: 2, created_at: '2026-01-01', updated_at: '2026-01-01' },
+    { id: 3, name: 'Subcontract', code: 'SUB', description: 'Subcontractor costs', is_active: true, sort_order: 3, created_at: '2026-01-01', updated_at: '2026-01-01' },
+  ],
+  probability_levels: [
+    { id: 1, name: 'Very Low', description: '<10%', weight: 0.05, level: 1, is_active: true, sort_order: 1, created_at: '2026-01-01', updated_at: '2026-01-01' },
+    { id: 2, name: 'Low', description: '10-25%', weight: 0.175, level: 2, is_active: true, sort_order: 2, created_at: '2026-01-01', updated_at: '2026-01-01' },
+    { id: 3, name: 'Medium', description: '25-50%', weight: 0.375, level: 3, is_active: true, sort_order: 3, created_at: '2026-01-01', updated_at: '2026-01-01' },
+  ],
 };
 
-// Build CONFIG_TABLES from the shared CONFIG_TABLE_INFO
-const CONFIG_TABLES: { name: ConfigTableName; label: string; weighted: boolean }[] =
-  (Object.keys(CONFIG_TABLE_INFO) as ConfigTableName[]).map(name => ({
-    name,
-    label: CONFIG_TABLE_INFO[name].description,
-    weighted: CONFIG_TABLE_INFO[name].weighted,
-  }));
+const EMPTY_FORM = { name: '', code: '', description: '', sort_order: 0, weight: 0, level: 1, category: '' };
 
-interface FormData { code: string; description: string; weight: string; is_active: boolean; }
-const initialFormData: FormData = { code: '', description: '', weight: '0', is_active: true };
-
-function ConfigTables() {
-  const [selectedTable, setSelectedTable] = useState<ConfigTableName>('cost-types');
-  const [items, setItems] = useState<(ConfigItem | WeightedConfigItem)[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<ConfigItem | WeightedConfigItem | null>(null);
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+export default function ConfigTables() {
+  const [activeTable, setActiveTable] = useState(TABLE_INFO[0]);
+  const [items, setItems] = useState<ConfigItem[]>(MOCK_DATA[TABLE_INFO[0].name] || []);
+  const [showForm, setShowForm] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [selected, setSelected] = useState<ConfigItem | null>(null);
+  const [form, setForm] = useState<any>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const isWeighted = CONFIG_TABLES.find(t => t.name === selectedTable)?.weighted || false;
-  const tableLabel = CONFIG_TABLES.find(t => t.name === selectedTable)?.label || selectedTable;
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ message: msg, type }); setTimeout(() => setToast(null), 3000); };
 
-  const loadItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await getConfigItems(selectedTable);
-      setItems(response.items);
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to load items', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTable]);
-
-  useEffect(() => { loadItems(); }, [loadItems]);
-
-  const showToast = (message: string, type: 'success' | 'error') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000); };
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!formData.code) errors.code = 'Required';
-    if (!formData.description) errors.description = 'Required';
-    if (isWeighted && (!formData.weight || isNaN(parseFloat(formData.weight)))) errors.weight = 'Valid weight required';
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  const switchTable = (info: ConfigTableInfo) => {
+    setActiveTable(info);
+    setItems(MOCK_DATA[info.name] || []);
   };
 
-  const handleCreate = async () => {
-    if (!validateForm()) return;
+  const handleCreate = () => { setSelected(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  const handleEdit = (item: ConfigItem) => { setSelected(item); setForm({ name: item.name, code: item.code || '', description: item.description || '', sort_order: item.sort_order, weight: item.weight || 0, level: item.level || 1, category: item.category || '' }); setShowForm(true); };
+
+  const handleSubmit = () => {
     setSaving(true);
-    try {
-      const payload: ConfigItemCreate | WeightedConfigItemCreate = isWeighted
-        ? { code: formData.code, description: formData.description, is_active: formData.is_active, weight: parseFloat(formData.weight) || 0 }
-        : { code: formData.code, description: formData.description, is_active: formData.is_active };
-      await createConfigItem(selectedTable, payload);
-      showToast('Item created successfully', 'success');
-      setShowCreateDialog(false);
-      setFormData(initialFormData);
-      loadItems();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to create item', 'error');
-    } finally {
-      setSaving(false);
+    if (selected) {
+      setItems(prev => prev.map(i => i.id === selected.id ? { ...i, ...form } : i));
+      showToast(`Item "${form.name}" updated`);
+    } else {
+      setItems(prev => [...prev, { ...form, id: (prev.length ? Math.max(...prev.map(i => i.id)) : 0) + 1, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      showToast(`Item "${form.name}" created`);
     }
+    setShowForm(false); setSaving(false);
   };
 
-  const handleEdit = (item: ConfigItem | WeightedConfigItem) => {
-    setSelectedItem(item);
-    setFormData({
-      code: item.code,
-      description: item.description,
-      weight: 'weight' in item ? item.weight.toString() : '0',
-      is_active: item.is_active,
-    });
-    setFormErrors({});
-    setShowEditDialog(true);
+  const confirmDelete = () => {
+    if (!selected) return;
+    setItems(prev => prev.filter(i => i.id !== selected.id));
+    showToast(`Item "${selected.name}" deleted`);
+    setShowDelete(false); setSelected(null);
   };
 
-  const handleUpdate = async () => {
-    if (!validateForm() || !selectedItem) return;
-    setSaving(true);
-    try {
-      const payload: ConfigItemUpdate | WeightedConfigItemUpdate = isWeighted
-        ? { code: formData.code, description: formData.description, is_active: formData.is_active, weight: parseFloat(formData.weight) || 0 }
-        : { code: formData.code, description: formData.description, is_active: formData.is_active };
-      await updateConfigItem(selectedTable, selectedItem.id, payload);
-      showToast('Item updated successfully', 'success');
-      setShowEditDialog(false);
-      setSelectedItem(null);
-      loadItems();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to update item', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = (item: ConfigItem | WeightedConfigItem) => { setSelectedItem(item); setShowDeleteDialog(true); };
-  const confirmDelete = async () => {
-    if (!selectedItem) return;
-    setSaving(true);
-    try {
-      await deleteConfigItem(selectedTable, selectedItem.id);
-      showToast('Item deleted successfully', 'success');
-      setShowDeleteDialog(false);
-      setSelectedItem(null);
-      loadItems();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to delete item', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
-
-  const columns: Column<ConfigItem | WeightedConfigItem>[] = [
-    { key: 'code', header: 'Code', sortable: true, width: '150px', render: item => <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{item.code}</span> },
-    { key: 'description', header: 'Description', sortable: true },
-    ...(isWeighted ? [{ key: 'weight' as const, header: 'Weight', sortable: true, width: '100px', render: (item: ConfigItem | WeightedConfigItem) => <span style={styles.weightBadge}>{(item as WeightedConfigItem).weight}</span> }] : []),
-    { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: item => <StatusBadge isActive={item.is_active} /> },
+  const baseColumns: Column<ConfigItem>[] = [
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'code', label: 'Code', width: '80px', render: v => v || '—' },
+    { key: 'description', label: 'Description', render: v => v || '—' },
+    { key: 'sort_order', label: 'Order', width: '70px' },
+    { key: 'is_active', label: 'Status', width: '90px', render: v => <StatusBadge active={v} /> },
   ];
 
+  const weightedColumns: Column<ConfigItem>[] = [
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'description', label: 'Description', render: v => v || '—' },
+    { key: 'weight', label: 'Weight', width: '80px', render: v => v?.toFixed(3) || '0' },
+    { key: 'level', label: 'Level', width: '70px', render: v => v || '—' },
+    { key: 'sort_order', label: 'Order', width: '70px' },
+    { key: 'is_active', label: 'Status', width: '90px', render: v => <StatusBadge active={v} /> },
+  ];
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' };
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div><h1 style={styles.title}>Configuration Tables</h1><p style={styles.subtitle}>Manage system lookup values</p></div>
-        <button style={styles.primaryButton} onClick={() => { setFormData(initialFormData); setFormErrors({}); setShowCreateDialog(true); }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Item
-        </button>
-      </div>
-
-      <div style={styles.toolbar}>
-        <div style={styles.tableSelector}>
-          <label style={{ fontSize: '14px', fontWeight: 500, color: '#475569' }}>Table:</label>
-          <select style={styles.tableSelect} value={selectedTable} onChange={e => setSelectedTable(e.target.value as ConfigTableName)}>
-            {CONFIG_TABLES.map(t => <option key={t.name} value={t.name}>{t.label}{t.weighted ? ' (Weighted)' : ''}</option>)}
-          </select>
+    <div style={{ maxWidth: '1400px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Configuration Tables</h1>
+          <p style={{ fontSize: '15px', color: '#64748b' }}>Manage lookup tables and system configuration</p>
         </div>
+        <button onClick={handleCreate} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
       </div>
 
-      <div style={styles.tableCard}>
-        {isWeighted && (
-          <div style={styles.tableInfo}>
-            <span style={styles.tableInfoIcon}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            </span>
-            <span style={styles.tableInfoText}>This is a weighted table. Each item has a weight value used in calculations.</span>
-          </div>
-        )}
-        <DataGrid data={items} columns={columns as Column<ConfigItem>[]} keyField="id" loading={loading} emptyMessage="No items found"
-          onEdit={handleEdit} onDelete={handleDelete} />
+      {/* Table selector */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+        {TABLE_INFO.map(t => (
+          <button key={t.name} onClick={() => switchTable(t)} style={{
+            padding: '8px 16px', border: '1px solid', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+            backgroundColor: activeTable.name === t.name ? '#0f172a' : '#fff',
+            color: activeTable.name === t.name ? '#fff' : '#475569',
+            borderColor: activeTable.name === t.name ? '#0f172a' : '#e2e8f0',
+          }}>
+            {t.label} {t.weighted && '⚖️'}
+          </button>
+        ))}
       </div>
 
-      <FormDialog open={showCreateDialog} title={`Add ${tableLabel} Item`} onClose={() => setShowCreateDialog(false)} onSubmit={handleCreate} loading={saving} submitLabel="Create">
-        <div style={styles.formGrid}>
-          <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.code} onChange={e => handleInputChange('code', e.target.value.toUpperCase())} placeholder="CODE" />{formErrors.code && <span style={styles.error}>{formErrors.code}</span>}</div>
-          {isWeighted && <div style={styles.formGroup}><label style={styles.label}>Weight *</label><input style={styles.input} type="number" step="0.01" min="0" max="1" value={formData.weight} onChange={e => handleInputChange('weight', e.target.value)} placeholder="0.50" />{formErrors.weight && <span style={styles.error}>{formErrors.weight}</span>}</div>}
-          <div style={{...styles.formGroup, ...(!isWeighted ? styles.formGroupFull : {})}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} placeholder="Description" />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
+      <div style={{ backgroundColor: '#f0fdf4', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', color: '#166534' }}>
+        <strong>{activeTable.label}</strong> — {activeTable.description}
+        {activeTable.weighted && <span style={{ marginLeft: '8px', opacity: 0.7 }}>(weighted table)</span>}
+      </div>
+
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <DataGrid columns={activeTable.weighted ? weightedColumns : baseColumns} data={items} total={items.length}
+          actions={(row: ConfigItem) => (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => handleEdit(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
+              <button onClick={() => { setSelected(row); setShowDelete(true); }} style={{ padding: '4px 12px', border: '1px solid #fee2e2', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>Delete</button>
+            </div>
+          )} />
+      </div>
+
+      <FormDialog open={showForm} title={selected ? `Edit ${activeTable.label} Item` : `Add ${activeTable.label} Item`} onClose={() => setShowForm(false)} onSubmit={handleSubmit} loading={saving}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+          <div><label style={labelStyle}>Name</label><input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+          {!activeTable.weighted && <div><label style={labelStyle}>Code</label><input style={inputStyle} value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} /></div>}
+          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Description</label><input style={inputStyle} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+          {activeTable.weighted && <div><label style={labelStyle}>Weight (0-1)</label><input style={inputStyle} type="number" step="0.001" min="0" max="1" value={form.weight} onChange={e => setForm({ ...form, weight: parseFloat(e.target.value) || 0 })} /></div>}
+          {activeTable.weighted && <div><label style={labelStyle}>Level</label><input style={inputStyle} type="number" min="1" value={form.level} onChange={e => setForm({ ...form, level: parseInt(e.target.value) || 1 })} /></div>}
+          <div><label style={labelStyle}>Sort Order</label><input style={inputStyle} type="number" min="0" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} /></div>
         </div>
       </FormDialog>
 
-      <FormDialog open={showEditDialog} title={`Edit ${tableLabel} Item`} onClose={() => setShowEditDialog(false)} onSubmit={handleUpdate} loading={saving} submitLabel="Save">
-        <div style={styles.formGrid}>
-          <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.code} onChange={e => handleInputChange('code', e.target.value.toUpperCase())} />{formErrors.code && <span style={styles.error}>{formErrors.code}</span>}</div>
-          {isWeighted && <div style={styles.formGroup}><label style={styles.label}>Weight *</label><input style={styles.input} type="number" step="0.01" min="0" max="1" value={formData.weight} onChange={e => handleInputChange('weight', e.target.value)} />{formErrors.weight && <span style={styles.error}>{formErrors.weight}</span>}</div>}
-          <div style={{...styles.formGroup, ...(!isWeighted ? styles.formGroupFull : {})}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Status</label><select style={styles.select} value={formData.is_active ? 'active' : 'inactive'} onChange={e => handleInputChange('is_active', e.target.value === 'active')}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-        </div>
-      </FormDialog>
-
-      <ConfirmDialog open={showDeleteDialog} title="Delete Item" message={`Delete "${selectedItem?.code}"?`} onClose={() => setShowDeleteDialog(false)} onConfirm={confirmDelete} loading={saving} confirmLabel="Delete" danger />
-
-      {toast && <div style={{...styles.toast, ...(toast.type === 'success' ? styles.toastSuccess : styles.toastError)}}>{toast.message}</div>}
+      <ConfirmDialog open={showDelete} title="Delete Item" message={`Delete "${selected?.name}" from ${activeTable.label}?`} onClose={() => setShowDelete(false)} onConfirm={confirmDelete} confirmLabel="Delete" danger />
+      {toast && <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 2000, backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444' }}>{toast.message}</div>}
     </div>
   );
 }
-
-export default ConfigTables;

@@ -44,6 +44,16 @@ class WBSResponse(BaseModel):
     resource_names: Optional[str] = None
     notes: Optional[str] = None
 
+    # Estimation (BOE)
+    requirements: Optional[str] = None
+    assumptions: Optional[str] = None
+
+    # Approval workflow (Phase 4)
+    approver: Optional[str] = None
+    approver_date: Optional[datetime] = None
+    estimate_revision: int = 0
+    approval_status: str = "draft"
+
     created_at: datetime
     updated_at: datetime
 

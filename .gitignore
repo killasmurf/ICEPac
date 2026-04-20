@@ -47,3 +47,6 @@ dmypy.json
 # Ruff
 .ruff_cache/
 icepac/
+
+nul
+.claude/worktrees/

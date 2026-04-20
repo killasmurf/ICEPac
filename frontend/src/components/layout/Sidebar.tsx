@@ -3,6 +3,7 @@ import { Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar } fro
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import HelpIcon from '@mui/icons-material/Help';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const DRAWER_WIDTH = 240;
@@ -11,6 +12,7 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Projects', icon: <FolderIcon />, path: '/projects' },
   { text: 'Help', icon: <HelpIcon />, path: '/help' },
+  { text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
 ];
 
 interface SidebarProps {

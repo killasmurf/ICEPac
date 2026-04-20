@@ -1,15 +1,11 @@
 /**
  * Admin API Client
- * 
- * Provides typed API calls for the admin system endpoints.
- * Part of Phase 2: Admin Circuit Migration
+ * Complete TypeScript client for all Phase 2 admin endpoints.
  */
 
-import client from './client';
+const API_BASE = '/api/v1/admin';
 
-// ============================================================
-// User Types & API
-// ============================================================
+// ── Types ────────────────────────────────────────────────────
 
 export interface User {
   id: number;
@@ -29,68 +25,28 @@ export interface UserCreate {
   username: string;
   password: string;
   full_name?: string;
-  role?: 'admin' | 'manager' | 'user' | 'viewer';
+  role?: string;
+  is_active?: boolean;
 }
 
 export interface UserUpdate {
   email?: string;
   username?: string;
   full_name?: string;
-  role?: 'admin' | 'manager' | 'user' | 'viewer';
+  role?: string;
   is_active?: boolean;
 }
-
-export interface UserPasswordUpdate {
-  current_password: string;
-  new_password: string;
-}
-
-export interface UserListResponse {
-  items: User[];
-  total: number;
-  skip: number;
-  limit: number;
-}
-
-export async function getUsers(skip = 0, limit = 100): Promise<UserListResponse> {
-  const response = await client.get('/admin/users', { params: { skip, limit } });
-  return response.data;
-}
-
-export async function getUser(userId: number): Promise<User> {
-  const response = await client.get(`/admin/users/${userId}`);
-  return response.data;
-}
-
-export async function createUser(data: UserCreate): Promise<User> {
-  const response = await client.post('/admin/users', data);
-  return response.data;
-}
-
-export async function updateUser(userId: number, data: UserUpdate): Promise<User> {
-  const response = await client.put(`/admin/users/${userId}`, data);
-  return response.data;
-}
-
-export async function updateUserPassword(userId: number, data: UserPasswordUpdate): Promise<void> {
-  await client.put(`/admin/users/${userId}/password`, data);
-}
-
-export async function deleteUser(userId: number): Promise<void> {
-  await client.delete(`/admin/users/${userId}`);
-}
-
-// ============================================================
-// Resource Types & API
-// ============================================================
 
 export interface Resource {
   id: number;
   resource_code: string;
   description: string;
-  eoc: string | null;
+  eoc?: string;
   cost: number;
-  units: string | null;
+  units?: string;
+  supplier_id?: number;
+  supplier_name?: string;
+  notes?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -100,9 +56,11 @@ export interface ResourceCreate {
   resource_code: string;
   description: string;
   eoc?: string;
-  cost?: number;
+  cost: number;
   units?: string;
-  is_active?: boolean;
+  supplier_id?: number;
+  supplier_name?: string;
+  notes?: string;
 }
 
 export interface ResourceUpdate {
@@ -111,365 +69,198 @@ export interface ResourceUpdate {
   eoc?: string;
   cost?: number;
   units?: string;
+  supplier_id?: number;
+  supplier_name?: string;
+  notes?: string;
   is_active?: boolean;
 }
 
-export interface ResourceListResponse {
-  items: Resource[];
-  total: number;
-  skip: number;
-  limit: number;
-}
-
-export async function getResources(
-  skip = 0,
-  limit = 100,
-  search?: string,
-  activeOnly = false
-): Promise<ResourceListResponse> {
-  const response = await client.get('/admin/resources', {
-    params: { skip, limit, search, active_only: activeOnly }
-  });
-  return response.data;
-}
-
-export async function getResource(resourceId: number): Promise<Resource> {
-  const response = await client.get(`/admin/resources/${resourceId}`);
-  return response.data;
-}
-
-export async function createResource(data: ResourceCreate): Promise<Resource> {
-  const response = await client.post('/admin/resources', data);
-  return response.data;
-}
-
-export async function updateResource(resourceId: number, data: ResourceUpdate): Promise<Resource> {
-  const response = await client.put(`/admin/resources/${resourceId}`, data);
-  return response.data;
-}
-
-export async function deleteResource(resourceId: number): Promise<void> {
-  await client.delete(`/admin/resources/${resourceId}`);
-}
-
-// ============================================================
-// Supplier Types & API
-// ============================================================
-
 export interface Supplier {
   id: number;
-  supplier_code: string;
   name: string;
-  contact: string | null;
-  phone: string | null;
-  email: string | null;
-  notes: string | null;
+  contact_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  notes?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface SupplierCreate {
-  supplier_code: string;
   name: string;
-  contact?: string;
-  phone?: string;
+  contact_name?: string;
   email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
   notes?: string;
-  is_active?: boolean;
 }
 
 export interface SupplierUpdate {
-  supplier_code?: string;
   name?: string;
-  contact?: string;
-  phone?: string;
+  contact_name?: string;
   email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
   notes?: string;
   is_active?: boolean;
 }
 
-export interface SupplierListResponse {
-  items: Supplier[];
-  total: number;
-  skip: number;
-  limit: number;
-}
-
-export async function getSuppliers(
-  skip = 0,
-  limit = 100,
-  search?: string,
-  activeOnly = false
-): Promise<SupplierListResponse> {
-  const response = await client.get('/admin/suppliers', {
-    params: { skip, limit, search, active_only: activeOnly }
-  });
-  return response.data;
-}
-
-export async function getSupplier(supplierId: number): Promise<Supplier> {
-  const response = await client.get(`/admin/suppliers/${supplierId}`);
-  return response.data;
-}
-
-export async function createSupplier(data: SupplierCreate): Promise<Supplier> {
-  const response = await client.post('/admin/suppliers', data);
-  return response.data;
-}
-
-export async function updateSupplier(supplierId: number, data: SupplierUpdate): Promise<Supplier> {
-  const response = await client.put(`/admin/suppliers/${supplierId}`, data);
-  return response.data;
-}
-
-export async function deleteSupplier(supplierId: number): Promise<void> {
-  await client.delete(`/admin/suppliers/${supplierId}`);
-}
-
-// ============================================================
-// Configuration Tables Types & API
-// ============================================================
-
 export interface ConfigItem {
   id: number;
-  code: string;
-  description: string;
+  name: string;
+  description?: string;
+  code?: string;
+  weight?: number;
+  level?: number;
+  category?: string;
   is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditLog {
+  id: number;
+  user_id: number;
+  username: string;
+  action: string;
+  entity_type: string;
+  entity_id?: number;
+  details?: string;
+  old_values?: string;
+  new_values?: string;
+  ip_address?: string;
   created_at: string;
 }
 
-export interface WeightedConfigItem extends ConfigItem {
-  weight: number;
-}
-
-export interface ConfigItemCreate {
-  code: string;
-  description: string;
-  is_active?: boolean;
-}
-
-export interface WeightedConfigItemCreate extends ConfigItemCreate {
-  weight: number;
-}
-
-export interface ConfigItemUpdate {
-  code?: string;
-  description?: string;
-  is_active?: boolean;
-}
-
-export interface WeightedConfigItemUpdate extends ConfigItemUpdate {
-  weight?: number;
-}
-
-export interface ConfigItemListResponse {
-  items: ConfigItem[];
+export interface PaginatedResponse<T> {
+  items: T[];
   total: number;
+  skip: number;
+  limit: number;
 }
 
 export interface ConfigTableInfo {
   name: string;
+  label: string;
   description: string;
   weighted: boolean;
 }
 
-export type ConfigTableName =
-  | 'cost-types'
-  | 'expense-types'
-  | 'regions'
-  | 'business-areas'
-  | 'estimating-techniques'
-  | 'risk-categories'
-  | 'expenditure-indicators'
-  | 'probability-levels'
-  | 'severity-levels'
-  | 'pmb-weights';
+// ── Helper ───────────────────────────────────────────────────
 
-export async function getConfigTables(): Promise<{ tables: ConfigTableInfo[] }> {
-  const response = await client.get('/admin/config');
-  return response.data;
-}
-
-export async function getConfigItems(
-  tableName: ConfigTableName,
-  activeOnly = false
-): Promise<ConfigItemListResponse> {
-  const response = await client.get(`/admin/config/${tableName}`, {
-    params: { active_only: activeOnly }
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
   });
-  return response.data;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `API error: ${res.status}`);
+  }
+  return res.json();
 }
 
-export async function getConfigItem(
-  tableName: ConfigTableName,
-  itemId: number
-): Promise<ConfigItem | WeightedConfigItem> {
-  const response = await client.get(`/admin/config/${tableName}/${itemId}`);
-  return response.data;
-}
+// ── Dashboard ────────────────────────────────────────────────
 
-export async function createConfigItem(
-  tableName: ConfigTableName,
-  data: ConfigItemCreate | WeightedConfigItemCreate
-): Promise<ConfigItem | WeightedConfigItem> {
-  const response = await client.post(`/admin/config/${tableName}`, data);
-  return response.data;
-}
+export const dashboardApi = {
+  getStats: () => apiFetch<any>(`${API_BASE}/dashboard`),
+};
 
-export async function updateConfigItem(
-  tableName: ConfigTableName,
-  itemId: number,
-  data: ConfigItemUpdate | WeightedConfigItemUpdate
-): Promise<ConfigItem | WeightedConfigItem> {
-  const response = await client.put(`/admin/config/${tableName}/${itemId}`, data);
-  return response.data;
-}
+// ── Users ────────────────────────────────────────────────────
 
-export async function deleteConfigItem(
-  tableName: ConfigTableName,
-  itemId: number
-): Promise<void> {
-  await client.delete(`/admin/config/${tableName}/${itemId}`);
-}
+export const usersApi = {
+  list: (params?: { skip?: number; limit?: number; search?: string; role?: string; is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.skip) q.set('skip', String(params.skip));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.role) q.set('role', params.role);
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return apiFetch<PaginatedResponse<User>>(`${API_BASE}/users?${q}`);
+  },
+  get: (id: number) => apiFetch<User>(`${API_BASE}/users/${id}`),
+  create: (data: UserCreate) => apiFetch<User>(`${API_BASE}/users`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: UserUpdate) => apiFetch<User>(`${API_BASE}/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => apiFetch<void>(`${API_BASE}/users/${id}`, { method: 'DELETE' }),
+  changePassword: (id: number, newPassword: string) =>
+    apiFetch<void>(`${API_BASE}/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ new_password: newPassword }) }),
+};
 
-// ============================================================
-// Audit Log Types & API
-// ============================================================
+// ── Resources ────────────────────────────────────────────────
 
-export interface AuditLog {
-  id: number;
-  user_id: number | null;
-  username: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: number | null;
-  old_values: Record<string, any> | null;
-  new_values: Record<string, any> | null;
-  ip_address: string | null;
-  user_agent: string | null;
-  created_at: string;
-}
+export const resourcesApi = {
+  list: (params?: { skip?: number; limit?: number; search?: string; eoc?: string; is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.skip) q.set('skip', String(params.skip));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.eoc) q.set('eoc', params.eoc);
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return apiFetch<PaginatedResponse<Resource>>(`${API_BASE}/resources?${q}`);
+  },
+  get: (id: number) => apiFetch<Resource>(`${API_BASE}/resources/${id}`),
+  create: (data: ResourceCreate) => apiFetch<Resource>(`${API_BASE}/resources`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: ResourceUpdate) => apiFetch<Resource>(`${API_BASE}/resources/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => apiFetch<void>(`${API_BASE}/resources/${id}`, { method: 'DELETE' }),
+  eocSummary: () => apiFetch<Record<string, number>>(`${API_BASE}/resources/eoc-summary`),
+};
 
-export interface AuditLogListResponse {
-  items: AuditLog[];
-  total: number;
-  skip: number;
-  limit: number;
-}
+// ── Suppliers ────────────────────────────────────────────────
 
-export interface AuditLogFilter {
-  user_id?: number;
-  action?: string;
-  entity_type?: string;
-  entity_id?: number;
-  start_date?: string;
-  end_date?: string;
-}
+export const suppliersApi = {
+  list: (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.skip) q.set('skip', String(params.skip));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return apiFetch<PaginatedResponse<Supplier>>(`${API_BASE}/suppliers?${q}`);
+  },
+  get: (id: number) => apiFetch<Supplier>(`${API_BASE}/suppliers/${id}`),
+  create: (data: SupplierCreate) => apiFetch<Supplier>(`${API_BASE}/suppliers`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: SupplierUpdate) => apiFetch<Supplier>(`${API_BASE}/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => apiFetch<void>(`${API_BASE}/suppliers/${id}`, { method: 'DELETE' }),
+};
 
-export async function getAuditLogs(
-  skip = 0,
-  limit = 100,
-  filters?: AuditLogFilter
-): Promise<AuditLogListResponse> {
-  const response = await client.get('/admin/audit-logs', {
-    params: { skip, limit, ...filters }
-  });
-  return response.data;
-}
+// ── Config Tables ────────────────────────────────────────────
 
-export async function getAuditLog(auditId: number): Promise<AuditLog> {
-  const response = await client.get(`/admin/audit-logs/${auditId}`);
-  return response.data;
-}
+export const configApi = {
+  listTables: () => apiFetch<ConfigTableInfo[]>(`${API_BASE}/config`),
+  listItems: (table: string, params?: { skip?: number; limit?: number; is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.skip) q.set('skip', String(params.skip));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return apiFetch<{ items: ConfigItem[]; total: number; table_name: string }>(`${API_BASE}/config/${table}?${q}`);
+  },
+  getItem: (table: string, id: number) => apiFetch<ConfigItem>(`${API_BASE}/config/${table}/${id}`),
+  createItem: (table: string, data: any) => apiFetch<ConfigItem>(`${API_BASE}/config/${table}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateItem: (table: string, id: number, data: any) => apiFetch<ConfigItem>(`${API_BASE}/config/${table}/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteItem: (table: string, id: number) => apiFetch<void>(`${API_BASE}/config/${table}/${id}`, { method: 'DELETE' }),
+};
 
-export async function getEntityAuditHistory(
-  entityType: string,
-  entityId: number,
-  skip = 0,
-  limit = 100
-): Promise<AuditLogListResponse> {
-  const response = await client.get(
-    `/admin/audit-logs/entity/${entityType}/${entityId}`,
-    { params: { skip, limit } }
-  );
-  return response.data;
-}
+// ── Audit Logs ───────────────────────────────────────────────
 
-// ============================================================
-// Utility Functions
-// ============================================================
-
-export function formatAuditAction(action: string): string {
-  const actionLabels: Record<string, string> = {
-    CREATE: 'Created',
-    UPDATE: 'Updated',
-    DELETE: 'Deleted',
-    LOGIN: 'Logged In',
-    LOGOUT: 'Logged Out',
-    FAILED_LOGIN: 'Failed Login',
-    PASSWORD_CHANGE: 'Password Changed',
-    ROLE_CHANGE: 'Role Changed',
-  };
-  return actionLabels[action] || action;
-}
-
-export function formatEntityType(type: string): string {
-  return type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-export function getRoleBadgeColor(role: string): string {
-  const colors: Record<string, string> = {
-    admin: '#dc3545',
-    manager: '#fd7e14',
-    user: '#28a745',
-    viewer: '#6c757d',
-  };
-  return colors[role] || '#6c757d';
-}
-
-// ============================================================
-// Dashboard Stats API
-// ============================================================
-
-export interface DashboardStats {
-  users: { total: number; active: number };
-  resources: { total: number; active: number };
-  suppliers: { total: number; active: number };
-}
-
-export async function getDashboardStats(): Promise<DashboardStats> {
-  const [users, resources, suppliers] = await Promise.all([
-    client.get('/admin/users', { params: { skip: 0, limit: 1 } }),
-    client.get('/admin/resources', { params: { skip: 0, limit: 1 } }),
-    client.get('/admin/suppliers', { params: { skip: 0, limit: 1 } }),
-  ]);
-
-  const [activeResources, activeSuppliers] = await Promise.all([
-    client.get('/admin/resources', { params: { skip: 0, limit: 1, active_only: true } }),
-    client.get('/admin/suppliers', { params: { skip: 0, limit: 1, active_only: true } }),
-  ]);
-
-  return {
-    users: { total: users.data.total, active: users.data.items.filter((u: User) => u.is_active).length || users.data.total },
-    resources: { total: resources.data.total, active: activeResources.data.total },
-    suppliers: { total: suppliers.data.total, active: activeSuppliers.data.total },
-  };
-}
-
-// ============================================================
-// Config Table Metadata
-// ============================================================
-
-export const CONFIG_TABLE_INFO: Record<ConfigTableName, { description: string; weighted: boolean }> = {
-  'cost-types': { description: 'Cost Types', weighted: false },
-  'expense-types': { description: 'Expense Types', weighted: false },
-  'regions': { description: 'Regions', weighted: false },
-  'business-areas': { description: 'Business Areas', weighted: false },
-  'estimating-techniques': { description: 'Estimating Techniques', weighted: false },
-  'risk-categories': { description: 'Risk Categories', weighted: false },
-  'expenditure-indicators': { description: 'Expenditure Indicators', weighted: false },
-  'probability-levels': { description: 'Probability Levels', weighted: true },
-  'severity-levels': { description: 'Severity Levels', weighted: true },
-  'pmb-weights': { description: 'PMB Weights', weighted: true },
+export const auditApi = {
+  list: (params?: { skip?: number; limit?: number; action?: string; entity_type?: string; user_id?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.skip) q.set('skip', String(params.skip));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.action) q.set('action', params.action);
+    if (params?.entity_type) q.set('entity_type', params.entity_type);
+    if (params?.user_id) q.set('user_id', String(params.user_id));
+    return apiFetch<PaginatedResponse<AuditLog>>(`${API_BASE}/audit-logs?${q}`);
+  },
+  get: (id: number) => apiFetch<AuditLog>(`${API_BASE}/audit-logs/${id}`),
 };

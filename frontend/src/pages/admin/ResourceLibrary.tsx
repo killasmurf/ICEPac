@@ -1,244 +1,123 @@
 /**
- * ResourceLibrary Component
- *
- * Admin page for managing resources with full CRUD operations.
- * Connected to real backend API endpoints.
+ * ResourceLibrary - Admin page for managing resources with EOC filtering.
  */
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
 import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import SearchBar from '../../components/admin/SearchBar';
-import {
-  getResources, createResource, updateResource, deleteResource,
-  Resource, ResourceCreate, ResourceUpdate,
-} from '../../api/admin';
+import { Resource } from '../../api/admin';
 
-const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: '1400px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
-  title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' },
-  subtitle: { fontSize: '15px', color: '#64748b' },
-  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
-  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' },
-  filters: { display: 'flex', gap: '12px', alignItems: 'center' },
-  filterSelect: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px', color: '#475569', backgroundColor: '#fff', cursor: 'pointer' },
-  tableCard: { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
-  formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  formGroupFull: { gridColumn: '1 / -1' },
-  label: { fontSize: '14px', fontWeight: 500, color: '#374151' },
-  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none' },
-  select: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
-  error: { color: '#dc2626', fontSize: '13px', marginTop: '4px' },
-  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-  toastSuccess: { backgroundColor: '#10b981' },
-  toastError: { backgroundColor: '#ef4444' },
-  costCell: { fontFamily: "'JetBrains Mono', monospace", fontWeight: 500, color: '#059669' },
-};
+const MOCK_RESOURCES: Resource[] = [
+  { id: 1, resource_code: 'LBR-001', description: 'Senior Engineer', eoc: 'Labor', cost: 175.0, units: 'hours', supplier_name: 'Acme Corp', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-15' },
+  { id: 2, resource_code: 'LBR-002', description: 'Junior Analyst', eoc: 'Labor', cost: 85.0, units: 'hours', is_active: true, created_at: '2026-01-02', updated_at: '2026-01-14' },
+  { id: 3, resource_code: 'MAT-001', description: 'Server Hardware', eoc: 'Materials', cost: 12500.0, units: 'each', supplier_name: 'Dell Inc', is_active: true, created_at: '2026-01-03', updated_at: '2026-01-13' },
+  { id: 4, resource_code: 'TRV-001', description: 'Domestic Travel', eoc: 'Travel', cost: 500.0, units: 'trip', is_active: true, created_at: '2026-01-04', updated_at: '2026-01-12' },
+  { id: 5, resource_code: 'SUB-001', description: 'Testing Contractor', eoc: 'Subcontract', cost: 225.0, units: 'hours', supplier_name: 'QA Partners', is_active: false, created_at: '2025-11-01', updated_at: '2026-01-10' },
+];
 
-const eocOptions = ['LABOR', 'MATERIAL', 'EQUIPMENT', 'SUBCONTRACT', 'ODC'];
-const unitOptions = ['hour', 'day', 'week', 'month', 'each', 'lot'];
+const EMPTY_FORM = { resource_code: '', description: '', eoc: '', cost: 0, units: '', supplier_name: '', notes: '' };
 
-interface FormData { resource_code: string; description: string; eoc: string; cost: string; units: string; is_active: boolean; }
-const initialFormData: FormData = { resource_code: '', description: '', eoc: 'LABOR', cost: '0', units: 'hour', is_active: true };
-
-function ResourceLibrary() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+export default function ResourceLibrary() {
+  const [resources, setResources] = useState<Resource[]>(MOCK_RESOURCES);
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
-  const [eocFilter, setEocFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [eocFilter, setEocFilter] = useState('');
+  const [loading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [selected, setSelected] = useState<Resource | null>(null);
+  const [form, setForm] = useState<any>(EMPTY_FORM);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const loadResources = useCallback(async () => {
-    setLoading(true);
-    try {
-      const activeOnly = statusFilter === 'active';
-      const response = await getResources(skip, 20, search || undefined, activeOnly);
-      let filtered = response.items;
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ message: msg, type }); setTimeout(() => setToast(null), 3000); };
 
-      // Client-side EOC filter (backend doesn't support it directly)
-      if (eocFilter !== 'all') {
-        filtered = filtered.filter(r => r.eoc === eocFilter);
-      }
-      if (statusFilter === 'inactive') {
-        filtered = filtered.filter(r => !r.is_active);
-      }
+  const handleCreate = () => { setSelected(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  const handleEdit = (r: Resource) => { setSelected(r); setForm({ resource_code: r.resource_code, description: r.description, eoc: r.eoc || '', cost: r.cost, units: r.units || '', supplier_name: r.supplier_name || '', notes: r.notes || '' }); setShowForm(true); };
 
-      setResources(filtered);
-      setTotal(response.total);
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to load resources', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [skip, search, eocFilter, statusFilter]);
-
-  useEffect(() => { loadResources(); }, [loadResources]);
-  useEffect(() => { if (searchParams.get('action') === 'new') { setShowCreateDialog(true); setSearchParams({}); } }, [searchParams, setSearchParams]);
-
-  const showToast = (message: string, type: 'success' | 'error') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000); };
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!formData.resource_code) errors.resource_code = 'Required';
-    if (!formData.description) errors.description = 'Required';
-    if (formData.cost && parseFloat(formData.cost) < 0) errors.cost = 'Cost cannot be negative';
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleCreate = async () => {
-    if (!validateForm()) return;
+  const handleSubmit = () => {
     setSaving(true);
-    try {
-      const payload: ResourceCreate = {
-        resource_code: formData.resource_code,
-        description: formData.description,
-        eoc: formData.eoc,
-        cost: parseFloat(formData.cost) || 0,
-        units: formData.units,
-        is_active: formData.is_active,
-      };
-      await createResource(payload);
-      showToast('Resource created successfully', 'success');
-      setShowCreateDialog(false);
-      setFormData(initialFormData);
-      loadResources();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to create resource', 'error');
-    } finally {
-      setSaving(false);
+    if (selected) {
+      setResources(prev => prev.map(r => r.id === selected.id ? { ...r, ...form, updated_at: new Date().toISOString() } : r));
+      showToast(`Resource "${form.resource_code}" updated`);
+    } else {
+      setResources(prev => [...prev, { ...form, id: Math.max(...prev.map(r => r.id)) + 1, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      showToast(`Resource "${form.resource_code}" created`);
     }
+    setShowForm(false); setSaving(false);
   };
 
-  const handleEdit = (r: Resource) => {
-    setSelectedResource(r);
-    setFormData({ resource_code: r.resource_code, description: r.description, eoc: r.eoc || 'LABOR', cost: r.cost.toString(), units: r.units || 'hour', is_active: r.is_active });
-    setFormErrors({});
-    setShowEditDialog(true);
+  const confirmDelete = () => {
+    if (!selected) return;
+    setResources(prev => prev.filter(r => r.id !== selected.id));
+    showToast(`Resource "${selected.resource_code}" deleted`);
+    setShowDelete(false); setSelected(null);
   };
-
-  const handleUpdate = async () => {
-    if (!validateForm() || !selectedResource) return;
-    setSaving(true);
-    try {
-      const payload: ResourceUpdate = {
-        resource_code: formData.resource_code,
-        description: formData.description,
-        eoc: formData.eoc,
-        cost: parseFloat(formData.cost) || 0,
-        units: formData.units,
-        is_active: formData.is_active,
-      };
-      await updateResource(selectedResource.id, payload);
-      showToast('Resource updated successfully', 'success');
-      setShowEditDialog(false);
-      setSelectedResource(null);
-      loadResources();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to update resource', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = (r: Resource) => { setSelectedResource(r); setShowDeleteDialog(true); };
-  const confirmDelete = async () => {
-    if (!selectedResource) return;
-    setSaving(true);
-    try {
-      await deleteResource(selectedResource.id);
-      showToast('Resource deleted successfully', 'success');
-      setShowDeleteDialog(false);
-      setSelectedResource(null);
-      loadResources();
-    } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to delete resource', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
 
   const columns: Column<Resource>[] = [
-    { key: 'resource_code', header: 'Code', sortable: true, width: '120px', render: r => <span style={{ fontWeight: 600 }}>{r.resource_code}</span> },
-    { key: 'description', header: 'Description', sortable: true },
-    { key: 'eoc', header: 'EOC', sortable: true, width: '120px', render: r => <span style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', borderRadius: '4px', fontSize: '12px' }}>{r.eoc}</span> },
-    { key: 'cost', header: 'Cost', sortable: true, width: '120px', render: r => <span style={styles.costCell}>${r.cost.toLocaleString()}</span> },
-    { key: 'units', header: 'Units', sortable: true, width: '100px' },
-    { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: r => <StatusBadge isActive={r.is_active} /> },
+    { key: 'resource_code', label: 'Code', sortable: true, width: '120px' },
+    { key: 'description', label: 'Description', sortable: true },
+    { key: 'eoc', label: 'EOC', sortable: true, width: '120px' },
+    { key: 'cost', label: 'Cost', sortable: true, width: '100px', render: (v) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+    { key: 'units', label: 'Units', width: '80px' },
+    { key: 'supplier_name', label: 'Supplier', render: (v) => v || '—' },
+    { key: 'is_active', label: 'Status', width: '90px', render: (v) => <StatusBadge active={v} /> },
   ];
 
+  const eocs = [...new Set(resources.map(r => r.eoc).filter(Boolean))];
+  const filtered = resources.filter(r => {
+    if (search && !r.resource_code.toLowerCase().includes(search.toLowerCase()) && !r.description.toLowerCase().includes(search.toLowerCase())) return false;
+    if (eocFilter && r.eoc !== eocFilter) return false;
+    return true;
+  });
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' };
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div><h1 style={styles.title}>Resource Library</h1><p style={styles.subtitle}>Manage resources for project estimation</p></div>
-        <button style={styles.primaryButton} onClick={() => { setFormData(initialFormData); setFormErrors({}); setShowCreateDialog(true); }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Resource
-        </button>
+    <div style={{ maxWidth: '1400px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Resource Library</h1>
+          <p style={{ fontSize: '15px', color: '#64748b' }}>Manage resources, costs, and Element of Cost classifications</p>
+        </div>
+        <button onClick={handleCreate} style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>+ Add Resource</button>
       </div>
 
-      <div style={styles.toolbar}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
         <SearchBar value={search} onChange={setSearch} placeholder="Search resources..." />
-        <div style={styles.filters}>
-          <select style={styles.filterSelect} value={eocFilter} onChange={e => setEocFilter(e.target.value)}>
-            <option value="all">All EOC</option>
-            {eocOptions.map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
-          <select style={styles.filterSelect} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
+        <select style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }} value={eocFilter} onChange={e => setEocFilter(e.target.value)}>
+          <option value="">All EOC</option>
+          {eocs.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
       </div>
 
-      <div style={styles.tableCard}>
-        <DataGrid data={resources} columns={columns} keyField="id" loading={loading} emptyMessage="No resources found"
-          onEdit={handleEdit} onDelete={handleDelete} pagination={{ total, skip, limit: 20, onPageChange: setSkip }} />
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <DataGrid columns={columns} data={filtered} total={filtered.length} page={page} pageSize={20} onPageChange={setPage} loading={loading}
+          actions={(row: Resource) => (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => handleEdit(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
+              <button onClick={() => { setSelected(row); setShowDelete(true); }} style={{ padding: '4px 12px', border: '1px solid #fee2e2', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>Delete</button>
+            </div>
+          )} />
       </div>
 
-      <FormDialog open={showCreateDialog} title="Create Resource" onClose={() => setShowCreateDialog(false)} onSubmit={handleCreate} loading={saving} submitLabel="Create">
-        <div style={styles.formGrid}>
-          <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.resource_code} onChange={e => handleInputChange('resource_code', e.target.value.toUpperCase())} />{formErrors.resource_code && <span style={styles.error}>{formErrors.resource_code}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>EOC</label><select style={styles.select} value={formData.eoc} onChange={e => handleInputChange('eoc', e.target.value)}>{eocOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
-          <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" min="0" step="0.01" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} />{formErrors.cost && <span style={styles.error}>{formErrors.cost}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Units</label><select style={styles.select} value={formData.units} onChange={e => handleInputChange('units', e.target.value)}>{unitOptions.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
+      <FormDialog open={showForm} title={selected ? 'Edit Resource' : 'Add Resource'} onClose={() => setShowForm(false)} onSubmit={handleSubmit} loading={saving}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+          <div><label style={labelStyle}>Resource Code</label><input style={inputStyle} value={form.resource_code} onChange={e => setForm({ ...form, resource_code: e.target.value })} /></div>
+          <div><label style={labelStyle}>EOC</label><select style={{ ...inputStyle, cursor: 'pointer' }} value={form.eoc} onChange={e => setForm({ ...form, eoc: e.target.value })}><option value="">Select...</option><option>Labor</option><option>Materials</option><option>Subcontract</option><option>Travel</option><option>Other Direct Costs</option><option>Overhead</option></select></div>
+          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Description</label><input style={inputStyle} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+          <div><label style={labelStyle}>Cost ($)</label><input style={inputStyle} type="number" value={form.cost} onChange={e => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label style={labelStyle}>Units</label><input style={inputStyle} value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></div>
+          <div><label style={labelStyle}>Supplier</label><input style={inputStyle} value={form.supplier_name} onChange={e => setForm({ ...form, supplier_name: e.target.value })} /></div>
+          <div><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
       </FormDialog>
 
-      <FormDialog open={showEditDialog} title="Edit Resource" onClose={() => setShowEditDialog(false)} onSubmit={handleUpdate} loading={saving} submitLabel="Save">
-        <div style={styles.formGrid}>
-          <div style={styles.formGroup}><label style={styles.label}>Code *</label><input style={styles.input} value={formData.resource_code} onChange={e => handleInputChange('resource_code', e.target.value.toUpperCase())} />{formErrors.resource_code && <span style={styles.error}>{formErrors.resource_code}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>EOC</label><select style={styles.select} value={formData.eoc} onChange={e => handleInputChange('eoc', e.target.value)}>{eocOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
-          <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Description *</label><input style={styles.input} value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />{formErrors.description && <span style={styles.error}>{formErrors.description}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Cost</label><input style={styles.input} type="number" min="0" step="0.01" value={formData.cost} onChange={e => handleInputChange('cost', e.target.value)} />{formErrors.cost && <span style={styles.error}>{formErrors.cost}</span>}</div>
-          <div style={styles.formGroup}><label style={styles.label}>Units</label><select style={styles.select} value={formData.units} onChange={e => handleInputChange('units', e.target.value)}>{unitOptions.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
-          <div style={styles.formGroup}><label style={styles.label}>Status</label><select style={styles.select} value={formData.is_active ? 'active' : 'inactive'} onChange={e => handleInputChange('is_active', e.target.value === 'active')}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-        </div>
-      </FormDialog>
+      <ConfirmDialog open={showDelete} title="Delete Resource" message={`Delete resource "${selected?.resource_code}"? This cannot be undone.`} onClose={() => setShowDelete(false)} onConfirm={confirmDelete} confirmLabel="Delete" danger />
 
-      <ConfirmDialog open={showDeleteDialog} title="Delete Resource" message={`Delete "${selectedResource?.resource_code}"?`} onClose={() => setShowDeleteDialog(false)} onConfirm={confirmDelete} loading={saving} confirmLabel="Delete" danger />
-
-      {toast && <div style={{...styles.toast, ...(toast.type === 'success' ? styles.toastSuccess : styles.toastError)}}>{toast.message}</div>}
+      {toast && <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 2000, backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444' }}>{toast.message}</div>}
     </div>
   );
 }
-
-export default ResourceLibrary;
