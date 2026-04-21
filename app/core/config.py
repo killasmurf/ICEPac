@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     S3_BUCKET_NAME: str = "icepac-files"
+    S3_ENDPOINT_URL: Optional[str] = None  # For LocalStack: http://localhost:4566
 
     # MPXJ (MS Project Parser)
     MPXJ_JAR_PATH: str = "./mpxj-12.0.0.jar"

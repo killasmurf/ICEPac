@@ -15,15 +15,6 @@ import SupplierManagement from './pages/admin/SupplierManagement';
 import ConfigTables from './pages/admin/ConfigTables';
 import AuditLogs from './pages/admin/AuditLogs';
 
-// Admin pages
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
-import ResourceLibrary from './pages/admin/ResourceLibrary';
-import SupplierManagement from './pages/admin/SupplierManagement';
-import ConfigTables from './pages/admin/ConfigTables';
-import AuditLogs from './pages/admin/AuditLogs';
-
 function App() {
   return (
     <BrowserRouter>
@@ -44,14 +35,6 @@ function App() {
             <Route path="config" element={<ConfigTables />} />
             <Route path="audit-logs" element={<AuditLogs />} />
           </Route>
-        </Route>
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="resources" element={<ResourceLibrary />} />
-          <Route path="suppliers" element={<SupplierManagement />} />
-          <Route path="config" element={<ConfigTables />} />
-          <Route path="audit-logs" element={<AuditLogs />} />
         </Route>
       </Routes>
     </BrowserRouter>

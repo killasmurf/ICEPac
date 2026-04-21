@@ -6,7 +6,7 @@ from uuid import UUID
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
-from app.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,19 +15,22 @@ class S3Service:
     """Service for managing file uploads and downloads to/from AWS S3"""
 
     def __init__(self):
-        self.bucket_name = settings.s3_bucket_name
-        self.region = settings.aws_region
+        self.bucket_name = settings.S3_BUCKET_NAME
+        self.region = settings.AWS_REGION
 
         # Initialize S3 client
         session_kwargs = {"region_name": self.region}
 
-        if settings.aws_access_key_id and settings.aws_secret_access_key:
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
             session_kwargs.update(
                 {
-                    "aws_access_key_id": settings.aws_access_key_id,
-                    "aws_secret_access_key": settings.aws_secret_access_key,
+                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
                 }
             )
+
+        if settings.S3_ENDPOINT_URL:
+            session_kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
 
         self.s3_client = boto3.client("s3", **session_kwargs)
 

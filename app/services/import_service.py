@@ -235,6 +235,8 @@ class ImportService:
             if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
                 session_kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
                 session_kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+            if settings.S3_ENDPOINT_URL:
+                session_kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
             client = boto3.client("s3", **session_kwargs)
             response = client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_key)
             return response["Body"].read()
