@@ -16,6 +16,7 @@ from app.models.database.config_tables import (
 from app.models.database.help import HelpCategory, HelpDescription, HelpTopic
 from app.models.database.import_job import ImportJob, ImportStatus
 from app.models.database.project import Project, ProjectSourceFormat, ProjectStatus
+from app.models.database.report import ReportJob
 from app.models.database.resource import Resource, Supplier
 from app.models.database.risk import Risk
 from app.models.database.user import User, UserRole
@@ -34,6 +35,7 @@ __all__ = [
     "Risk",
     "ImportJob",
     "ImportStatus",
+    "ReportJob",
     "CostType",
     "ExpenseType",
     "Region",

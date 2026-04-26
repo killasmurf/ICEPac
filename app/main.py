@@ -75,7 +75,7 @@ async def root():
 
 
 # Include routers
-from app.routes import admin, auth, estimation, help, project  # noqa: E402
+from app.routes import admin, auth, estimation, help, project, reports  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
@@ -83,6 +83,9 @@ app.include_router(help.router, prefix=settings.API_V1_PREFIX, tags=["Help"])
 app.include_router(project.router, prefix=settings.API_V1_PREFIX, tags=["Projects"])
 app.include_router(
     estimation.router, prefix=settings.API_V1_PREFIX, tags=["Estimation"]
+)
+app.include_router(
+    reports.router, prefix=settings.API_V1_PREFIX, tags=["Reports"]
 )
 
 

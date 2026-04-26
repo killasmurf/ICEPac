@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import Reports from './pages/Reports';
 import Help from './pages/Help';
 import HelpTopic from './pages/HelpTopic';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -24,6 +25,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/help" element={<Help />} />
           <Route path="/help/:id" element={<HelpTopic />} />
           {/* Admin routes */}
