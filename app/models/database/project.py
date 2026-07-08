@@ -72,6 +72,9 @@ class Project(Base):
     import_jobs = relationship(
         "ImportJob", back_populates="project", cascade="all, delete-orphan"
     )
+    project_risks = relationship(
+        "Risk", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.project_name}')>"
