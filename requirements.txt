@@ -16,6 +16,11 @@ psycopg2-binary==2.9.9
 # Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+# passlib 1.7.4's bcrypt backend detection reads bcrypt.__about__.__version__,
+# which bcrypt removed in 4.1+ (pip resolves to the newest bcrypt otherwise,
+# breaking every password hash/verify call at runtime with
+# "AttributeError: module 'bcrypt' has no attribute '__about__'")
+bcrypt==4.0.1
 
 # Async tasks
 celery==5.3.4
