@@ -22,6 +22,7 @@ import ProjectUpload from '../components/project/ProjectUpload';
 import WBSTree from '../components/project/WBSTree';
 import EstimationSummary from '../components/estimation/EstimationSummary';
 import WBSDetailPanel from '../components/estimation/WBSDetailPanel';
+import { ProjectRiskRegister } from '../components/project/ProjectRiskRegister';
 
 const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info'> = {
   draft: 'default',
@@ -222,6 +223,7 @@ const ProjectDetail: React.FC = () => {
           <Tab label={`WBS${project.task_count ? ` (${project.task_count})` : ''}`} />
           <Tab label="Import" />
           <Tab label="Estimation" />
+          <Tab label="Risk Register" />
         </Tabs>
       </Box>
 
@@ -340,6 +342,13 @@ const ProjectDetail: React.FC = () => {
       {activeTab === 3 && (
         <Paper sx={{ p: 3 }}>
           <EstimationSummary projectId={Number(id)} />
+        </Paper>
+      )}
+
+      {/* Risk Register Tab — project-level (cross-cutting) risks */}
+      {activeTab === 4 && (
+        <Paper sx={{ p: 3 }}>
+          <ProjectRiskRegister projectId={Number(id)} />
         </Paper>
       )}
 
