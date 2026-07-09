@@ -2,19 +2,25 @@
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from app.models.database.config_tables import ProbabilityLevel, SeverityLevel
 from app.models.database.risk import Risk
 from app.models.database.wbs import WBS
-from app.models.database.config_tables import ProbabilityLevel, SeverityLevel
-from app.models.schemas.risk import RiskCreate, RiskUpdate, RiskResponse
+from app.models.schemas.risk import (
+    ProjectRiskCreate,
+    ProjectRiskUpdate,
+    RiskCreate,
+    RiskUpdate,
+)
 from app.repositories.risk_repository import RiskRepository
 from app.repositories.wbs_repository import WBSRepository
 
 
 class RiskService:
-    """Service for managing risks."""
+    """Service for managing risks — both WBS-scoped (legacy) and
+    project-scoped (the cross-cutting risk register)."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -36,15 +42,15 @@ class RiskService:
         return risk
 
     def get_by_wbs(self, wbs_id: int) -> List[Risk]:
-        """Get all risks for a WBS item."""
+        """Get WBS-scoped risks for a single WBS item."""
         return self.repository.get_by_wbs(wbs_id)
 
     def count_by_wbs(self, wbs_id: int) -> int:
-        """Count risks for a WBS item."""
+        """Count WBS-scoped risks for a single WBS item."""
         return self.repository.count_by_wbs(wbs_id)
 
     def create(self, wbs_id: int, data: RiskCreate) -> Risk:
-        """Create a new risk for a WBS item.
+        """Create a new WBS-scoped risk.
 
         Validates:
         - WBS item exists
@@ -56,33 +62,92 @@ class RiskService:
         # Create risk
         risk_data = data.model_dump()
         risk_data["wbs_id"] = wbs_id
+        risk_data["project_id"] = None  # XOR: WBS-scoped risks have no project_id
         return self.repository.create(risk_data)
 
     def update(self, risk_id: int, data: RiskUpdate) -> Risk:
-        """Update a risk.
+        """Update a WBS-scoped risk.
 
         Validates:
         - Risk exists
         - WBS item is editable (not submitted/approved)
         """
         risk = self.get_or_404(risk_id)
+        if risk.wbs_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="WBS-scoped risk not found",
+            )
 
         # Validate WBS is editable
         self._validate_wbs_editable(risk.wbs_id)
 
         update_data = data.model_dump(exclude_unset=True)
+        # Refuse attempts to flip wbs_id / project_id via update
+        update_data.pop("wbs_id", None)
+        update_data.pop("project_id", None)
         return self.repository.update(risk, update_data)
 
     def delete(self, risk_id: int) -> bool:
-        """Delete a risk.
+        """Delete a WBS-scoped risk.
 
         Validates WBS is editable before allowing delete.
         """
         risk = self.get_or_404(risk_id)
+        if risk.wbs_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="WBS-scoped risk not found",
+            )
 
         # Validate WBS is editable
         self._validate_wbs_editable(risk.wbs_id)
 
+        return self.repository.delete(risk_id)
+
+    # ---- Project-scoped (cross-cutting) risks ----
+
+    def get_by_project(self, project_id: int) -> List[Risk]:
+        """Get project-level risks (excludes WBS-scoped)."""
+        return self.repository.get_by_project(project_id)
+
+    def count_by_project(self, project_id: int) -> int:
+        """Count project-level risks."""
+        return self.repository.count_by_project(project_id)
+
+    def get_total_cost_by_project(self, project_id: int) -> float:
+        """Sum of risk_cost for project-level risks (WBS-scoped excluded)."""
+        return self.repository.get_total_cost_by_project(project_id)
+
+    def create_for_project(self, project_id: int, data: ProjectRiskCreate) -> Risk:
+        """Create a project-level risk. Sets project_id, leaves wbs_id NULL."""
+        risk_data = data.model_dump()
+        risk_data["project_id"] = project_id
+        risk_data["wbs_id"] = None  # XOR: project-scoped risks have no wbs_id
+        return self.repository.create(risk_data)
+
+    def update_project_risk(self, risk_id: int, data: ProjectRiskUpdate) -> Risk:
+        """Update a project-scoped risk. Verifies scope before mutating."""
+        risk = self.get_or_404(risk_id)
+        if risk.project_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project-scoped risk not found",
+            )
+        update_data = data.model_dump(exclude_unset=True)
+        # Refuse attempts to flip project_id / wbs_id (locked to URL scope)
+        update_data.pop("project_id", None)
+        update_data.pop("wbs_id", None)
+        return self.repository.update(risk, update_data)
+
+    def delete_project_risk(self, risk_id: int) -> bool:
+        """Delete a project-scoped risk. Verifies scope before deleting."""
+        risk = self.get_or_404(risk_id)
+        if risk.project_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project-scoped risk not found",
+            )
         return self.repository.delete(risk_id)
 
     def compute_risk_exposure(self, risk: Risk) -> float:
@@ -101,9 +166,7 @@ class RiskService:
         prob_weight = float(probability.weight) if probability else 0.0
 
         # Get severity weight
-        sev_stmt = select(SeverityLevel).where(
-            SeverityLevel.code == risk.severity_code
-        )
+        sev_stmt = select(SeverityLevel).where(SeverityLevel.code == risk.severity_code)
         severity = self.db.scalars(sev_stmt).first()
         sev_weight = float(severity.weight) if severity else 0.0
 

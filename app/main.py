@@ -5,13 +5,13 @@ Cost Estimation & Project Risk Management System
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
-from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.rate_limiter import RateLimitMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -57,6 +57,7 @@ app.add_middleware(ErrorHandlerMiddleware)
 # ════════════════════════════════════════════════════════════════
 # System Endpoints
 # ════════════════════════════════════════════════════════════════
+
 
 @app.get("/health", tags=["System"])
 async def health_check():
@@ -107,6 +108,7 @@ async def root():
 async def get_feature_flags():
     """Get current feature flag status."""
     from app.services.feature_flags import feature_flags
+
     return feature_flags.get_all()
 
 
@@ -114,15 +116,32 @@ async def get_feature_flags():
 # Include Routers
 # ════════════════════════════════════════════════════════════════
 
-from app.routes import admin, auth, dashboard, estimation, help, project, reports  # noqa: E402
+from app.routes import (  # noqa: E402
+    admin,
+    auth,
+    dashboard,
+    estimation,
+    help,
+    project,
+    reports,
+    risk,
+)
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX, tags=["Admin"])
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX, tags=["Dashboard"])
 app.include_router(help.router, prefix=settings.API_V1_PREFIX, tags=["Help"])
 app.include_router(project.router, prefix=settings.API_V1_PREFIX, tags=["Projects"])
-app.include_router(estimation.router, prefix=settings.API_V1_PREFIX, tags=["Estimation"])
+app.include_router(
+    estimation.router, prefix=settings.API_V1_PREFIX, tags=["Estimation"]
+)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX, tags=["Reports"])
+
+# Risk routers — project-level (cross-cutting risk register)
+# WBS-scoped risk CRUD lives in app.routes.estimation
+app.include_router(
+    risk.project_risk_router, prefix=settings.API_V1_PREFIX, tags=["Risks"]
+)
 
 
 if __name__ == "__main__":
