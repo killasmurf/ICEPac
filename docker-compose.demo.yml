@@ -1,0 +1,208 @@
+# Demo stack for ICEPac.
+#
+# Runs ALONGSIDE the dev stack on different ports + volumes + network so
+# you can demonstrate the app to a stakeholder without nuking your dev data.
+#
+# Bring up:
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml \
+#     --profile demo up -d
+#
+# Tear down:
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml \
+#     --profile demo down -v
+#
+# Open the demo:
+#   Frontend:    http://localhost:3001   (admin/admin123)
+#   API docs:    http://localhost:8001/docs
+#   OpenAPI:     http://localhost:8001/openapi.json
+#   Localstack:  http://localhost:4567   (S3 demo bucket pre-created)
+#
+# What's different from the dev stack:
+#   - All published host ports shifted by 100 (5433, 6380, 4567, 8001, 3001)
+#   - All volumes renamed with a `demo-` prefix
+#   - All services named with a `demo-` prefix
+#   - All on a dedicated `icepac-demo-network` bridge
+#   - A demo-init sidecar runs alembic upgrade head + seed_demo.py + seed_admin.py
+#     on first boot, then exits; the demo-app service waits on it via
+#     service_completed_successfully
+#   - The frontend hits the demo app at http://localhost:8001 via
+#     REACT_APP_API_URL
+
+services:
+  demo-postgres:
+    image: postgres:15-alpine
+    container_name: icepac-demo-postgres
+    environment:
+      - POSTGRES_USER=icepac
+      - POSTGRES_PASSWORD=icepac
+      - POSTGRES_DB=icepac
+    ports:
+      - "5433:5432"
+    volumes:
+      - demo-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icepac"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - icepac-demo-network
+
+  demo-redis:
+    image: redis:7-alpine
+    container_name: icepac-demo-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - demo-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - icepac-demo-network
+
+  demo-localstack:
+    image: localstack/localstack:3.0
+    container_name: icepac-demo-localstack
+    ports:
+      - "4567:4566"
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+      - PERSISTENCE=1
+    volumes:
+      - demo-localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - icepac-demo-network
+
+  demo-init:
+    # One-shot sidecar: waits for postgres + redis + localstack, then
+    # runs migrations and seeds the demo data. Exits 0 when done;
+    # demo-app waits for service_completed_successfully before booting.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icepac-demo-init
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+      demo-localstack:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://icepac:icepac@demo-postgres:5432/icepac
+      - REDIS_URL=redis://demo-redis:6379/0
+      - CELERY_BROKER_URL=redis://demo-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://demo-redis:6379/2
+      - AWS_REGION=us-east-1
+      - S3_BUCKET_NAME=icepac-files
+      - S3_ENDPOINT_URL=http://demo-localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "[demo-init] running alembic migrations..."
+        alembic upgrade head
+        echo "[demo-init] seeding admin user..."
+        python scripts/seed_admin.py
+        echo "[demo-init] seeding demo data (~500 rows)..."
+        python scripts/seed_demo.py
+        echo "[demo-init] done."
+    networks:
+      - icepac-demo-network
+
+  demo-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icepac-demo-app
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+      demo-localstack:
+        condition: service_healthy
+      demo-init:
+        condition: service_completed_successfully
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://icepac:icepac@demo-postgres:5432/icepac
+      - REDIS_URL=redis://demo-redis:6379/0
+      - CELERY_BROKER_URL=redis://demo-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://demo-redis:6379/2
+      - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:8001
+      - AWS_REGION=us-east-1
+      - S3_BUCKET_NAME=icepac-files
+      - S3_ENDPOINT_URL=http://demo-localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - ./app:/app/app
+    networks:
+      - icepac-demo-network
+
+  demo-celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icepac-demo-celery-worker
+    command: celery -A celery_worker worker --loglevel=info
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+      demo-localstack:
+        condition: service_healthy
+      demo-init:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=postgresql://icepac:icepac@demo-postgres:5432/icepac
+      - REDIS_URL=redis://demo-redis:6379/0
+      - CELERY_BROKER_URL=redis://demo-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://demo-redis:6379/2
+      - AWS_REGION=us-east-1
+      - S3_BUCKET_NAME=icepac-files
+      - S3_ENDPOINT_URL=http://demo-localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    networks:
+      - icepac-demo-network
+
+  demo-frontend:
+    build: ./frontend
+    container_name: icepac-demo-frontend
+    depends_on:
+      - demo-app
+    ports:
+      - "3001:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8001/api/v1
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - icepac-demo-network
+
+networks:
+  icepac-demo-network:
+    driver: bridge
+
+volumes:
+  demo-postgres-data:
+  demo-redis-data:
+  demo-localstack-data:
