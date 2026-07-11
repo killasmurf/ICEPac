@@ -113,12 +113,38 @@ services:
       - |
         set -e
         echo "[demo-init] running alembic migrations..."
+        # Handle legacy alembic_version from old images. PR #11's migration
+        # work renamed the "add project-level risk fields" revision from
+        # the old identifier "1c6e862ab27f" to "006_project_level_risks".
+        # Also "002_remaining_tables" was re-stamped to chain off
+        # "b7e2f3a1c9d4" instead of "a41d9a15aea8". DBs that were stamped
+        # with the OLD identifiers need to be re-stamped to the current
+        # chain before `alembic upgrade head` can find the head.
+        #
+        # Stamp to the lowest known ancestor of the new chain that's
+        # reachable from each legacy identifier. If the DB is on a
+        # current-chain revision, this is a no-op (it skips because the
+        # target == current).
+        CURRENT=$(alembic current 2>/dev/null | awk '{print $3}')
+        echo "[demo-init] current alembic version: $CURRENT"
+        if [ "$CURRENT" = "1c6e862ab27f" ]; then
+          echo "[demo-init] stamping legacy 'add project-level risk fields' to 006_project_level_risks"
+          alembic stamp 006_project_level_risks
+        fi
+        # (002_remaining_tables was originally branched from the
+        # initial; re-stamping to the new chain would need a 'merge'
+        # operation. Since 002 creates the SAME tables as 003 (different
+        # column sets), and 002_remaining_tables is now chained off
+        # b7e2f3a1c9d4 in the new tree, the existing fresh-DB path works.
+        # For an OLD DB that's on 002_remaining_tables as a head, the
+        # operator can stamp it to a known current-chain revision.)
         alembic upgrade head
         echo "[demo-init] seeding admin user..."
         python scripts/seed_admin.py
-        echo "[demo-init] seeding demo data (~500 rows)..."
-        python scripts/seed_demo.py
-        echo "[demo-init] done."
+        # Note: scripts/seed_demo.py was archived in this branch. To
+        # populate the demo DB with the 500+ rows of test data, run
+        # the showcase or restore seed_demo.py from _archive/.
+        echo "[demo-init] done. (showcase: docker exec demo-app python scripts/seed_report_showcase.py)"
     networks:
       - icepac-demo-network
 
