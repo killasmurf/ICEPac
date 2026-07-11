@@ -193,12 +193,17 @@ class ReportRepository:
                 "cost_type": r.cost_type_code or "",
                 "technique": r.estimating_technique_code or "",
                 "resource_code": r.resource_code or "",
+                # Cast all numeric fields to float upfront so the
+                # PERT math below doesn't trip on Decimal + float.
+                # (Postgres returns Decimal for Numeric columns; Python
+                # int + Decimal = TypeError. Casting each term to float
+                # explicitly avoids the mixed-arithmetic failure mode.)
                 "best_estimate": float(r.best_estimate or 0),
                 "likely_estimate": float(r.likely_estimate or 0),
                 "worst_estimate": float(r.worst_estimate or 0),
                 "pert_estimate": round(
-                    float(
-                        (r.best_estimate or 0)
+                    (
+                        float(r.best_estimate or 0)
                         + 4 * float(r.likely_estimate or 0)
                         + float(r.worst_estimate or 0)
                     )
