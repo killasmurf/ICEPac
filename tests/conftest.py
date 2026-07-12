@@ -1,12 +1,20 @@
 """
 Pytest configuration and fixtures for ICEPac tests.
 """
+# Use a temp file (NOT :memory:) so the DB is shared across the thread
+# pool that FastAPI's TestClient uses. With in-memory SQLite, each
+# connection gets its own DB and the request handler thread sees an
+# empty schema — login hangs waiting for a connection that doesn't have
+# the user we just added.
+import os
+import tempfile
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
@@ -15,11 +23,15 @@ from app.main import app
 # Real SQLite engine for integration-style unit tests
 # ---------------------------------------------------------------------------
 
-TEST_DATABASE_URL = "sqlite:///:memory:"
+
+_TMPDIR = tempfile.mkdtemp(prefix="icepac_test_db_")
+TEST_DATABASE_URL = f"sqlite:///{os.path.join(_TMPDIR, 'test.db')}"
 
 engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,  # single shared connection; the temp file is
+    # the actual cross-thread shared state
 )
 
 
@@ -81,6 +93,35 @@ def anyio_backend():
 def mock_db():
     """Create a mock database session."""
     return MagicMock(spec=Session)
+
+
+@pytest.fixture
+def clear_ratelimit():
+    """Clear Redis rate-limit state before any test that does auth.
+
+    The dev stack's rate limiter is configured at 5 logins per minute
+    per client IP. TestClient requests all come from "testclient", so
+    running >4 auth-hitting tests in a row hits the limit and the
+    next test hangs waiting for the backoff to expire. This fixture
+    flushes the rate-limit keys so tests don't depend on prior test
+    state.
+    """
+    try:
+        import redis as r
+
+        client = r.from_url(
+            "redis://redis:6379/0",
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        if client.ping():
+            keys = client.keys("*ratelimit*")
+            if keys:
+                client.delete(*keys)
+    except Exception:
+        pass  # If Redis is unavailable, the limiter falls back to no-op
+    yield
 
 
 @pytest.fixture

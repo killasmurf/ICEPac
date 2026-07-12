@@ -2,9 +2,17 @@
 suppliers, assignments, risks, audit_log.
 
 Revision ID: 002_remaining_tables
-Revises: a41d9a15aea8
+Revises: b7e2f3a1c9d4
 Create Date: 2026-02-20 00:00:00.000000
 
+Note: this migration was previously down_revision='a41d9a15aea8'
+which created a branch in the alembic chain (001 b7e2f3a1c9d4
+also branched from the initial schema). Re-stamped to chain off
+b7e2f3a1c9d4 so the chain is now linear
+(a41d9a15aea8 -> b7e2f3a1c9d4 -> 002_admin_tables
+                     -> 003 -> 004 -> 005 -> 006 -> 007 -> 008).
+This is a one-time backfill of the down_revision pointer; the
+upgrade() and downgrade() logic are unchanged.
 """
 from typing import Sequence, Union
 
@@ -12,7 +20,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = '002_remaining_tables'
-down_revision: Union[str, None] = 'a41d9a15aea8'
+down_revision: Union[str, None] = 'b7e2f3a1c9d4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

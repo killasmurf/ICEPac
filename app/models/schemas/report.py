@@ -1,8 +1,9 @@
 """Report Pydantic schemas for request validation and response serialization."""
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from datetime import date, datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class ReportType(str, Enum):
@@ -36,42 +37,106 @@ REPORT_CATALOG = {
     "cost_control": {
         "label": "Cost Control Reports",
         "reports": [
-            {"type": "cost_by_wbs", "label": "Cost by WBS", "description": "Cost rollup by Work Breakdown Structure"},
-            {"type": "cost_by_resource", "label": "Cost by Resource", "description": "Cost breakdown by resource code"},
-            {"type": "cost_by_supplier", "label": "Cost by Supplier", "description": "Cost breakdown by supplier"},
-            {"type": "cost_by_eoc", "label": "Cost by EOC", "description": "Cost by Element of Cost category"},
-            {"type": "cost_by_technique", "label": "Cost by Technique", "description": "Cost by estimating technique"},
-            {"type": "cost_by_region", "label": "Cost by Region", "description": "Cost breakdown by geographic region"},
+            {
+                "type": "cost_by_wbs",
+                "label": "Cost by WBS",
+                "description": "Cost rollup by Work Breakdown Structure",
+            },
+            {
+                "type": "cost_by_resource",
+                "label": "Cost by Resource",
+                "description": "Cost breakdown by resource code",
+            },
+            {
+                "type": "cost_by_supplier",
+                "label": "Cost by Supplier",
+                "description": "Cost breakdown by supplier",
+            },
+            {
+                "type": "cost_by_eoc",
+                "label": "Cost by EOC",
+                "description": "Cost by Element of Cost category",
+            },
+            {
+                "type": "cost_by_technique",
+                "label": "Cost by Technique",
+                "description": "Cost by estimating technique",
+            },
+            {
+                "type": "cost_by_region",
+                "label": "Cost by Region",
+                "description": "Cost breakdown by geographic region",
+            },
         ],
     },
     "boe": {
         "label": "Basis of Estimate",
         "reports": [
-            {"type": "boe_summary", "label": "BOE Summary", "description": "High-level estimation basis summary"},
-            {"type": "boe_detailed", "label": "BOE Detailed", "description": "Detailed estimation basis with methodology"},
-            {"type": "boe_by_wbs", "label": "BOE by WBS", "description": "Basis of estimate per WBS item"},
+            {
+                "type": "boe_summary",
+                "label": "BOE Summary",
+                "description": "High-level estimation basis summary",
+            },
+            {
+                "type": "boe_detailed",
+                "label": "BOE Detailed",
+                "description": "Detailed estimation basis with methodology",
+            },
+            {
+                "type": "boe_by_wbs",
+                "label": "BOE by WBS",
+                "description": "Basis of estimate per WBS item",
+            },
         ],
     },
     "risk": {
         "label": "Risk Reports",
         "reports": [
-            {"type": "risk_assessment", "label": "Risk Assessment", "description": "Full risk assessment with probability/severity"},
-            {"type": "risk_summary", "label": "Risk Summary", "description": "Risk summary with exposure totals"},
+            {
+                "type": "risk_assessment",
+                "label": "Risk Assessment",
+                "description": "Full risk assessment with probability/severity",
+            },
+            {
+                "type": "risk_summary",
+                "label": "Risk Summary",
+                "description": "Risk summary with exposure totals",
+            },
         ],
     },
     "audit": {
         "label": "Audit Reports",
         "reports": [
-            {"type": "estimator_activity", "label": "Estimator Activity", "description": "Activity log for estimators"},
-            {"type": "approver_activity", "label": "Approver Activity", "description": "Approval decisions and history"},
-            {"type": "change_history", "label": "Change History", "description": "All changes to project estimates"},
+            {
+                "type": "estimator_activity",
+                "label": "Estimator Activity",
+                "description": "Activity log for estimators",
+            },
+            {
+                "type": "approver_activity",
+                "label": "Approver Activity",
+                "description": "Approval decisions and history",
+            },
+            {
+                "type": "change_history",
+                "label": "Change History",
+                "description": "All changes to project estimates",
+            },
         ],
     },
     "utilization": {
         "label": "Utilization Reports",
         "reports": [
-            {"type": "resource_utilization", "label": "Resource Utilization", "description": "Resource allocation across projects"},
-            {"type": "project_summary", "label": "Project Summary", "description": "Overall project status and metrics"},
+            {
+                "type": "resource_utilization",
+                "label": "Resource Utilization",
+                "description": "Resource allocation across projects",
+            },
+            {
+                "type": "project_summary",
+                "label": "Project Summary",
+                "description": "Overall project status and metrics",
+            },
         ],
     },
 }
@@ -79,8 +144,10 @@ REPORT_CATALOG = {
 
 # ── Request Schemas ───────────────────────────────────────────
 
+
 class ReportFilter(BaseModel):
     """Common filter parameters for all reports."""
+
     project_id: int
     date_from: Optional[date] = None
     date_to: Optional[date] = None
@@ -96,23 +163,36 @@ class ReportFilter(BaseModel):
 
 class ReportRequest(BaseModel):
     """Request to generate a report."""
+
     report_type: ReportType
     filters: ReportFilter
     export_format: ExportFormat = ExportFormat.JSON
     title: Optional[str] = None
-    include_charts: bool = False
+    # NOTE: include_charts was removed in US-006/Phase 5. The field was
+    # defined as a placeholder for a chart-generation feature that was
+    # never implemented (the engine ignored it). It is now dropped from
+    # the request schema. Callers sending include_charts will receive
+    # a 422 from pydantic validation; the OpenAPI spec at /openapi.json
+    # no longer advertises the field. To prevent silent surprise for
+    # any caller still including the field, the API also accepts (and
+    # ignores) the value with a DeprecationWarning logged server-side
+    # for one release — removed in the next major version. See the
+    # "Reports" help topic in /api/v1/help for the user-facing note.
 
 
 # ── Response Schemas ──────────────────────────────────────────
 
+
 class ReportRow(BaseModel):
     """Single row in a report result."""
+
     label: str
     values: Dict[str, Any]
 
 
 class CostBreakdownRow(BaseModel):
     """Row in a cost breakdown report."""
+
     group_key: str
     group_label: str
     best_total: float = 0
@@ -128,6 +208,7 @@ class CostBreakdownRow(BaseModel):
 
 class BOERow(BaseModel):
     """Row in a Basis of Estimate report."""
+
     wbs_code: str
     wbs_title: str
     cost_type: Optional[str] = None
@@ -144,6 +225,7 @@ class BOERow(BaseModel):
 
 class RiskRow(BaseModel):
     """Row in a risk report."""
+
     wbs_code: str
     wbs_title: str
     risk_title: str
@@ -157,6 +239,7 @@ class RiskRow(BaseModel):
 
 class AuditRow(BaseModel):
     """Row in an audit report."""
+
     timestamp: datetime
     user: str
     action: str
@@ -167,6 +250,7 @@ class AuditRow(BaseModel):
 
 class ReportResult(BaseModel):
     """Complete report result."""
+
     report_type: str
     title: str
     generated_at: datetime
@@ -181,6 +265,7 @@ class ReportResult(BaseModel):
 
 class ReportJobResponse(BaseModel):
     """Response for async report job."""
+
     id: int
     report_type: str
     status: str
