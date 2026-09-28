@@ -52,8 +52,16 @@ export interface UserListResponse {
   limit: number;
 }
 
-export async function getUsers(skip = 0, limit = 100): Promise<UserListResponse> {
-  const response = await client.get('/admin/users', { params: { skip, limit } });
+export async function getUsers(
+  skip = 0,
+  limit = 100,
+  search?: string,
+  role?: string,
+  activeOnly?: boolean
+): Promise<UserListResponse> {
+  const response = await client.get('/admin/users', {
+    params: { skip, limit, search, role, active_only: activeOnly },
+  });
   return response.data;
 }
 

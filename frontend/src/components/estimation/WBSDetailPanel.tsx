@@ -9,6 +9,11 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AssignmentList from './AssignmentList';
@@ -103,6 +108,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   const [riskFormOpen, setRiskFormOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
 
+  // Confirm delete states
+  const [deleteAssignmentTarget, setDeleteAssignmentTarget] = useState<Assignment | null>(null);
+  const [deleteRiskTarget, setDeleteRiskTarget] = useState<Risk | null>(null);
+  const [confirmDeleting, setConfirmDeleting] = useState(false);
+
   useEffect(() => {
     if (open && wbs) {
       loadData();
@@ -144,13 +154,22 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
     setAssignmentFormOpen(true);
   };
 
-  const handleDeleteAssignment = async (assignment: Assignment) => {
-    if (!wbs || !confirm('Are you sure you want to delete this assignment?')) return;
+  const handleDeleteAssignment = (assignment: Assignment) => {
+    setDeleteAssignmentTarget(assignment);
+  };
+
+  const confirmDeleteAssignment = async () => {
+    if (!wbs || !deleteAssignmentTarget) return;
+    setConfirmDeleting(true);
     try {
-      await deleteAssignment(projectId, wbs.id, assignment.id);
+      await deleteAssignment(projectId, wbs.id, deleteAssignmentTarget.id);
+      setDeleteAssignmentTarget(null);
       await loadData();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete assignment');
+      setDeleteAssignmentTarget(null);
+    } finally {
+      setConfirmDeleting(false);
     }
   };
 
@@ -176,13 +195,22 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
     setRiskFormOpen(true);
   };
 
-  const handleDeleteRisk = async (risk: Risk) => {
-    if (!wbs || !confirm('Are you sure you want to delete this risk?')) return;
+  const handleDeleteRisk = (risk: Risk) => {
+    setDeleteRiskTarget(risk);
+  };
+
+  const confirmDeleteRisk = async () => {
+    if (!wbs || !deleteRiskTarget) return;
+    setConfirmDeleting(true);
     try {
-      await deleteRisk(projectId, wbs.id, risk.id);
+      await deleteRisk(projectId, wbs.id, deleteRiskTarget.id);
+      setDeleteRiskTarget(null);
       await loadData();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete risk');
+      setDeleteRiskTarget(null);
+    } finally {
+      setConfirmDeleting(false);
     }
   };
 
@@ -345,6 +373,32 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
         probabilityLevels={probabilityLevels}
         severityLevels={severityLevels}
       />
+
+      <Dialog open={Boolean(deleteAssignmentTarget)} onClose={() => setDeleteAssignmentTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Assignment</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this assignment?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteAssignmentTarget(null)} disabled={confirmDeleting}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={confirmDeleteAssignment} disabled={confirmDeleting}>
+            {confirmDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteRiskTarget)} onClose={() => setDeleteRiskTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Risk</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this risk?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteRiskTarget(null)} disabled={confirmDeleting}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={confirmDeleteRisk} disabled={confirmDeleting}>
+            {confirmDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Drawer>
   );
 };

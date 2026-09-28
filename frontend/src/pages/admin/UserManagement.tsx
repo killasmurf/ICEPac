@@ -185,33 +185,23 @@ function UserManagement() {
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Load users from API
+  // Load users from API with server-side filtering
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getUsers(skip, limit);
+      const activeOnly = statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined;
+      const response = await getUsers(
+        skip,
+        limit,
+        search || undefined,
+        roleFilter !== 'all' ? roleFilter : undefined,
+        activeOnly,
+      );
       let filtered = response.items;
-
-      // Client-side filtering (search/role/status filters)
-      if (search) {
-        const searchLower = search.toLowerCase();
-        filtered = filtered.filter(u =>
-          u.username.toLowerCase().includes(searchLower) ||
-          u.email.toLowerCase().includes(searchLower) ||
-          u.full_name?.toLowerCase().includes(searchLower)
-        );
-      }
-
-      if (roleFilter !== 'all') {
-        filtered = filtered.filter(u => u.role === roleFilter);
-      }
-
-      if (statusFilter === 'active') {
-        filtered = filtered.filter(u => u.is_active);
-      } else if (statusFilter === 'inactive') {
+      // inactive-only filter (backend returns all when activeOnly is undefined)
+      if (statusFilter === 'inactive') {
         filtered = filtered.filter(u => !u.is_active);
       }
-
       setUsers(filtered);
       setTotal(response.total);
     } catch (error: any) {

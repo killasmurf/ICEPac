@@ -45,6 +45,28 @@ const styles: Record<string, React.CSSProperties> = {
 interface FormData { supplier_code: string; name: string; contact: string; phone: string; email: string; notes: string; is_active: boolean; }
 const initialFormData: FormData = { supplier_code: '', name: '', contact: '', phone: '', email: '', notes: '', is_active: true };
 
+interface SupplierFormFieldsProps {
+  formData: FormData;
+  formErrors: Record<string, string>;
+  showEditDialog: boolean;
+  onChange: (field: keyof FormData, value: string | boolean) => void;
+}
+
+const SupplierFormFields: React.FC<SupplierFormFieldsProps> = ({ formData, formErrors, showEditDialog, onChange }) => {
+  const s = styles;
+  return (
+    <div style={s.formGrid}>
+      <div style={s.formGroup}><label style={s.label}>Supplier Code *</label><input style={s.input} value={formData.supplier_code} onChange={e => onChange('supplier_code', e.target.value.toUpperCase())} placeholder="ACME" />{formErrors.supplier_code && <span style={s.error}>{formErrors.supplier_code}</span>}</div>
+      <div style={s.formGroup}><label style={s.label}>Contact Name</label><input style={s.input} value={formData.contact} onChange={e => onChange('contact', e.target.value)} placeholder="John Smith" /></div>
+      <div style={{...s.formGroup, ...s.formGroupFull}}><label style={s.label}>Company Name *</label><input style={s.input} value={formData.name} onChange={e => onChange('name', e.target.value)} placeholder="Acme Corporation" />{formErrors.name && <span style={s.error}>{formErrors.name}</span>}</div>
+      <div style={s.formGroup}><label style={s.label}>Phone</label><input style={s.input} value={formData.phone} onChange={e => onChange('phone', e.target.value)} placeholder="+1-555-0100" /></div>
+      <div style={s.formGroup}><label style={s.label}>Email</label><input style={s.input} type="email" value={formData.email} onChange={e => onChange('email', e.target.value)} placeholder="contact@acme.com" />{formErrors.email && <span style={s.error}>{formErrors.email}</span>}</div>
+      <div style={{...s.formGroup, ...s.formGroupFull}}><label style={s.label}>Notes</label><textarea style={s.textarea} value={formData.notes} onChange={e => onChange('notes', e.target.value)} placeholder="Additional notes about this supplier..." /></div>
+      {showEditDialog && <div style={s.formGroup}><label style={s.label}>Status</label><select style={s.select} value={formData.is_active ? 'active' : 'inactive'} onChange={e => onChange('is_active', e.target.value === 'active')}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>}
+    </div>
+  );
+};
+
 function SupplierManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -65,7 +87,7 @@ function SupplierManagement() {
   const loadSuppliers = useCallback(async () => {
     setLoading(true);
     try {
-      const activeOnly = statusFilter === 'active';
+      const activeOnly = statusFilter === 'active' ? true : undefined;
       const response = await getSuppliers(skip, 20, search || undefined, activeOnly);
       let filtered = response.items;
       if (statusFilter === 'inactive') {
@@ -182,18 +204,6 @@ function SupplierManagement() {
     { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: s => <StatusBadge isActive={s.is_active} /> },
   ];
 
-  const FormFields = () => (
-    <div style={styles.formGrid}>
-      <div style={styles.formGroup}><label style={styles.label}>Supplier Code *</label><input style={styles.input} value={formData.supplier_code} onChange={e => handleInputChange('supplier_code', e.target.value.toUpperCase())} placeholder="ACME" />{formErrors.supplier_code && <span style={styles.error}>{formErrors.supplier_code}</span>}</div>
-      <div style={styles.formGroup}><label style={styles.label}>Contact Name</label><input style={styles.input} value={formData.contact} onChange={e => handleInputChange('contact', e.target.value)} placeholder="John Smith" /></div>
-      <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Company Name *</label><input style={styles.input} value={formData.name} onChange={e => handleInputChange('name', e.target.value)} placeholder="Acme Corporation" />{formErrors.name && <span style={styles.error}>{formErrors.name}</span>}</div>
-      <div style={styles.formGroup}><label style={styles.label}>Phone</label><input style={styles.input} value={formData.phone} onChange={e => handleInputChange('phone', e.target.value)} placeholder="+1-555-0100" /></div>
-      <div style={styles.formGroup}><label style={styles.label}>Email</label><input style={styles.input} type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} placeholder="contact@acme.com" />{formErrors.email && <span style={styles.error}>{formErrors.email}</span>}</div>
-      <div style={{...styles.formGroup, ...styles.formGroupFull}}><label style={styles.label}>Notes</label><textarea style={styles.textarea} value={formData.notes} onChange={e => handleInputChange('notes', e.target.value)} placeholder="Additional notes about this supplier..." /></div>
-      {showEditDialog && <div style={styles.formGroup}><label style={styles.label}>Status</label><select style={styles.select} value={formData.is_active ? 'active' : 'inactive'} onChange={e => handleInputChange('is_active', e.target.value === 'active')}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>}
-    </div>
-  );
-
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -221,11 +231,11 @@ function SupplierManagement() {
       </div>
 
       <FormDialog open={showCreateDialog} title="Create Supplier" onClose={() => setShowCreateDialog(false)} onSubmit={handleCreate} loading={saving} submitLabel="Create">
-        <FormFields />
+        <SupplierFormFields formData={formData} formErrors={formErrors} showEditDialog={false} onChange={handleInputChange} />
       </FormDialog>
 
       <FormDialog open={showEditDialog} title="Edit Supplier" onClose={() => setShowEditDialog(false)} onSubmit={handleUpdate} loading={saving} submitLabel="Save">
-        <FormFields />
+        <SupplierFormFields formData={formData} formErrors={formErrors} showEditDialog={showEditDialog} onChange={handleInputChange} />
       </FormDialog>
 
       <ConfirmDialog open={showDeleteDialog} title="Delete Supplier" message={`Delete "${selectedSupplier?.name}"?`} onClose={() => setShowDeleteDialog(false)} onConfirm={confirmDelete} loading={saving} confirmLabel="Delete" danger />

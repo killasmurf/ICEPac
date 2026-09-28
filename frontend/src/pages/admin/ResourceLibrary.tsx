@@ -66,11 +66,12 @@ function ResourceLibrary() {
   const loadResources = useCallback(async () => {
     setLoading(true);
     try {
-      const activeOnly = statusFilter === 'active';
-      const response = await getResources(skip, 20, search || undefined, activeOnly);
+      const activeOnly = statusFilter === 'active' ? true : undefined;
+      // Fetch a larger page when EOC or inactive filter is active since backend lacks those params
+      const limit = (eocFilter !== 'all' || statusFilter === 'inactive') ? 500 : 20;
+      const response = await getResources(skip, limit, search || undefined, activeOnly);
       let filtered = response.items;
 
-      // Client-side EOC filter (backend doesn't support it directly)
       if (eocFilter !== 'all') {
         filtered = filtered.filter(r => r.eoc === eocFilter);
       }

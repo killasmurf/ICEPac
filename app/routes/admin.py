@@ -56,13 +56,20 @@ router = APIRouter(
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    active_only: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """List all users with pagination."""
+    """List users with optional search/role/status filtering."""
     service = UserService(db)
-    users = service.get_multi(skip=skip, limit=limit)
-    total = service.count()
+    if search or role or active_only is not None:
+        users = service.search(search=search, role=role, active_only=active_only, skip=skip, limit=limit)
+        total = service.count_search(search=search, role=role, active_only=active_only)
+    else:
+        users = service.get_multi(skip=skip, limit=limit)
+        total = service.count()
     return UserListResponse(items=users, total=total, skip=skip, limit=limit)
 
 

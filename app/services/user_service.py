@@ -33,6 +33,26 @@ class UserService:
     def get_multi(self, skip: int = 0, limit: int = 100) -> List[User]:
         return self.repository.get_multi(skip=skip, limit=limit)
 
+    def search(
+        self,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        active_only: Optional[bool] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[User]:
+        return self.repository.search(
+            search=search, role=role, active_only=active_only, skip=skip, limit=limit
+        )
+
+    def count_search(
+        self,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        active_only: Optional[bool] = None,
+    ) -> int:
+        return self.repository.count_search(search=search, role=role, active_only=active_only)
+
     def count(self) -> int:
         return self.repository.count()
 

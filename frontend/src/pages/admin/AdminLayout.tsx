@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 // Icons as simple SVG components
 const Icons = {
@@ -250,6 +250,12 @@ function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    navigate('/login');
+  };
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -328,7 +334,19 @@ function AdminLayout() {
             <span style={styles.breadcrumbCurrent}>{getBreadcrumb()}</span>
           </div>
           <div style={styles.userMenu}>
-            <div style={styles.avatar}>AM</div>
+            <a
+              href="/"
+              style={{ fontSize: '14px', color: '#475569', textDecoration: 'none', marginRight: '8px' }}
+              title="Back to main app"
+            >
+              ← App
+            </a>
+            <button
+              onClick={handleLogout}
+              style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', fontSize: '14px', cursor: 'pointer' }}
+            >
+              Logout
+            </button>
           </div>
         </header>
 

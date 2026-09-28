@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Typography,
   Paper,
@@ -49,12 +49,15 @@ const Projects: React.FC = () => {
     description: '',
   });
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadProjects();
   }, []);
 
-  const loadProjects = async (search?: string) => {
+  const loadProjects = useCallback(async (search?: string) => {
     setLoading(true);
     setError('');
     try {
@@ -66,11 +69,14 @@ const Projects: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    loadProjects(query || undefined);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      loadProjects(query || undefined);
+    }, 300);
   };
 
   const handleCreate = async () => {
@@ -88,14 +94,23 @@ const Projects: React.FC = () => {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: number) => {
+  const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
-    if (!window.confirm('Archive this project?')) return;
+    setDeleteTarget(project);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteProject(id);
+      await deleteProject(deleteTarget.id);
+      setDeleteTarget(null);
       loadProjects(searchQuery || undefined);
     } catch {
-      setError('Failed to archive project.');
+      setError('Failed to delete project.');
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -182,7 +197,12 @@ const Projects: React.FC = () => {
                     <TableCell align="right">{project.task_count || 0}</TableCell>
                     <TableCell>{formatDate(project.created_at)}</TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={(e) => handleDelete(e, project.id)}>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={(e) => handleDeleteClick(e, project)}
+                        title="Delete project"
+                      >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -200,6 +220,7 @@ const Projects: React.FC = () => {
         </Typography>
       )}
 
+      {/* Create project dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Project</DialogTitle>
         <DialogContent>
@@ -236,6 +257,28 @@ const Projects: React.FC = () => {
             disabled={creating || !newProject.project_name.trim()}
           >
             {creating ? 'Creating...' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Project</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete <strong>{deleteTarget?.project_name}</strong>? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteConfirm}
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
