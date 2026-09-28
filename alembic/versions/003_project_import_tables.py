@@ -26,13 +26,6 @@ def upgrade() -> None:
     """Create project, WBS, import, assignment, and risk tables."""
 
     # ================================================================
-    # PostgreSQL Enum Types
-    # ================================================================
-    op.execute("CREATE TYPE projectstatus AS ENUM ('draft', 'importing', 'imported', 'import_failed', 'active', 'archived')")
-    op.execute("CREATE TYPE projectsourceformat AS ENUM ('mpp', 'mpx', 'xml', 'manual')")
-    op.execute("CREATE TYPE importstatus AS ENUM ('pending', 'uploading', 'parsing', 'creating_records', 'completed', 'failed')")
-
-    # ================================================================
     # Projects Table
     # ================================================================
     op.create_table(

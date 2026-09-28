@@ -19,10 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create user_role enum
-    op.execute("CREATE TYPE userrole AS ENUM ('admin', 'manager', 'user', 'viewer')")
-
-    # Create users table
+    # Create users table (SQLAlchemy will auto-create the userrole ENUM)
     op.create_table(
         'users',
         sa.Column('id', sa.Integer(), nullable=False),
