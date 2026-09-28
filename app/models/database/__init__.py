@@ -14,6 +14,7 @@ from app.models.database.config_tables import (
     SeverityLevel,
 )
 from app.models.database.help import HelpCategory, HelpDescription, HelpTopic
+from app.models.database.report import GeneratedReport, ReportFormat, ReportStatus, ReportType
 from app.models.database.import_job import ImportJob, ImportStatus
 from app.models.database.project import Project, ProjectSourceFormat, ProjectStatus
 from app.models.database.resource import Resource, Supplier
@@ -49,4 +50,8 @@ __all__ = [
     "HelpCategory",
     "HelpTopic",
     "HelpDescription",
+    "GeneratedReport",
+    "ReportType",
+    "ReportFormat",
+    "ReportStatus",
 ]
