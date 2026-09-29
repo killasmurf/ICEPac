@@ -8,38 +8,39 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getDashboardStats, getAuditLogs, DashboardStats, AuditLog } from '../../api/admin';
+import { adminTokens as t } from './admin-tokens';
 
 // Styles
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
   header: { marginBottom: '32px' },
-  title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' },
-  subtitle: { fontSize: '15px', color: '#64748b' },
+  title: { fontSize: '28px', fontWeight: 700, color: t.navy, marginBottom: '8px' },
+  subtitle: { fontSize: '15px', color: t.slate500 },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' },
-  statCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', transition: 'all 0.2s ease', cursor: 'pointer', textDecoration: 'none' },
-  statCardHover: { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+  statCard: { backgroundColor: '#fff', borderRadius: t.radiusLg, padding: '24px', boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, transition: t.transition, cursor: 'pointer', textDecoration: 'none' },
+  statCardHover: { transform: 'translateY(-2px)', boxShadow: t.shadowMd },
   statHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' },
-  statIcon: { width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: '36px', fontWeight: 700, color: '#0f172a', lineHeight: 1, marginBottom: '4px' },
-  statLabel: { fontSize: '14px', color: '#64748b', fontWeight: 500 },
-  statMeta: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' },
+  statIcon: { width: '48px', height: '48px', borderRadius: t.radiusMd, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  statValue: { fontSize: '36px', fontWeight: 700, color: t.navy, lineHeight: 1, marginBottom: '4px' },
+  statLabel: { fontSize: '14px', color: t.slate500, fontWeight: 500 },
+  statMeta: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${t.slate100}` },
   statMetaBadge: { fontSize: '13px', fontWeight: 500, padding: '4px 10px', borderRadius: '20px' },
   section: { marginBottom: '32px' },
-  sectionTitle: { fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' },
-  activityList: { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' },
-  activityItem: { padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' },
-  activityItemHover: { backgroundColor: '#f8fafc' },
-  activityIcon: { width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  sectionTitle: { fontSize: '18px', fontWeight: 600, color: t.navy, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' },
+  activityList: { backgroundColor: '#fff', borderRadius: t.radiusLg, boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, overflow: 'hidden' },
+  activityItem: { padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', borderBottom: `1px solid ${t.slate100}`, transition: 'background-color 120ms ease' },
+  activityItemHover: { backgroundColor: t.slate50 },
+  activityIcon: { width: '40px', height: '40px', borderRadius: t.radiusMd, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   activityContent: { flex: 1, minWidth: 0 },
-  activityText: { fontSize: '14px', color: '#0f172a', marginBottom: '4px' },
-  activityMeta: { fontSize: '13px', color: '#64748b' },
-  actionBadge: { fontSize: '11px', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase' },
+  activityText: { fontSize: '14px', color: t.navy, marginBottom: '4px' },
+  activityMeta: { fontSize: '13px', color: t.slate500 },
+  actionBadge: { fontSize: '11px', fontWeight: 600, padding: '3px 7px', borderRadius: t.radiusSm, textTransform: 'uppercase' },
   quickActions: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' },
-  quickActionCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '16px', transition: 'all 0.2s ease' },
-  quickActionIcon: { width: '44px', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  quickActionText: { fontSize: '14px', fontWeight: 600, color: '#0f172a' },
-  loading: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px', color: '#64748b' },
-  emptyActivity: { padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' },
+  quickActionCard: { backgroundColor: '#fff', borderRadius: t.radiusLg, padding: '20px', boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '16px', transition: t.transition },
+  quickActionIcon: { width: '44px', height: '44px', borderRadius: t.radiusMd, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  quickActionText: { fontSize: '14px', fontWeight: 600, color: t.navy },
+  loading: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px', color: t.slate500 },
+  emptyActivity: { padding: '32px', textAlign: 'center', color: t.slate400, fontSize: '14px' },
 };
 
 // Icon components
@@ -73,12 +74,12 @@ const StatIcons = {
   ),
 };
 
-// Action colors
+// Action colors — sourced from design tokens
 const actionColors: Record<string, { bg: string; text: string }> = {
-  CREATE: { bg: '#dcfce7', text: '#166534' },
-  UPDATE: { bg: '#dbeafe', text: '#1e40af' },
-  DELETE: { bg: '#fee2e2', text: '#991b1b' },
-  LOGIN: { bg: '#f3e8ff', text: '#6b21a8' },
+  CREATE: { bg: t.greenL,  text: t.greenD },
+  UPDATE: { bg: t.blueL,   text: t.blueD },
+  DELETE: { bg: t.redL,    text: t.redD },
+  LOGIN:  { bg: '#F3E8FF', text: '#6B21A8' },
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -130,9 +131,9 @@ function AdminDashboard() {
   }
 
   const statCards = [
-    { key: 'users', label: 'Total Users', value: stats.users.total, active: stats.users.active, icon: StatIcons.Users, color: '#3b82f6', bgColor: '#eff6ff', link: '/admin/users' },
-    { key: 'resources', label: 'Resources', value: stats.resources.total, active: stats.resources.active, icon: StatIcons.Resources, color: '#10b981', bgColor: '#ecfdf5', link: '/admin/resources' },
-    { key: 'suppliers', label: 'Suppliers', value: stats.suppliers.total, active: stats.suppliers.active, icon: StatIcons.Suppliers, color: '#8b5cf6', bgColor: '#f5f3ff', link: '/admin/suppliers' },
+    { key: 'users',     label: 'Total Users', value: stats.users.total,     active: stats.users.active,     icon: StatIcons.Users,     color: t.blue,    bgColor: t.blueL,    link: '/admin/users' },
+    { key: 'resources', label: 'Resources',   value: stats.resources.total, active: stats.resources.active, icon: StatIcons.Resources, color: t.green,   bgColor: t.greenL,  link: '/admin/resources' },
+    { key: 'suppliers', label: 'Suppliers',   value: stats.suppliers.total, active: stats.suppliers.active, icon: StatIcons.Suppliers, color: '#8B5CF6', bgColor: '#F5F3FF', link: '/admin/suppliers' },
   ];
 
   return (
@@ -157,8 +158,8 @@ function AdminDashboard() {
                 <div style={{ ...styles.statIcon, backgroundColor: card.bgColor, color: card.color }}><Icon /></div>
               </div>
               <div style={styles.statMeta}>
-                <span style={{ ...styles.statMetaBadge, backgroundColor: '#dcfce7', color: '#166534' }}>{card.active} active</span>
-                <span style={{ fontSize: '13px', color: '#94a3b8' }}>{card.value - card.active} inactive</span>
+                <span style={{ ...styles.statMetaBadge, backgroundColor: t.greenL, color: t.greenD }}>{card.active} active</span>
+                <span style={{ fontSize: '13px', color: t.slate400 }}>{card.value - card.active} inactive</span>
               </div>
             </Link>
           );

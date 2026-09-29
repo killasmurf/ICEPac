@@ -7,141 +7,34 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { adminTokens as t } from './admin-tokens';
 import DataGrid, { Column, StatusBadge, RoleBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import SearchBar from '../../components/admin/SearchBar';
 import { getUsers, createUser, updateUser, deleteUser, User, UserCreate, UserUpdate } from '../../api/admin';
 
-// Styles
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: '1400px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '24px',
-    flexWrap: 'wrap',
-    gap: '16px',
-  },
+  container: { maxWidth: '1400px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
   titleSection: {},
-  title: {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: '#0f172a',
-    marginBottom: '8px',
-  },
-  subtitle: {
-    fontSize: '15px',
-    color: '#64748b',
-  },
-  actions: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-  },
-  primaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#3b82f6',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-  },
-  toolbar: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    gap: '16px',
-  },
-  filters: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-  },
-  filterSelect: {
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: '1px solid #e2e8f0',
-    fontSize: '14px',
-    color: '#475569',
-    backgroundColor: '#fff',
-    cursor: 'pointer',
-  },
-  tableCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #e2e8f0',
-    overflow: 'hidden',
-  },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '20px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: 500,
-    color: '#374151',
-  },
-  input: {
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '1px solid #d1d5db',
-    fontSize: '14px',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
-    outline: 'none',
-  },
-  select: {
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '1px solid #d1d5db',
-    fontSize: '14px',
-    backgroundColor: '#fff',
-    cursor: 'pointer',
-  },
-  error: {
-    color: '#dc2626',
-    fontSize: '13px',
-    marginTop: '4px',
-  },
-  toast: {
-    position: 'fixed',
-    bottom: '24px',
-    right: '24px',
-    padding: '16px 24px',
-    borderRadius: '8px',
-    color: '#fff',
-    fontSize: '14px',
-    fontWeight: 500,
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-  },
-  toastSuccess: {
-    backgroundColor: '#10b981',
-  },
-  toastError: {
-    backgroundColor: '#ef4444',
-  },
+  title: { fontSize: '28px', fontWeight: 700, color: t.navy, marginBottom: '8px' },
+  subtitle: { fontSize: '15px', color: t.slate500 },
+  actions: { display: 'flex', gap: '12px', alignItems: 'center' },
+  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: t.blue, color: '#fff', border: 'none', borderRadius: t.radiusMd, fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: t.transition },
+  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' },
+  filters: { display: 'flex', gap: '12px', alignItems: 'center' },
+  filterSelect: { padding: '8px 12px', borderRadius: t.radiusSm, border: `1px solid ${t.slate200}`, fontSize: '14px', color: t.slate600, backgroundColor: '#fff', cursor: 'pointer' },
+  tableCard: { backgroundColor: '#fff', borderRadius: t.radiusLg, boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, overflow: 'hidden' },
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
+  formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: { fontSize: '14px', fontWeight: 500, color: t.slate700 },
+  input: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', transition: 'border-color 0.15s, box-shadow 0.15s', outline: 'none' },
+  select: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
+  error: { color: t.red, fontSize: '13px', marginTop: '4px' },
+  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: t.radiusMd, color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  toastSuccess: { backgroundColor: t.green },
+  toastError: { backgroundColor: t.red },
 };
 
 interface UserFormData {
@@ -353,23 +246,12 @@ function UserManagement() {
       sortable: true,
       render: (user) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: '#e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#475569',
-          }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: t.slate200, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: t.slate600 }}>
             {user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || user.username[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 500, color: '#0f172a' }}>{user.username}</div>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>{user.full_name || 'No name'}</div>
+            <div style={{ fontWeight: 500, color: t.navy }}>{user.username}</div>
+            <div style={{ fontSize: '13px', color: t.slate500 }}>{user.full_name || 'No name'}</div>
           </div>
         </div>
       ),
@@ -396,7 +278,7 @@ function UserManagement() {
       header: 'Last Login',
       sortable: true,
       render: (user) => (
-        <span style={{ color: '#64748b', fontSize: '13px' }}>
+        <span style={{ color: t.slate500, fontSize: '13px' }}>
           {user.last_login
             ? new Date(user.last_login).toLocaleDateString()
             : 'Never'}

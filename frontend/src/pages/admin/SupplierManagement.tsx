@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { adminTokens as t } from './admin-tokens';
 import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
@@ -19,27 +20,27 @@ import {
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
-  title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' },
-  subtitle: { fontSize: '15px', color: '#64748b' },
-  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
+  title: { fontSize: '28px', fontWeight: 700, color: t.navy, marginBottom: '8px' },
+  subtitle: { fontSize: '15px', color: t.slate500 },
+  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#8B5CF6', color: '#fff', border: 'none', borderRadius: t.radiusMd, fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
   toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' },
   filters: { display: 'flex', gap: '12px', alignItems: 'center' },
-  filterSelect: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '14px', color: '#475569', backgroundColor: '#fff', cursor: 'pointer' },
-  tableCard: { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' },
+  filterSelect: { padding: '8px 12px', borderRadius: t.radiusSm, border: `1px solid ${t.slate200}`, fontSize: '14px', color: t.slate600, backgroundColor: '#fff', cursor: 'pointer' },
+  tableCard: { backgroundColor: '#fff', borderRadius: t.radiusLg, boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, overflow: 'hidden' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
   formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   formGroupFull: { gridColumn: '1 / -1' },
-  label: { fontSize: '14px', fontWeight: 500, color: '#374151' },
-  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none' },
-  textarea: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', minHeight: '80px', resize: 'vertical' as const, fontFamily: 'inherit' },
-  select: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
-  error: { color: '#dc2626', fontSize: '13px', marginTop: '4px' },
-  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-  toastSuccess: { backgroundColor: '#10b981' },
-  toastError: { backgroundColor: '#ef4444' },
+  label: { fontSize: '14px', fontWeight: 500, color: t.slate700 },
+  input: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', outline: 'none' },
+  textarea: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', outline: 'none', minHeight: '80px', resize: 'vertical' as const, fontFamily: 'inherit' },
+  select: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
+  error: { color: t.red, fontSize: '13px', marginTop: '4px' },
+  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: t.radiusMd, color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  toastSuccess: { backgroundColor: t.green },
+  toastError: { backgroundColor: t.red },
   contactInfo: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  contactName: { fontWeight: 500, color: '#0f172a' },
-  contactDetail: { fontSize: '13px', color: '#64748b' },
+  contactName: { fontWeight: 500, color: t.navy },
+  contactDetail: { fontSize: '13px', color: t.slate500 },
 };
 
 interface FormData { supplier_code: string; name: string; contact: string; phone: string; email: string; notes: string; is_active: boolean; }
@@ -200,7 +201,7 @@ function SupplierManagement() {
         {s.email && <span style={styles.contactDetail}>{s.email}</span>}
       </div>
     )},
-    { key: 'phone', header: 'Phone', sortable: true, width: '140px', render: s => <span style={{ color: '#64748b' }}>{s.phone || '-'}</span> },
+    { key: 'phone', header: 'Phone', sortable: true, width: '140px', render: s => <span style={{ color: t.slate500 }}>{s.phone || '-'}</span> },
     { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: s => <StatusBadge isActive={s.is_active} /> },
   ];
 

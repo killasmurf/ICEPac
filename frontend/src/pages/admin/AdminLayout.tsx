@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { adminTokens as t } from './admin-tokens';
 
 // Icons as simple SVG components
 const Icons = {
@@ -83,16 +84,16 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f8fafc',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    backgroundColor: t.slate50,
+    fontFamily: t.fontSans,
   },
   sidebar: {
     width: '260px',
-    backgroundColor: '#0f172a',
-    color: '#e2e8f0',
+    backgroundColor: t.navy,
+    color: t.slate200,
     display: 'flex',
     flexDirection: 'column',
-    transition: 'width 0.3s ease',
+    transition: 'width 0.25s ease',
     position: 'fixed',
     left: 0,
     top: 0,
@@ -104,7 +105,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   logo: {
     padding: '24px 20px',
-    borderBottom: '1px solid #1e293b',
+    borderBottom: `1px solid ${t.slate800}`,
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
@@ -112,8 +113,8 @@ const styles: Record<string, React.CSSProperties> = {
   logoIcon: {
     width: '32px',
     height: '32px',
-    backgroundColor: '#3b82f6',
-    borderRadius: '8px',
+    backgroundColor: t.blue,
+    borderRadius: t.radiusMd,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -140,7 +141,7 @@ const styles: Record<string, React.CSSProperties> = {
   navSectionTitle: {
     fontSize: '11px',
     fontWeight: 600,
-    color: '#64748b',
+    color: t.slate500,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     padding: '8px 12px',
@@ -150,22 +151,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    color: '#94a3b8',
+    padding: '10px 14px',
+    borderRadius: t.radiusMd,
+    color: t.slate400,
     textDecoration: 'none',
     fontSize: '14px',
     fontWeight: 500,
-    transition: 'all 0.15s ease',
-    marginBottom: '4px',
+    transition: t.transition,
+    marginBottom: '2px',
   },
   navLinkActive: {
-    backgroundColor: '#1e293b',
+    backgroundColor: t.slate800,
     color: '#fff',
   },
   navLinkHover: {
-    backgroundColor: '#1e293b',
-    color: '#e2e8f0',
+    backgroundColor: t.slate800,
+    color: t.slate200,
   },
   navIcon: {
     flexShrink: 0,
@@ -177,23 +178,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleBtn: {
     padding: '16px',
-    borderTop: '1px solid #1e293b',
+    borderTop: `1px solid ${t.slate800}`,
     display: 'flex',
     justifyContent: 'flex-end',
   },
   toggleButton: {
     background: 'none',
     border: 'none',
-    color: '#64748b',
+    color: t.slate500,
     cursor: 'pointer',
     padding: '8px',
-    borderRadius: '6px',
-    transition: 'all 0.15s ease',
+    borderRadius: t.radiusSm,
+    transition: t.transition,
   },
   main: {
     flex: 1,
     marginLeft: '260px',
-    transition: 'margin-left 0.3s ease',
+    transition: 'margin-left 0.25s ease',
     minHeight: '100vh',
   },
   mainCollapsed: {
@@ -201,7 +202,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   header: {
     backgroundColor: '#fff',
-    borderBottom: '1px solid #e2e8f0',
+    borderBottom: `1px solid ${t.slate200}`,
     padding: '16px 32px',
     display: 'flex',
     alignItems: 'center',
@@ -215,13 +216,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     fontSize: '14px',
-    color: '#64748b',
+    color: t.slate500,
   },
   breadcrumbSeparator: {
-    color: '#cbd5e1',
+    color: t.slate300,
   },
   breadcrumbCurrent: {
-    color: '#0f172a',
+    color: t.navy,
     fontWeight: 500,
   },
   content: {
@@ -236,13 +237,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: t.slate200,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#475569',
+    color: t.slate600,
   },
 };
 
@@ -336,14 +337,14 @@ function AdminLayout() {
           <div style={styles.userMenu}>
             <a
               href="/"
-              style={{ fontSize: '14px', color: '#475569', textDecoration: 'none', marginRight: '8px' }}
+              style={{ fontSize: '14px', color: t.slate600, textDecoration: 'none', marginRight: '8px' }}
               title="Back to main app"
             >
               ← App
             </a>
             <button
               onClick={handleLogout}
-              style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', fontSize: '14px', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: t.radiusSm, border: `1px solid ${t.slate200}`, backgroundColor: '#fff', color: t.slate600, fontSize: '14px', cursor: 'pointer', fontFamily: t.fontSans }}
             >
               Logout
             </button>

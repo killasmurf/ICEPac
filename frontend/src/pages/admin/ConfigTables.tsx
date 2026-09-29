@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { adminTokens as t } from './admin-tokens';
 import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
@@ -18,27 +19,27 @@ import {
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: '1400px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' },
-  title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' },
-  subtitle: { fontSize: '15px', color: '#64748b' },
-  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
+  title: { fontSize: '28px', fontWeight: 700, color: t.navy, marginBottom: '8px' },
+  subtitle: { fontSize: '15px', color: t.slate500 },
+  primaryButton: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: t.amber, color: '#fff', border: 'none', borderRadius: t.radiusMd, fontSize: '14px', fontWeight: 600, cursor: 'pointer' },
   toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' },
   tableSelector: { display: 'flex', gap: '12px', alignItems: 'center' },
-  tableSelect: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: 500, color: '#0f172a', backgroundColor: '#fff', cursor: 'pointer', minWidth: '220px' },
-  tableCard: { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' },
+  tableSelect: { padding: '10px 16px', borderRadius: t.radiusMd, border: `1px solid ${t.slate200}`, fontSize: '14px', fontWeight: 500, color: t.navy, backgroundColor: '#fff', cursor: 'pointer', minWidth: '220px' },
+  tableCard: { backgroundColor: '#fff', borderRadius: t.radiusLg, boxShadow: t.shadowSm, border: `1px solid ${t.slate200}`, overflow: 'hidden' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
   formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   formGroupFull: { gridColumn: '1 / -1' },
-  label: { fontSize: '14px', fontWeight: 500, color: '#374151' },
-  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none' },
-  select: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
-  error: { color: '#dc2626', fontSize: '13px', marginTop: '4px' },
-  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-  toastSuccess: { backgroundColor: '#10b981' },
-  toastError: { backgroundColor: '#ef4444' },
-  tableInfo: { padding: '16px 20px', backgroundColor: '#fef3c7', borderBottom: '1px solid #fcd34d', display: 'flex', alignItems: 'center', gap: '12px' },
-  tableInfoIcon: { color: '#d97706' },
-  tableInfoText: { fontSize: '14px', color: '#92400e' },
-  weightBadge: { padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '13px', fontWeight: 500 },
+  label: { fontSize: '14px', fontWeight: 500, color: t.slate700 },
+  input: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', outline: 'none' },
+  select: { padding: '10px 14px', borderRadius: t.radiusMd, border: `1px solid ${t.slate300}`, fontSize: '14px', backgroundColor: '#fff', cursor: 'pointer' },
+  error: { color: t.red, fontSize: '13px', marginTop: '4px' },
+  toast: { position: 'fixed', bottom: '24px', right: '24px', padding: '16px 24px', borderRadius: t.radiusMd, color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 1000, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  toastSuccess: { backgroundColor: t.green },
+  toastError: { backgroundColor: t.red },
+  tableInfo: { padding: '16px 20px', backgroundColor: t.amberL, borderBottom: '1px solid #FCD34D', display: 'flex', alignItems: 'center', gap: '12px' },
+  tableInfoIcon: { color: '#D97706' },
+  tableInfoText: { fontSize: '14px', color: t.amberD },
+  weightBadge: { padding: '4px 10px', backgroundColor: t.blueL, color: t.blueD, borderRadius: '12px', fontSize: '13px', fontWeight: 500 },
 };
 
 // Build CONFIG_TABLES from the shared CONFIG_TABLE_INFO
@@ -162,7 +163,7 @@ function ConfigTables() {
   const handleInputChange = (field: keyof FormData, value: string | boolean) => { setFormData(p => ({ ...p, [field]: value })); if (formErrors[field]) setFormErrors(p => ({ ...p, [field]: '' })); };
 
   const columns: Column<ConfigItem | WeightedConfigItem>[] = [
-    { key: 'code', header: 'Code', sortable: true, width: '150px', render: item => <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{item.code}</span> },
+    { key: 'code', header: 'Code', sortable: true, width: '150px', render: item => <span style={{ fontFamily: t.fontMono, fontWeight: 600 }}>{item.code}</span> },
     { key: 'description', header: 'Description', sortable: true },
     ...(isWeighted ? [{ key: 'weight' as const, header: 'Weight', sortable: true, width: '100px', render: (item: ConfigItem | WeightedConfigItem) => <span style={styles.weightBadge}>{(item as WeightedConfigItem).weight}</span> }] : []),
     { key: 'is_active', header: 'Status', sortable: true, width: '100px', render: item => <StatusBadge isActive={item.is_active} /> },
@@ -180,7 +181,7 @@ function ConfigTables() {
 
       <div style={styles.toolbar}>
         <div style={styles.tableSelector}>
-          <label style={{ fontSize: '14px', fontWeight: 500, color: '#475569' }}>Table:</label>
+          <label style={{ fontSize: '14px', fontWeight: 500, color: t.slate600 }}>Table:</label>
           <select style={styles.tableSelect} value={selectedTable} onChange={e => setSelectedTable(e.target.value as ConfigTableName)}>
             {CONFIG_TABLES.map(t => <option key={t.name} value={t.name}>{t.label}{t.weighted ? ' (Weighted)' : ''}</option>)}
           </select>
