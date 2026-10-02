@@ -43,6 +43,13 @@ const styles: Record<string, React.CSSProperties> = {
   emptyActivity: { padding: '32px', textAlign: 'center', color: t.slate400, fontSize: '14px' },
 };
 
+const shimmer: React.CSSProperties = {
+  background: `linear-gradient(90deg, ${t.slate100} 25%, ${t.slate200} 50%, ${t.slate100} 75%)`,
+  backgroundSize: '600px 100%',
+  animation: 'shimmer 1.5s infinite linear',
+  borderRadius: t.radiusSm,
+};
+
 // Icon components
 const StatIcons = {
   Users: () => (
@@ -123,7 +130,45 @@ function AdminDashboard() {
   }, []);
 
   if (loading) {
-    return <div style={styles.loading}>Loading dashboard...</div>;
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={{ width: '180px', height: '30px', marginBottom: '10px', ...shimmer }} />
+          <div style={{ width: '260px', height: '16px', ...shimmer }} />
+        </div>
+        <div style={styles.statsGrid}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ ...styles.statCard as React.CSSProperties, cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ width: '60px', height: '36px', marginBottom: '8px', ...shimmer }} />
+                  <div style={{ width: '110px', height: '14px', ...shimmer }} />
+                </div>
+                <div style={{ width: '48px', height: '48px', borderRadius: t.radiusMd, ...shimmer }} />
+              </div>
+              <div style={{ paddingTop: '16px', borderTop: `1px solid ${t.slate100}`, display: 'flex', gap: '8px' }}>
+                <div style={{ width: '88px', height: '26px', borderRadius: '20px', ...shimmer }} />
+                <div style={{ width: '72px', height: '26px', borderRadius: '20px', ...shimmer }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ width: '140px', height: '20px', marginBottom: '16px', ...shimmer }} />
+          <div style={styles.activityList}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} style={{ ...styles.activityItem as React.CSSProperties, borderBottom: `1px solid ${t.slate100}` }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: t.radiusMd, flexShrink: 0, ...shimmer }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ width: '55%', height: '14px', marginBottom: '8px', ...shimmer }} />
+                  <div style={{ width: '30%', height: '12px', ...shimmer }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!stats) {

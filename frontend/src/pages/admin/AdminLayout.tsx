@@ -5,7 +5,7 @@
  * Features a modern, professional design with collapsible sidebar.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { adminTokens as t } from './admin-tokens';
 
@@ -80,6 +80,17 @@ const navItems = [
   { path: '/admin/audit-logs', label: 'Audit Logs', icon: Icons.AuditLog },
 ];
 
+const ADMIN_KEYFRAMES = `
+  @keyframes pageIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+  }
+`;
+
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
@@ -104,11 +115,12 @@ const styles: Record<string, React.CSSProperties> = {
     width: '72px',
   },
   logo: {
-    padding: '24px 20px',
+    padding: '20px',
     borderBottom: `1px solid ${t.slate800}`,
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+    background: `linear-gradient(180deg, rgba(59,130,246,0.1) 0%, transparent 100%)`,
   },
   logoIcon: {
     width: '32px',
@@ -161,8 +173,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '2px',
   },
   navLinkActive: {
-    backgroundColor: t.slate800,
+    background: `linear-gradient(90deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.06) 100%)`,
     color: '#fff',
+    boxShadow: `inset 3px 0 0 ${t.blue}`,
   },
   navLinkHover: {
     backgroundColor: t.slate800,
@@ -201,8 +214,11 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: '72px',
   },
   header: {
-    backgroundColor: '#fff',
-    borderBottom: `1px solid ${t.slate200}`,
+    backgroundColor: 'rgba(248,250,252,0.85)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    borderBottom: `1px solid rgba(226,232,240,0.7)`,
+    boxShadow: '0 1px 8px rgba(15,23,42,0.06)',
     padding: '16px 32px',
     display: 'flex',
     alignItems: 'center',
@@ -252,6 +268,16 @@ function AdminLayout() {
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const id = 'admin-keyframes';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = ADMIN_KEYFRAMES;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -351,9 +377,11 @@ function AdminLayout() {
           </div>
         </header>
 
-        {/* Page Content */}
+        {/* Page Content — re-keyed on route change to trigger pageIn animation */}
         <div style={styles.content}>
-          <Outlet />
+          <div key={location.pathname} style={{ animation: 'pageIn 200ms ease both' }}>
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
