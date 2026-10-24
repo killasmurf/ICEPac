@@ -36,7 +36,7 @@ def upgrade() -> None:
     # Projects Table
     # ================================================================
     op.create_table(
-        'projects',
+        'tblProjects',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('project_name', sa.String(255), nullable=False),
         sa.Column('project_manager', sa.String(255), nullable=True),
@@ -61,17 +61,17 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['owner_id'], ['users.id'], name='fk_projects_owner_id', ondelete='SET NULL'),
+        sa.ForeignKeyConstraint(['owner_id'], ['tblUsers.id'], name='fk_projects_owner_id', ondelete='SET NULL'),
     )
-    op.create_index('ix_projects_id', 'projects', ['id'])
-    op.create_index('ix_projects_project_name', 'projects', ['project_name'])
-    op.create_index('ix_projects_status', 'projects', ['status'])
+    op.create_index('ix_projects_id', 'tblProjects', ['id'])
+    op.create_index('ix_projects_project_name', 'tblProjects', ['project_name'])
+    op.create_index('ix_projects_status', 'tblProjects', ['status'])
 
     # ================================================================
     # WBS Table
     # ================================================================
     op.create_table(
-        'wbs',
+        'tblWBS',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('project_id', sa.Integer(), nullable=False),
         sa.Column('task_unique_id', sa.Integer(), nullable=True),
@@ -114,19 +114,19 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name='fk_wbs_project_id', ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['parent_id'], ['wbs.id'], name='fk_wbs_parent_id', ondelete='SET NULL'),
+        sa.ForeignKeyConstraint(['project_id'], ['tblProjects.id'], name='fk_wbs_project_id', ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['parent_id'], ['tblWBS.id'], name='fk_wbs_parent_id', ondelete='SET NULL'),
     )
-    op.create_index('ix_wbs_id', 'wbs', ['id'])
-    op.create_index('ix_wbs_project_id', 'wbs', ['project_id'])
-    op.create_index('ix_wbs_parent_id', 'wbs', ['parent_id'])
-    op.create_index('ix_wbs_task_unique_id', 'wbs', ['task_unique_id'])
+    op.create_index('ix_wbs_id', 'tblWBS', ['id'])
+    op.create_index('ix_wbs_project_id', 'tblWBS', ['project_id'])
+    op.create_index('ix_wbs_parent_id', 'tblWBS', ['parent_id'])
+    op.create_index('ix_wbs_task_unique_id', 'tblWBS', ['task_unique_id'])
 
     # ================================================================
     # Import Jobs Table
     # ================================================================
     op.create_table(
-        'import_jobs',
+        'tblImportJobs',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('project_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
@@ -150,20 +150,20 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name='fk_import_jobs_project_id', ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='fk_import_jobs_user_id'),
+        sa.ForeignKeyConstraint(['project_id'], ['tblProjects.id'], name='fk_import_jobs_project_id', ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['user_id'], ['tblUsers.id'], name='fk_import_jobs_user_id'),
     )
-    op.create_index('ix_import_jobs_id', 'import_jobs', ['id'])
-    op.create_index('ix_import_jobs_project_id', 'import_jobs', ['project_id'])
-    op.create_index('ix_import_jobs_user_id', 'import_jobs', ['user_id'])
-    op.create_index('ix_import_jobs_status', 'import_jobs', ['status'])
-    op.create_index('ix_import_jobs_celery_task_id', 'import_jobs', ['celery_task_id'])
+    op.create_index('ix_import_jobs_id', 'tblImportJobs', ['id'])
+    op.create_index('ix_import_jobs_project_id', 'tblImportJobs', ['project_id'])
+    op.create_index('ix_import_jobs_user_id', 'tblImportJobs', ['user_id'])
+    op.create_index('ix_import_jobs_status', 'tblImportJobs', ['status'])
+    op.create_index('ix_import_jobs_celery_task_id', 'tblImportJobs', ['celery_task_id'])
 
     # ================================================================
     # Resource Assignments Table
     # ================================================================
     op.create_table(
-        'resource_assignments',
+        'tblResourceAssignment',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('wbs_id', sa.Integer(), nullable=False),
         sa.Column('resource_code', sa.String(50), nullable=False),
@@ -184,22 +184,22 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['wbs_id'], ['wbs.id'], name='fk_assignments_wbs_id', ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['resource_code'], ['resources.resource_code'], name='fk_assignments_resource_code'),
-        sa.ForeignKeyConstraint(['supplier_code'], ['suppliers.supplier_code'], name='fk_assignments_supplier_code'),
-        sa.ForeignKeyConstraint(['cost_type_code'], ['cost_types.code'], name='fk_assignments_cost_type'),
-        sa.ForeignKeyConstraint(['region_code'], ['regions.code'], name='fk_assignments_region'),
-        sa.ForeignKeyConstraint(['bus_area_code'], ['business_areas.code'], name='fk_assignments_bus_area'),
-        sa.ForeignKeyConstraint(['estimating_technique_code'], ['estimating_techniques.code'], name='fk_assignments_est_technique'),
+        sa.ForeignKeyConstraint(['wbs_id'], ['tblWBS.id'], name='fk_assignments_wbs_id', ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['resource_code'], ['tblResource.resource_code'], name='fk_assignments_resource_code'),
+        sa.ForeignKeyConstraint(['supplier_code'], ['tblSupplier.supplier_code'], name='fk_assignments_supplier_code'),
+        sa.ForeignKeyConstraint(['cost_type_code'], ['tblCostType.code'], name='fk_assignments_cost_type'),
+        sa.ForeignKeyConstraint(['region_code'], ['tblRegion.code'], name='fk_assignments_region'),
+        sa.ForeignKeyConstraint(['bus_area_code'], ['tblBus_Area.code'], name='fk_assignments_bus_area'),
+        sa.ForeignKeyConstraint(['estimating_technique_code'], ['tblEstimatingTechnique.code'], name='fk_assignments_est_technique'),
     )
-    op.create_index('ix_resource_assignments_id', 'resource_assignments', ['id'])
-    op.create_index('ix_resource_assignments_wbs_id', 'resource_assignments', ['wbs_id'])
+    op.create_index('ix_resource_assignments_id', 'tblResourceAssignment', ['id'])
+    op.create_index('ix_resource_assignments_wbs_id', 'tblResourceAssignment', ['wbs_id'])
 
     # ================================================================
     # Risks Table
     # ================================================================
     op.create_table(
-        'risks',
+        'tblRisks',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('wbs_id', sa.Integer(), nullable=False),
         sa.Column('risk_category_code', sa.String(50), nullable=True),
@@ -212,23 +212,23 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['wbs_id'], ['wbs.id'], name='fk_risks_wbs_id', ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['risk_category_code'], ['risk_categories.code'], name='fk_risks_category'),
-        sa.ForeignKeyConstraint(['probability_code'], ['probability_levels.code'], name='fk_risks_probability'),
-        sa.ForeignKeyConstraint(['severity_code'], ['severity_levels.code'], name='fk_risks_severity'),
+        sa.ForeignKeyConstraint(['wbs_id'], ['tblWBS.id'], name='fk_risks_wbs_id', ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['risk_category_code'], ['tblRiskCategory.code'], name='fk_risks_category'),
+        sa.ForeignKeyConstraint(['probability_code'], ['tblProbabilityOccurrence.code'], name='fk_risks_probability'),
+        sa.ForeignKeyConstraint(['severity_code'], ['tblSeverityOccurrence.code'], name='fk_risks_severity'),
     )
-    op.create_index('ix_risks_id', 'risks', ['id'])
-    op.create_index('ix_risks_wbs_id', 'risks', ['wbs_id'])
+    op.create_index('ix_risks_id', 'tblRisks', ['id'])
+    op.create_index('ix_risks_wbs_id', 'tblRisks', ['wbs_id'])
 
 
 def downgrade() -> None:
     """Drop project, WBS, import, assignment, and risk tables."""
     # Drop in reverse dependency order
-    op.drop_table('risks')
-    op.drop_table('resource_assignments')
-    op.drop_table('import_jobs')
-    op.drop_table('wbs')
-    op.drop_table('projects')
+    op.drop_table('tblRisks')
+    op.drop_table('tblResourceAssignment')
+    op.drop_table('tblImportJobs')
+    op.drop_table('tblWBS')
+    op.drop_table('tblProjects')
 
     # Drop enum types
     op.execute('DROP TYPE importstatus')

@@ -14,10 +14,10 @@ class AuditLog(Base):
     user authentication events (LOGIN, LOGOUT, FAILED_LOGIN).
     """
 
-    __tablename__ = "audit_logs"
+    __tablename__ = "tblLog"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("tblUsers.id"), nullable=True, index=True)
     action = Column(String(50), nullable=False, index=True)
     entity_type = Column(String(100), nullable=False, index=True)
     entity_id = Column(Integer, nullable=True, index=True)

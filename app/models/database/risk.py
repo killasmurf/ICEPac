@@ -27,26 +27,26 @@ class Risk(Base):
     project_id) may be set, and at least one must be set.
     """
 
-    __tablename__ = "risks"
+    __tablename__ = "tblRisks"
 
     id = Column(Integer, primary_key=True, index=True)
     # wbs_id is nullable now (was NOT NULL pre-US-006). Project-scoped risks
     # leave it NULL. The CHECK constraint enforces exactly-one-of.
-    wbs_id = Column(Integer, ForeignKey("wbs.id"), nullable=True, index=True)
+    wbs_id = Column(Integer, ForeignKey("tblWBS.id"), nullable=True, index=True)
     project_id = Column(
-        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+        Integer, ForeignKey("tblProjects.id", ondelete="CASCADE"), nullable=True
     )
     title = Column(String(255), nullable=False)
     status = Column(String(32), nullable=False, server_default="open")
     risk_category_code = Column(
-        String(50), ForeignKey("risk_categories.code"), nullable=True
+        String(50), ForeignKey("tblRiskCategory.code"), nullable=True
     )
     risk_cost = Column(Numeric(18, 2), default=0)
     probability_code = Column(
-        String(50), ForeignKey("probability_levels.code"), nullable=True
+        String(50), ForeignKey("tblProbabilityOccurrence.code"), nullable=True
     )
     severity_code = Column(
-        String(50), ForeignKey("severity_levels.code"), nullable=True
+        String(50), ForeignKey("tblSeverityOccurrence.code"), nullable=True
     )
     mitigation_plan = Column(Text, nullable=True)
     date_identified = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -24,17 +24,17 @@ class WBS(Base):
     and task classification flags for MS Project import.
     """
 
-    __tablename__ = "wbs"
+    __tablename__ = "tblWBS"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("tblProjects.id"), nullable=False, index=True)
     task_unique_id = Column(Integer, nullable=True, index=True)
     wbs_code = Column(String(100), nullable=True)
     wbs_title = Column(String(500), nullable=False)
 
     # Hierarchy (Phase 3)
     outline_level = Column(Integer, default=0, nullable=False)
-    parent_id = Column(Integer, ForeignKey("wbs.id"), nullable=True, index=True)
+    parent_id = Column(Integer, ForeignKey("tblWBS.id"), nullable=True, index=True)
 
     # Schedule dates
     schedule_start = Column(DateTime, nullable=True)

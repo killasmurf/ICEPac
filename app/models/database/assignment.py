@@ -10,21 +10,21 @@ from app.core.database import Base
 class ResourceAssignment(Base):
     """Resource Assignment model - maps to legacy tblResourceAssignment."""
 
-    __tablename__ = "resource_assignments"
+    __tablename__ = "tblResourceAssignment"
 
     id = Column(Integer, primary_key=True, index=True)
-    wbs_id = Column(Integer, ForeignKey("wbs.id"), nullable=False, index=True)
+    wbs_id = Column(Integer, ForeignKey("tblWBS.id"), nullable=False, index=True)
     resource_code = Column(
-        String(50), ForeignKey("resources.resource_code"), nullable=False
+        String(50), ForeignKey("tblResource.resource_code"), nullable=False
     )
     supplier_code = Column(
-        String(50), ForeignKey("suppliers.supplier_code"), nullable=True
+        String(50), ForeignKey("tblSupplier.supplier_code"), nullable=True
     )
-    cost_type_code = Column(String(50), ForeignKey("cost_types.code"), nullable=True)
-    region_code = Column(String(50), ForeignKey("regions.code"), nullable=True)
-    bus_area_code = Column(String(50), ForeignKey("business_areas.code"), nullable=True)
+    cost_type_code = Column(String(50), ForeignKey("tblCostType.code"), nullable=True)
+    region_code = Column(String(50), ForeignKey("tblRegion.code"), nullable=True)
+    bus_area_code = Column(String(50), ForeignKey("tblBus_Area.code"), nullable=True)
     estimating_technique_code = Column(
-        String(50), ForeignKey("estimating_techniques.code"), nullable=True
+        String(50), ForeignKey("tblEstimatingTechnique.code"), nullable=True
     )
 
     # Three-point estimation

@@ -6,10 +6,10 @@ from app.core.database import Base
 
 class ReportJob(Base):
     """Tracks async report generation jobs."""
-    __tablename__ = "report_jobs"
+    __tablename__ = "tblReportJobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("tblUsers.id"), nullable=False, index=True)
     report_type = Column(String(50), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="pending", index=True)
     # pending -> generating -> completed -> expired | failed

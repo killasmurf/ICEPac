@@ -13,7 +13,7 @@ class Resource(Base):
     with associated costs and units.
     """
 
-    __tablename__ = "resources"
+    __tablename__ = "tblResource"
 
     id = Column(Integer, primary_key=True, index=True)
     resource_code = Column(String(50), unique=True, nullable=False, index=True)
@@ -38,7 +38,7 @@ class Supplier(Base):
     with resource assignments.
     """
 
-    __tablename__ = "suppliers"
+    __tablename__ = "tblSupplier"
 
     id = Column(Integer, primary_key=True, index=True)
     supplier_code = Column(String(50), unique=True, nullable=False, index=True)

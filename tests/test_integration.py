@@ -226,8 +226,8 @@ class TestModelRegistry:
             AuditLog, CostType, Region, ProbabilityLevel, SeverityLevel,
             HelpTopic, HelpCategory,
         )
-        assert User.__tablename__ == "users"
-        assert ReportJob.__tablename__ == "report_jobs"
+        assert User.__tablename__ == "tblUsers"
+        assert ReportJob.__tablename__ == "tblReportJobs"
 
     def test_models_have_id(self):
         from app.models.database import (

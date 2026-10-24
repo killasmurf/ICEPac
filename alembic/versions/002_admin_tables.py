@@ -29,7 +29,7 @@ def upgrade() -> None:
     # Resources Table
     # ================================================================
     op.create_table(
-        'resources',
+        'tblResource',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('resource_code', sa.String(50), nullable=False),
         sa.Column('description', sa.String(500), nullable=False),
@@ -42,15 +42,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('resource_code', name='uq_resources_code')
     )
-    op.create_index('ix_resources_id', 'resources', ['id'])
-    op.create_index('ix_resources_code', 'resources', ['resource_code'])
-    op.create_index('ix_resources_is_active', 'resources', ['is_active'])
+    op.create_index('ix_resources_id', 'tblResource', ['id'])
+    op.create_index('ix_resources_code', 'tblResource', ['resource_code'])
+    op.create_index('ix_resources_is_active', 'tblResource', ['is_active'])
 
     # ================================================================
     # Suppliers Table
     # ================================================================
     op.create_table(
-        'suppliers',
+        'tblSupplier',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('supplier_code', sa.String(50), nullable=False),
         sa.Column('name', sa.String(255), nullable=False),
@@ -64,21 +64,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('supplier_code', name='uq_suppliers_code')
     )
-    op.create_index('ix_suppliers_id', 'suppliers', ['id'])
-    op.create_index('ix_suppliers_code', 'suppliers', ['supplier_code'])
-    op.create_index('ix_suppliers_is_active', 'suppliers', ['is_active'])
+    op.create_index('ix_suppliers_id', 'tblSupplier', ['id'])
+    op.create_index('ix_suppliers_code', 'tblSupplier', ['supplier_code'])
+    op.create_index('ix_suppliers_is_active', 'tblSupplier', ['is_active'])
 
     # ================================================================
     # Standard Configuration Tables
     # ================================================================
     config_tables = [
-        'cost_types',
-        'expense_types',
-        'regions',
-        'business_areas',
-        'estimating_techniques',
-        'risk_categories',
-        'expenditure_indicators',
+        'tblCostType',
+        'tblExpType',
+        'tblRegion',
+        'tblBus_Area',
+        'tblEstimatingTechnique',
+        'tblRiskCategory',
+        'tblExpInd',
     ]
     
     for table_name in config_tables:
@@ -99,9 +99,9 @@ def upgrade() -> None:
     # Weighted Configuration Tables
     # ================================================================
     weighted_tables = [
-        'probability_levels',
-        'severity_levels',
-        'pmb_weights',
+        'tblProbabilityOccurrence',
+        'tblSeverityOccurrence',
+        'tblPMBWeight',
     ]
     
     for table_name in weighted_tables:
@@ -123,7 +123,7 @@ def upgrade() -> None:
     # Audit Logs Table
     # ================================================================
     op.create_table(
-        'audit_logs',
+        'tblLog',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=True),
         sa.Column('action', sa.String(50), nullable=False),
@@ -135,13 +135,13 @@ def upgrade() -> None:
         sa.Column('user_agent', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='fk_audit_logs_user_id', ondelete='SET NULL')
+        sa.ForeignKeyConstraint(['user_id'], ['tblUsers.id'], name='fk_audit_logs_user_id', ondelete='SET NULL')
     )
-    op.create_index('ix_audit_logs_id', 'audit_logs', ['id'])
-    op.create_index('ix_audit_logs_user_id', 'audit_logs', ['user_id'])
-    op.create_index('ix_audit_logs_action', 'audit_logs', ['action'])
-    op.create_index('ix_audit_logs_entity', 'audit_logs', ['entity_type', 'entity_id'])
-    op.create_index('ix_audit_logs_created_at', 'audit_logs', ['created_at'])
+    op.create_index('ix_audit_logs_id', 'tblLog', ['id'])
+    op.create_index('ix_audit_logs_user_id', 'tblLog', ['user_id'])
+    op.create_index('ix_audit_logs_action', 'tblLog', ['action'])
+    op.create_index('ix_audit_logs_entity', 'tblLog', ['entity_type', 'entity_id'])
+    op.create_index('ix_audit_logs_created_at', 'tblLog', ['created_at'])
 
     # ================================================================
     # Seed Data: Configuration Tables
@@ -149,7 +149,7 @@ def upgrade() -> None:
     
     # Cost Types
     op.execute("""
-        INSERT INTO cost_types (code, description, is_active) VALUES
+        INSERT INTO tblCostType (code, description, is_active) VALUES
         ('LABOR', 'Labor costs', true),
         ('MATERIAL', 'Material costs', true),
         ('EQUIPMENT', 'Equipment costs', true),
@@ -161,7 +161,7 @@ def upgrade() -> None:
 
     # Expense Types
     op.execute("""
-        INSERT INTO expense_types (code, description, is_active) VALUES
+        INSERT INTO tblExpType (code, description, is_active) VALUES
         ('CAPEX', 'Capital Expenditure', true),
         ('OPEX', 'Operating Expenditure', true),
         ('DIRECT', 'Direct Expense', true),
@@ -170,7 +170,7 @@ def upgrade() -> None:
 
     # Regions
     op.execute("""
-        INSERT INTO regions (code, description, is_active) VALUES
+        INSERT INTO tblRegion (code, description, is_active) VALUES
         ('NA', 'North America', true),
         ('EU', 'Europe', true),
         ('APAC', 'Asia Pacific', true),
@@ -181,7 +181,7 @@ def upgrade() -> None:
 
     # Business Areas
     op.execute("""
-        INSERT INTO business_areas (code, description, is_active) VALUES
+        INSERT INTO tblBus_Area (code, description, is_active) VALUES
         ('IT', 'Information Technology', true),
         ('ENG', 'Engineering', true),
         ('MFG', 'Manufacturing', true),
@@ -193,7 +193,7 @@ def upgrade() -> None:
 
     # Estimating Techniques
     op.execute("""
-        INSERT INTO estimating_techniques (code, description, is_active) VALUES
+        INSERT INTO tblEstimatingTechnique (code, description, is_active) VALUES
         ('ANALOG', 'Analogous Estimation', true),
         ('PARAM', 'Parametric Estimation', true),
         ('BOTTOMUP', 'Bottom-Up Estimation', true),
@@ -205,7 +205,7 @@ def upgrade() -> None:
 
     # Risk Categories
     op.execute("""
-        INSERT INTO risk_categories (code, description, is_active) VALUES
+        INSERT INTO tblRiskCategory (code, description, is_active) VALUES
         ('TECH', 'Technical Risk', true),
         ('SCHEDULE', 'Schedule Risk', true),
         ('COST', 'Cost Risk', true),
@@ -217,7 +217,7 @@ def upgrade() -> None:
 
     # Expenditure Indicators
     op.execute("""
-        INSERT INTO expenditure_indicators (code, description, is_active) VALUES
+        INSERT INTO tblExpInd (code, description, is_active) VALUES
         ('PLANNED', 'Planned Expenditure', true),
         ('ACTUAL', 'Actual Expenditure', true),
         ('COMMITTED', 'Committed Expenditure', true),
@@ -226,7 +226,7 @@ def upgrade() -> None:
 
     # Probability Levels
     op.execute("""
-        INSERT INTO probability_levels (code, description, weight, is_active) VALUES
+        INSERT INTO tblProbabilityOccurrence (code, description, weight, is_active) VALUES
         ('RARE', 'Rare (1-10%)', 0.05, true),
         ('UNLIKELY', 'Unlikely (11-30%)', 0.20, true),
         ('POSSIBLE', 'Possible (31-50%)', 0.40, true),
@@ -236,7 +236,7 @@ def upgrade() -> None:
 
     # Severity Levels
     op.execute("""
-        INSERT INTO severity_levels (code, description, weight, is_active) VALUES
+        INSERT INTO tblSeverityOccurrence (code, description, weight, is_active) VALUES
         ('NEGLIGIBLE', 'Negligible Impact', 0.05, true),
         ('MINOR', 'Minor Impact', 0.10, true),
         ('MODERATE', 'Moderate Impact', 0.25, true),
@@ -246,7 +246,7 @@ def upgrade() -> None:
 
     # PMB Weights
     op.execute("""
-        INSERT INTO pmb_weights (code, description, weight, is_active) VALUES
+        INSERT INTO tblPMBWeight (code, description, weight, is_active) VALUES
         ('LOW', 'Low Confidence', 0.25, true),
         ('MEDIUM', 'Medium Confidence', 0.50, true),
         ('HIGH', 'High Confidence', 0.75, true),
@@ -257,7 +257,7 @@ def upgrade() -> None:
     # Seed Data: Sample Resources
     # ================================================================
     op.execute("""
-        INSERT INTO resources (resource_code, description, eoc, cost, units, is_active) VALUES
+        INSERT INTO tblResource (resource_code, description, eoc, cost, units, is_active) VALUES
         ('ENG-SR', 'Senior Engineer', 'LABOR', 150.00, 'hour', true),
         ('ENG-JR', 'Junior Engineer', 'LABOR', 85.00, 'hour', true),
         ('PM', 'Project Manager', 'LABOR', 175.00, 'hour', true),
@@ -274,7 +274,7 @@ def upgrade() -> None:
     # Seed Data: Sample Suppliers
     # ================================================================
     op.execute("""
-        INSERT INTO suppliers (supplier_code, name, contact, phone, email, is_active) VALUES
+        INSERT INTO tblSupplier (supplier_code, name, contact, phone, email, is_active) VALUES
         ('ACME', 'Acme Corporation', 'John Smith', '+1-555-0100', 'john@acme.com', true),
         ('TECHSOL', 'Tech Solutions Inc', 'Jane Doe', '+1-555-0200', 'jane@techsol.com', true),
         ('GLOBSERV', 'Global Services Ltd', 'Bob Wilson', '+1-555-0300', 'bob@globserv.com', true),
@@ -286,22 +286,22 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Drop admin system tables."""
     # Drop audit logs first (has FK)
-    op.drop_table('audit_logs')
+    op.drop_table('tblLog')
     
     # Drop weighted config tables
-    op.drop_table('pmb_weights')
-    op.drop_table('severity_levels')
-    op.drop_table('probability_levels')
+    op.drop_table('tblPMBWeight')
+    op.drop_table('tblSeverityOccurrence')
+    op.drop_table('tblProbabilityOccurrence')
     
     # Drop standard config tables
-    op.drop_table('expenditure_indicators')
-    op.drop_table('risk_categories')
-    op.drop_table('estimating_techniques')
-    op.drop_table('business_areas')
-    op.drop_table('regions')
-    op.drop_table('expense_types')
-    op.drop_table('cost_types')
+    op.drop_table('tblExpInd')
+    op.drop_table('tblRiskCategory')
+    op.drop_table('tblEstimatingTechnique')
+    op.drop_table('tblBus_Area')
+    op.drop_table('tblRegion')
+    op.drop_table('tblExpType')
+    op.drop_table('tblCostType')
     
     # Drop resources and suppliers
-    op.drop_table('suppliers')
-    op.drop_table('resources')
+    op.drop_table('tblSupplier')
+    op.drop_table('tblResource')

@@ -10,7 +10,7 @@ from app.core.database import Base
 class HelpCategory(Base):
     """Help category model - groups related help topics."""
 
-    __tablename__ = "help_categories"
+    __tablename__ = "tblHelpCategory"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, unique=True)
@@ -32,10 +32,10 @@ class HelpCategory(Base):
 class HelpTopic(Base):
     """Help topic model - maps to legacy tblHelp."""
 
-    __tablename__ = "help_topics"
+    __tablename__ = "tblHelp"
 
     id = Column(Integer, primary_key=True, index=True)
-    category_id = Column(Integer, ForeignKey("help_categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("tblHelpCategory.id"), nullable=False)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
@@ -57,10 +57,10 @@ class HelpTopic(Base):
 class HelpDescription(Base):
     """Help description model - maps to legacy tblHelpDescr."""
 
-    __tablename__ = "help_descriptions"
+    __tablename__ = "tblHelpDescr"
 
     id = Column(Integer, primary_key=True, index=True)
-    topic_id = Column(Integer, ForeignKey("help_topics.id"), nullable=False)
+    topic_id = Column(Integer, ForeignKey("tblHelp.id"), nullable=False)
     section_number = Column(Integer, default=1, nullable=False)
     detailed_text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

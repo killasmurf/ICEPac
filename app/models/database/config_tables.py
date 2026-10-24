@@ -39,7 +39,7 @@ class WeightedConfigTableMixin(ConfigTableMixin):
 class CostType(ConfigTableMixin, Base):
     """Cost type classification - maps to legacy tblCostType."""
 
-    __tablename__ = "cost_types"
+    __tablename__ = "tblCostType"
 
     def __repr__(self):
         return f"<CostType(code='{self.code}', desc='{self.description}')>"
@@ -48,7 +48,7 @@ class CostType(ConfigTableMixin, Base):
 class ExpenseType(ConfigTableMixin, Base):
     """Expense type - maps to legacy tblExpType."""
 
-    __tablename__ = "expense_types"
+    __tablename__ = "tblExpType"
 
     def __repr__(self):
         return f"<ExpenseType(code='{self.code}')>"
@@ -57,7 +57,7 @@ class ExpenseType(ConfigTableMixin, Base):
 class Region(ConfigTableMixin, Base):
     """Geographic region - maps to legacy tblRegion."""
 
-    __tablename__ = "regions"
+    __tablename__ = "tblRegion"
 
     def __repr__(self):
         return f"<Region(code='{self.code}')>"
@@ -66,7 +66,7 @@ class Region(ConfigTableMixin, Base):
 class BusinessArea(ConfigTableMixin, Base):
     """Business area - maps to legacy tblBus_Area."""
 
-    __tablename__ = "business_areas"
+    __tablename__ = "tblBus_Area"
 
     def __repr__(self):
         return f"<BusinessArea(code='{self.code}')>"
@@ -75,7 +75,7 @@ class BusinessArea(ConfigTableMixin, Base):
 class EstimatingTechnique(ConfigTableMixin, Base):
     """Estimating technique - maps to legacy tblEstimatingTechnique."""
 
-    __tablename__ = "estimating_techniques"
+    __tablename__ = "tblEstimatingTechnique"
 
     def __repr__(self):
         return f"<EstimatingTechnique(code='{self.code}')>"
@@ -84,7 +84,7 @@ class EstimatingTechnique(ConfigTableMixin, Base):
 class RiskCategory(ConfigTableMixin, Base):
     """Risk category - maps to legacy tblRiskCategory."""
 
-    __tablename__ = "risk_categories"
+    __tablename__ = "tblRiskCategory"
 
     def __repr__(self):
         return f"<RiskCategory(code='{self.code}')>"
@@ -93,7 +93,7 @@ class RiskCategory(ConfigTableMixin, Base):
 class ExpenditureIndicator(ConfigTableMixin, Base):
     """Expenditure indicator - maps to legacy tblExpInd."""
 
-    __tablename__ = "expenditure_indicators"
+    __tablename__ = "tblExpInd"
 
     def __repr__(self):
         return f"<ExpenditureIndicator(code='{self.code}')>"
@@ -110,7 +110,7 @@ class ProbabilityLevel(Base):
     Maps to legacy tblProbabilityOccurrence.
     """
 
-    __tablename__ = "probability_levels"
+    __tablename__ = "tblProbabilityOccurrence"
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
@@ -126,7 +126,7 @@ class ProbabilityLevel(Base):
 class SeverityLevel(Base):
     """Severity level for risk assessment - maps to legacy tblSeverityOccurrence."""
 
-    __tablename__ = "severity_levels"
+    __tablename__ = "tblSeverityOccurrence"
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
@@ -142,7 +142,7 @@ class SeverityLevel(Base):
 class PMBWeight(Base):
     """Project Management Baseline weight - maps to legacy tblPMBWeight."""
 
-    __tablename__ = "pmb_weights"
+    __tablename__ = "tblPMBWeight"
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)

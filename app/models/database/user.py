@@ -21,7 +21,7 @@ class UserRole(str, enum.Enum):
 class User(Base):
     """User model for authentication and authorization."""
 
-    __tablename__ = "users"
+    __tablename__ = "tblUsers"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)

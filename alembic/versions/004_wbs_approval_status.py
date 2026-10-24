@@ -21,11 +21,11 @@ depends_on = None
 def upgrade() -> None:
     """Add approval_status column to wbs table."""
     op.add_column(
-        'wbs',
+        'tblWBS',
         sa.Column('approval_status', sa.String(20), nullable=False, server_default='draft')
     )
 
 
 def downgrade() -> None:
     """Remove approval_status column from wbs table."""
-    op.drop_column('wbs', 'approval_status')
+    op.drop_column('tblWBS', 'approval_status')

@@ -37,22 +37,22 @@ depends_on = None
 def upgrade() -> None:
     # 1. Add nullable project_id column + FK + index
     op.add_column(
-        "risks",
+        "tblRisks",
         sa.Column("project_id", sa.Integer(), nullable=True),
     )
     op.create_foreign_key(
         "fk_risks_project_id_projects",
-        "risks",
-        "projects",
+        "tblRisks",
+        "tblProjects",
         ["project_id"],
         ["id"],
         ondelete="CASCADE",
     )
-    op.create_index("ix_risks_project_id", "risks", ["project_id"])
+    op.create_index("ix_risks_project_id", "tblRisks", ["project_id"])
 
     # 2. Add nullable status column with server_default
     op.add_column(
-        "risks",
+        "tblRisks",
         sa.Column(
             "status",
             sa.String(length=32),
@@ -61,29 +61,29 @@ def upgrade() -> None:
         ),
     )
     # Backfill any NULL statuses
-    op.execute("UPDATE risks SET status = 'open' WHERE status IS NULL")
-    op.alter_column("risks", "status", nullable=False)
+    op.execute("UPDATE tblRisks SET status = 'open' WHERE status IS NULL")
+    op.alter_column("tblRisks", "status", nullable=False)
 
     # 3. Add nullable title column, backfill, then make NOT NULL
     op.add_column(
-        "risks",
+        "tblRisks",
         sa.Column("title", sa.String(length=255), nullable=True),
     )
     # Backfill placeholder titles for any existing WBS-scoped risks.
     op.execute(
-        "UPDATE risks SET title = '(legacy WBS-scoped risk #' || id || ')' "
+        "UPDATE tblRisks SET title = '(legacy WBS-scoped risk #' || id || ')' "
         "WHERE title IS NULL"
     )
-    op.alter_column("risks", "title", nullable=False)
+    op.alter_column("tblRisks", "title", nullable=False)
 
     # 4. Relax wbs_id from NOT NULL to nullable (required so project-scoped
     # risks with project_id set can have wbs_id=NULL)
-    op.alter_column("risks", "wbs_id", nullable=True)
+    op.alter_column("tblRisks", "wbs_id", nullable=True)
 
     # 5. CHECK constraint enforcing the XOR invariant at the DB layer
     op.create_check_constraint(
         "ck_risk_xor_parent",
-        "risks",
+        "tblRisks",
         "(wbs_id IS NOT NULL) <> (project_id IS NOT NULL)",
     )
 
@@ -94,10 +94,10 @@ def downgrade() -> None:
     # will fail at the title NOT NULL step (project-level risks were inserted
     # with real titles, so the column won't go back to NULL) or, if those
     # rows are deleted first, the project_id column drop will lose data.
-    op.drop_constraint("ck_risk_xor_parent", "risks", type_="check")
-    op.alter_column("risks", "wbs_id", nullable=False)
-    op.alter_column("risks", "title", nullable=True)
-    op.drop_column("risks", "status")
-    op.drop_index("ix_risks_project_id", table_name="risks")
-    op.drop_constraint("fk_risks_project_id_projects", "risks", type_="foreignkey")
-    op.drop_column("risks", "project_id")
+    op.drop_constraint("ck_risk_xor_parent", "tblRisks", type_="check")
+    op.alter_column("tblRisks", "wbs_id", nullable=False)
+    op.alter_column("tblRisks", "title", nullable=True)
+    op.drop_column("tblRisks", "status")
+    op.drop_index("ix_risks_project_id", table_name="tblRisks")
+    op.drop_constraint("fk_risks_project_id_projects", "tblRisks", type_="foreignkey")
+    op.drop_column("tblRisks", "project_id")

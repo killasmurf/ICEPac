@@ -33,7 +33,7 @@ class ProjectSourceFormat(str, enum.Enum):
 class Project(Base):
     """Project model - maps to legacy tblProjects."""
 
-    __tablename__ = "projects"
+    __tablename__ = "tblProjects"
 
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String(255), nullable=False, index=True)
@@ -62,7 +62,7 @@ class Project(Base):
     resource_count = Column(Integer, default=0)
 
     # Owner FK to users table
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("tblUsers.id"), nullable=True)
 
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id])

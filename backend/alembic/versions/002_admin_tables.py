@@ -19,7 +19,7 @@ def upgrade():
 
     # ── Suppliers ──────────────────────────────────────────────
     op.create_table(
-        "suppliers",
+        "tblSupplier",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("name", sa.String(200), unique=True, nullable=False),
         sa.Column("contact_name", sa.String(200), nullable=True),
@@ -34,11 +34,11 @@ def upgrade():
         sa.Column("created_by", sa.Integer(), nullable=True),
         sa.Column("updated_by", sa.Integer(), nullable=True),
     )
-    op.create_index("ix_suppliers_name", "suppliers", ["name"])
+    op.create_index("ix_suppliers_name", "tblSupplier", ["name"])
 
     # ── Resources ─────────────────────────────────────────────
     op.create_table(
-        "resources",
+        "tblResource",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("resource_code", sa.String(50), unique=True, nullable=False),
         sa.Column("description", sa.String(500), nullable=False),
@@ -54,12 +54,12 @@ def upgrade():
         sa.Column("created_by", sa.Integer(), nullable=True),
         sa.Column("updated_by", sa.Integer(), nullable=True),
     )
-    op.create_index("ix_resources_code", "resources", ["resource_code"])
-    op.create_index("ix_resources_eoc", "resources", ["eoc"])
+    op.create_index("ix_resources_code", "tblResource", ["resource_code"])
+    op.create_index("ix_resources_eoc", "tblResource", ["eoc"])
 
     # ── Standard Config Tables ────────────────────────────────
-    for table_name in ["cost_types", "expense_types", "regions", "business_areas",
-                       "estimating_techniques", "risk_categories", "expenditure_indicators"]:
+    for table_name in ["tblCostType", "tblExpType", "tblRegion", "tblBus_Area",
+                       "tblEstimatingTechnique", "tblRiskCategory", "tblExpInd"]:
         op.create_table(
             table_name,
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -73,7 +73,7 @@ def upgrade():
         )
 
     # ── Weighted Config Tables ────────────────────────────────
-    for table_name in ["probability_levels", "severity_levels"]:
+    for table_name in ["tblProbabilityOccurrence", "tblSeverityOccurrence"]:
         op.create_table(
             table_name,
             sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -88,7 +88,7 @@ def upgrade():
         )
 
     op.create_table(
-        "pmb_weights",
+        "tblPMBWeight",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("name", sa.String(200), unique=True, nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
@@ -102,7 +102,7 @@ def upgrade():
 
     # ── Audit Logs ────────────────────────────────────────────
     op.create_table(
-        "audit_logs",
+        "tblLog",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("username", sa.String(100), nullable=False),
@@ -115,14 +115,14 @@ def upgrade():
         sa.Column("ip_address", sa.String(45), nullable=True),
         sa.Column("created_at", sa.DateTime(), default=datetime.utcnow, nullable=False),
     )
-    op.create_index("ix_audit_user_id", "audit_logs", ["user_id"])
-    op.create_index("ix_audit_action", "audit_logs", ["action"])
-    op.create_index("ix_audit_entity", "audit_logs", ["entity_type"])
-    op.create_index("ix_audit_created", "audit_logs", ["created_at"])
+    op.create_index("ix_audit_user_id", "tblLog", ["user_id"])
+    op.create_index("ix_audit_action", "tblLog", ["action"])
+    op.create_index("ix_audit_entity", "tblLog", ["entity_type"])
+    op.create_index("ix_audit_created", "tblLog", ["created_at"])
 
     # ── Seed Data ─────────────────────────────────────────────
     op.execute(f"""
-        INSERT INTO cost_types (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
+        INSERT INTO tblCostType (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
         ('Labor', 'LBR', 'Direct labor costs', true, 1, '{now}', '{now}'),
         ('Materials', 'MAT', 'Materials and supplies', true, 2, '{now}', '{now}'),
         ('Subcontract', 'SUB', 'Subcontractor costs', true, 3, '{now}', '{now}'),
@@ -132,7 +132,7 @@ def upgrade():
     """)
 
     op.execute(f"""
-        INSERT INTO estimating_techniques (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
+        INSERT INTO tblEstimatingTechnique (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
         ('Analogy', 'ANA', 'Estimation by analogy to similar projects', true, 1, '{now}', '{now}'),
         ('Parametric', 'PAR', 'Statistical parametric models', true, 2, '{now}', '{now}'),
         ('Engineering Build-Up', 'ENG', 'Bottom-up engineering estimate', true, 3, '{now}', '{now}'),
@@ -141,7 +141,7 @@ def upgrade():
     """)
 
     op.execute(f"""
-        INSERT INTO risk_categories (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
+        INSERT INTO tblRiskCategory (name, code, description, is_active, sort_order, created_at, updated_at) VALUES
         ('Technical', 'TECH', 'Technical complexity risks', true, 1, '{now}', '{now}'),
         ('Schedule', 'SCHED', 'Schedule and timeline risks', true, 2, '{now}', '{now}'),
         ('Cost', 'COST', 'Cost overrun risks', true, 3, '{now}', '{now}'),
@@ -150,7 +150,7 @@ def upgrade():
     """)
 
     op.execute(f"""
-        INSERT INTO probability_levels (name, description, weight, level, is_active, sort_order, created_at, updated_at) VALUES
+        INSERT INTO tblProbabilityOccurrence (name, description, weight, level, is_active, sort_order, created_at, updated_at) VALUES
         ('Very Low', 'Less than 10% probability', 0.05, 1, true, 1, '{now}', '{now}'),
         ('Low', '10-25% probability', 0.175, 2, true, 2, '{now}', '{now}'),
         ('Medium', '25-50% probability', 0.375, 3, true, 3, '{now}', '{now}'),
@@ -159,7 +159,7 @@ def upgrade():
     """)
 
     op.execute(f"""
-        INSERT INTO severity_levels (name, description, weight, level, is_active, sort_order, created_at, updated_at) VALUES
+        INSERT INTO tblSeverityOccurrence (name, description, weight, level, is_active, sort_order, created_at, updated_at) VALUES
         ('Negligible', 'Minimal impact', 0.05, 1, true, 1, '{now}', '{now}'),
         ('Minor', 'Small impact, easily managed', 0.2, 2, true, 2, '{now}', '{now}'),
         ('Moderate', 'Noticeable impact, manageable', 0.4, 3, true, 3, '{now}', '{now}'),
@@ -169,16 +169,16 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_table("audit_logs")
-    op.drop_table("pmb_weights")
-    op.drop_table("severity_levels")
-    op.drop_table("probability_levels")
-    op.drop_table("expenditure_indicators")
-    op.drop_table("risk_categories")
-    op.drop_table("estimating_techniques")
-    op.drop_table("business_areas")
-    op.drop_table("regions")
-    op.drop_table("expense_types")
-    op.drop_table("cost_types")
-    op.drop_table("resources")
-    op.drop_table("suppliers")
+    op.drop_table("tblLog")
+    op.drop_table("tblPMBWeight")
+    op.drop_table("tblSeverityOccurrence")
+    op.drop_table("tblProbabilityOccurrence")
+    op.drop_table("tblExpInd")
+    op.drop_table("tblRiskCategory")
+    op.drop_table("tblEstimatingTechnique")
+    op.drop_table("tblBus_Area")
+    op.drop_table("tblRegion")
+    op.drop_table("tblExpType")
+    op.drop_table("tblCostType")
+    op.drop_table("tblResource")
+    op.drop_table("tblSupplier")

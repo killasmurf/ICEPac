@@ -16,7 +16,7 @@ depends_on = None
 
 def upgrade():
     op.create_table(
-        "report_jobs",
+        "tblReportJobs",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("report_type", sa.String(50), nullable=False),
@@ -34,10 +34,10 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
-    op.create_index("ix_report_jobs_user", "report_jobs", ["user_id"])
-    op.create_index("ix_report_jobs_status", "report_jobs", ["status"])
-    op.create_index("ix_report_jobs_type", "report_jobs", ["report_type"])
+    op.create_index("ix_report_jobs_user", "tblReportJobs", ["user_id"])
+    op.create_index("ix_report_jobs_status", "tblReportJobs", ["status"])
+    op.create_index("ix_report_jobs_type", "tblReportJobs", ["report_type"])
 
 
 def downgrade():
-    op.drop_table("report_jobs")
+    op.drop_table("tblReportJobs")

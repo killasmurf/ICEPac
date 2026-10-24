@@ -24,11 +24,11 @@ class ImportStatus(str, enum.Enum):
 class ImportJob(Base):
     """Tracks async MS Project file import jobs."""
 
-    __tablename__ = "import_jobs"
+    __tablename__ = "tblImportJobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("tblProjects.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("tblUsers.id"), nullable=False, index=True)
 
     # File info
     filename = Column(String(500), nullable=False)

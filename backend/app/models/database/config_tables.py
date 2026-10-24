@@ -14,45 +14,45 @@ class ConfigTableMixin:
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class CostType(ConfigTableMixin, Base):
-    __tablename__ = "cost_types"
+    __tablename__ = "tblCostType"
     code = Column(String(20), unique=True, nullable=True)
 
 class ExpenseType(ConfigTableMixin, Base):
-    __tablename__ = "expense_types"
+    __tablename__ = "tblExpType"
     code = Column(String(20), unique=True, nullable=True)
 
 class Region(ConfigTableMixin, Base):
-    __tablename__ = "regions"
+    __tablename__ = "tblRegion"
     code = Column(String(20), unique=True, nullable=True)
 
 class BusinessArea(ConfigTableMixin, Base):
-    __tablename__ = "business_areas"
+    __tablename__ = "tblBus_Area"
     code = Column(String(20), unique=True, nullable=True)
 
 class EstimatingTechnique(ConfigTableMixin, Base):
-    __tablename__ = "estimating_techniques"
+    __tablename__ = "tblEstimatingTechnique"
     code = Column(String(20), unique=True, nullable=True)
 
 class RiskCategory(ConfigTableMixin, Base):
-    __tablename__ = "risk_categories"
+    __tablename__ = "tblRiskCategory"
     code = Column(String(20), unique=True, nullable=True)
 
 class ExpenditureIndicator(ConfigTableMixin, Base):
-    __tablename__ = "expenditure_indicators"
+    __tablename__ = "tblExpInd"
     code = Column(String(20), unique=True, nullable=True)
 
 class ProbabilityLevel(ConfigTableMixin, Base):
-    __tablename__ = "probability_levels"
+    __tablename__ = "tblProbabilityOccurrence"
     weight = Column(Float, nullable=False, default=0.0)
     level = Column(Integer, nullable=False, default=1)
 
 class SeverityLevel(ConfigTableMixin, Base):
-    __tablename__ = "severity_levels"
+    __tablename__ = "tblSeverityOccurrence"
     weight = Column(Float, nullable=False, default=0.0)
     level = Column(Integer, nullable=False, default=1)
 
 class PMBWeight(ConfigTableMixin, Base):
-    __tablename__ = "pmb_weights"
+    __tablename__ = "tblPMBWeight"
     weight = Column(Float, nullable=False, default=0.0)
     category = Column(String(50), nullable=True)
 
