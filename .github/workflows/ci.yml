@@ -54,9 +54,17 @@ jobs:
       run: |
         isort --check-only --profile black app tests
 
+    - name: Debug test environment
+      if: failure() || success()
+      run: |
+        python -c "import pytest; print('pytest', pytest.__version__)"
+        python -c "import pytest_cov; print('pytest-cov', pytest_cov.__version__)"
+        python -c "import pytest_asyncio; print('pytest-asyncio', pytest_asyncio.__version__)"
+        python -m pytest --collect-only 2>&1 | tail -20 || true
+
     - name: Run tests with pytest
       run: |
-        pytest --cov=app --cov-report=xml --cov-report=term-missing
+        pytest --cov=app --cov-report=xml --cov-report=term-missing -v 2>&1 | tail -80
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
