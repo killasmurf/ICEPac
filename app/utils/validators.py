@@ -113,13 +113,18 @@ def sanitize_filename(filename: str) -> str:
     if not filename:
         return "unnamed_file"
 
-    # Get just the filename, removing any directory components
+    # Normalize Windows backslashes before extracting basename
+    filename = filename.replace("\\", "/")
+
+    # Get just the filename, removing any directory components.
+    # Handle Windows-style backslash paths even when running on Linux
+    # (uploaded files may carry a Windows path).
+    if "\\" in filename:
+        filename = filename.rsplit("\\", 1)[-1]
     filename = os.path.basename(filename)
 
     # Remove path traversal sequences
     filename = filename.replace("..", "")
-    filename = filename.replace("/", "_")
-    filename = filename.replace("\\", "_")
 
     # Remove or replace potentially dangerous characters
     # Keep alphanumeric, dots, hyphens, underscores, and spaces

@@ -368,7 +368,7 @@ class TestReportJobModel:
     def test_report_job_defaults(self):
         from app.models.database.report import ReportJob
 
-        assert ReportJob.__tablename__ == "report_jobs"
+        assert ReportJob.__tablename__ == "tblReportJobs"
 
     def test_report_job_response_schema(self):
         from app.models.schemas.report import ReportJobResponse
