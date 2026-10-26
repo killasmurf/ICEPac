@@ -1,4 +1,5 @@
 """Supplier repository for data access operations."""
+
 from typing import List, Optional
 
 from sqlalchemy import func, or_, select

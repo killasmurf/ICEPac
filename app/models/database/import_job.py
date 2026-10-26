@@ -1,4 +1,5 @@
 """Import job database model for tracking MS Project file imports."""
+
 import enum
 from datetime import datetime
 
@@ -27,7 +28,9 @@ class ImportJob(Base):
     __tablename__ = "tblImportJobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("tblProjects.id"), nullable=False, index=True)
+    project_id = Column(
+        Integer, ForeignKey("tblProjects.id"), nullable=False, index=True
+    )
     user_id = Column(Integer, ForeignKey("tblUsers.id"), nullable=False, index=True)
 
     # File info

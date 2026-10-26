@@ -1,4 +1,5 @@
 """Configuration table schemas for generic CRUD operations."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional

@@ -1,4 +1,5 @@
 """WBS repository."""
+
 from typing import List, Optional
 
 from sqlalchemy import delete, func, select

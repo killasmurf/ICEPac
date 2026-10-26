@@ -1,6 +1,7 @@
 """
 Comprehensive tests for the validators module.
 """
+
 from app.utils.validators import (
     DEFAULT_MAX_FILE_SIZE,
     MIN_FILE_SIZE,

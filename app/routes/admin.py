@@ -2,6 +2,7 @@
 
 All admin routes require authentication and appropriate role permissions.
 """
+
 from datetime import datetime
 from typing import Optional
 

@@ -1,4 +1,5 @@
 """Resource and Supplier schemas for API requests and responses."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional

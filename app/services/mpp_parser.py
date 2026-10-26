@@ -5,6 +5,7 @@ Extracts full project data including hierarchy, baselines, late dates,
 duration, flags, resources, and assignments into pure dataclasses
 (no database coupling).
 """
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -214,9 +215,11 @@ class MPPParser:
                     unique_id=uid,
                     name=self._str(task.getName()) or f"Task {uid}",
                     wbs_code=self._str(task.getWBS()),
-                    outline_level=int(task.getOutlineLevel())
-                    if task.getOutlineLevel() is not None
-                    else 0,
+                    outline_level=(
+                        int(task.getOutlineLevel())
+                        if task.getOutlineLevel() is not None
+                        else 0
+                    ),
                     parent_unique_id=parent_uid,
                     start=self._to_datetime(task.getStart()),
                     finish=self._to_datetime(task.getFinish()),
@@ -232,15 +235,21 @@ class MPPParser:
                     or 0.0,
                     cost=self._to_float(task.getCost()) or 0.0,
                     baseline_cost=self._to_float(task.getBaselineCost()) or 0.0,
-                    is_milestone=bool(task.getMilestone())
-                    if task.getMilestone() is not None
-                    else False,
-                    is_summary=bool(task.getSummary())
-                    if task.getSummary() is not None
-                    else False,
-                    is_critical=bool(task.getCritical())
-                    if task.getCritical() is not None
-                    else False,
+                    is_milestone=(
+                        bool(task.getMilestone())
+                        if task.getMilestone() is not None
+                        else False
+                    ),
+                    is_summary=(
+                        bool(task.getSummary())
+                        if task.getSummary() is not None
+                        else False
+                    ),
+                    is_critical=(
+                        bool(task.getCritical())
+                        if task.getCritical() is not None
+                        else False
+                    ),
                     resource_names=resource_names,
                     notes=self._str(task.getNotes()),
                 )

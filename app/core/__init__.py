@@ -1,4 +1,5 @@
 """Core application modules."""
+
 from app.core.config import get_settings, settings
 from app.core.database import Base, SessionLocal, drop_db, engine, get_db, init_db
 from app.core.security import (

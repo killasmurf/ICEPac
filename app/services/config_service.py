@@ -1,4 +1,5 @@
 """Configuration table service for generic CRUD operations."""
+
 from typing import Any, List, Optional, Type
 
 from fastapi import HTTPException, status

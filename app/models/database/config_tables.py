@@ -4,6 +4,7 @@ Maps legacy tables: tblCostType, tblExpType, tblRegion, tblBus_Area,
 tblEstimatingTechnique, tblRiskCategory, tblProbabilityOccurrence,
 tblSeverityOccurrence, tblExpInd, tblPMBWeight.
 """
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String

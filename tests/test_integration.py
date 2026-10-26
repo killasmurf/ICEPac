@@ -3,34 +3,40 @@
 Tests the full workflow: Auth → Project → Import → Estimation → Reports.
 Run with: pytest tests/test_integration.py -v
 """
-import json
-import math
+
 import csv
 import io
-import pytest
+import math
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ════════════════════════════════════════════════════════════════
 # Fixtures
 # ════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_db():
     from sqlalchemy.orm import Session
+
     return MagicMock(spec=Session)
+
 
 @pytest.fixture
 def mock_wbs_items():
     items = []
-    for i, (code, title, parent) in enumerate([
-        ("1.0", "Project Management", None),
-        ("2.0", "Engineering", None),
-        ("2.1", "Design", 2),
-        ("2.2", "Development", 2),
-        ("3.0", "Testing", None),
-    ], 1):
+    for i, (code, title, parent) in enumerate(
+        [
+            ("1.0", "Project Management", None),
+            ("2.0", "Engineering", None),
+            ("2.1", "Design", 2),
+            ("2.2", "Development", 2),
+            ("3.0", "Testing", None),
+        ],
+        1,
+    ):
         wbs = MagicMock()
         wbs.id = i
         wbs.project_id = 1
@@ -41,12 +47,16 @@ def mock_wbs_items():
         items.append(wbs)
     return items
 
+
 @pytest.fixture
 def sample_report_result():
     from app.models.schemas.report import ReportResult
+
     return ReportResult(
-        report_type="cost_by_wbs", title="Test Report",
-        generated_at=datetime(2026, 4, 26), project_name="Test Project",
+        report_type="cost_by_wbs",
+        title="Test Report",
+        generated_at=datetime(2026, 4, 26),
+        project_name="Test Project",
         filters_applied={"project_id": 1},
         columns=[
             {"key": "group_label", "label": "WBS"},
@@ -65,6 +75,7 @@ def sample_report_result():
 # Project → Estimation Flow
 # ════════════════════════════════════════════════════════════════
 
+
 class TestProjectToEstimationFlow:
     def test_wbs_hierarchy_integrity(self, mock_wbs_items):
         ids = {w.id for w in mock_wbs_items}
@@ -82,6 +93,7 @@ class TestProjectToEstimationFlow:
 # Estimation → Reports Flow
 # ════════════════════════════════════════════════════════════════
 
+
 class TestEstimationToReportsFlow:
     def test_pert_formula(self):
         best, likely, worst = 10000, 15000, 25000
@@ -94,20 +106,24 @@ class TestEstimationToReportsFlow:
 
     def test_combined_std_dev_is_rss(self):
         std_devs = [2500, 5000, 8000]
-        combined = math.sqrt(sum(s ** 2 for s in std_devs))
+        combined = math.sqrt(sum(s**2 for s in std_devs))
         assert combined < sum(std_devs) and combined > max(std_devs)
 
     @patch("app.services.report_engine.ReportRepository")
     def test_empty_project(self, MockRepo):
+        from app.models.schemas.report import ReportFilter, ReportRequest, ReportType
         from app.services.report_engine import ReportEngine
-        from app.models.schemas.report import ReportRequest, ReportFilter, ReportType
+
         mock_repo = MockRepo.return_value
         mock_repo.cost_by_wbs.return_value = []
         mock_repo.get_project_name.return_value = "Empty"
         engine = ReportEngine.__new__(ReportEngine)
         engine.repo = mock_repo
-        result = engine.generate(ReportRequest(
-            report_type=ReportType.COST_BY_WBS, filters=ReportFilter(project_id=1)))
+        result = engine.generate(
+            ReportRequest(
+                report_type=ReportType.COST_BY_WBS, filters=ReportFilter(project_id=1)
+            )
+        )
         assert result.row_count == 0
 
 
@@ -115,22 +131,31 @@ class TestEstimationToReportsFlow:
 # Reports → Export Flow
 # ════════════════════════════════════════════════════════════════
 
+
 class TestReportsToExportFlow:
     def test_all_formats(self, sample_report_result):
-        from app.services.report_exporters import ReportExporter
         from app.models.schemas.report import ExportFormat
-        for fmt in [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF, ExportFormat.DOCX]:
+        from app.services.report_exporters import ReportExporter
+
+        for fmt in [
+            ExportFormat.CSV,
+            ExportFormat.XLSX,
+            ExportFormat.PDF,
+            ExportFormat.DOCX,
+        ]:
             content, ct, fn = ReportExporter.export(sample_report_result, fmt)
             assert len(content) > 0 and fn.endswith(f".{fmt.value}")
 
     def test_csv_round_trip(self, sample_report_result):
         from app.services.report_exporters import CSVExporter
+
         content, _, _ = CSVExporter.export(sample_report_result, "test")
         rows = list(csv.reader(io.StringIO(content.decode("utf-8"))))
         assert rows[0] == ["WBS", "PERT ($)"] and len(rows) >= 3
 
     def test_pdf_valid(self, sample_report_result):
         from app.services.report_exporters import PDFExporter
+
         content, _, _ = PDFExporter.export(sample_report_result, "test")
         assert content[:4] == b"%PDF"
 
@@ -139,15 +164,24 @@ class TestReportsToExportFlow:
 # Admin → Estimation Config Flow
 # ════════════════════════════════════════════════════════════════
 
+
 class TestAdminToEstimationFlow:
     def test_config_tables_complete(self):
         from app.models.database.config_tables import ALL_CONFIG_MODELS
-        for t in ["cost-types", "regions", "estimating-techniques",
-                   "risk-categories", "probability-levels", "severity-levels"]:
+
+        for t in [
+            "cost-types",
+            "regions",
+            "estimating-techniques",
+            "risk-categories",
+            "probability-levels",
+            "severity-levels",
+        ]:
             assert t in ALL_CONFIG_MODELS
 
     def test_weighted_tables(self):
         from app.models.database.config_tables import WEIGHTED_CONFIG_MODELS
+
         for name, model in WEIGHTED_CONFIG_MODELS.items():
             assert hasattr(model, "weight")
 
@@ -156,19 +190,23 @@ class TestAdminToEstimationFlow:
 # Feature Flags
 # ════════════════════════════════════════════════════════════════
 
+
 class TestFeatureFlags:
     def test_circuit_flags(self):
         from app.services.feature_flags import DEFAULT_FLAGS
+
         for c in ["help", "admin", "projects", "estimation", "reports"]:
             assert f"circuit.{c}" in DEFAULT_FLAGS
 
     def test_export_flags(self):
         from app.services.feature_flags import DEFAULT_FLAGS
+
         for f in ["pdf", "xlsx", "docx", "csv"]:
             assert f"feature.export_{f}" in DEFAULT_FLAGS
 
     def test_defaults_enabled(self):
         from app.services.feature_flags import DEFAULT_FLAGS
+
         for flag, val in DEFAULT_FLAGS.items():
             assert val is True
 
@@ -177,15 +215,22 @@ class TestFeatureFlags:
 # Cache Keys
 # ════════════════════════════════════════════════════════════════
 
+
 class TestCacheKeys:
     def test_key_builders(self):
-        from app.services.cache_service import project_key, project_list_key, wbs_list_key
+        from app.services.cache_service import (
+            project_key,
+            project_list_key,
+            wbs_list_key,
+        )
+
         assert project_key(1) == "project:1"
         assert project_list_key(0, 20, True) == "projects:list:0:20:active=True"
         assert wbs_list_key(1) == "project:1:wbs"
 
     def test_uniqueness(self):
         from app.services.cache_service import project_key, project_list_key
+
         assert project_key(1) != project_key(2)
         assert project_list_key(0, 20, True) != project_list_key(0, 20, False)
 
@@ -194,22 +239,28 @@ class TestCacheKeys:
 # Schema Consistency
 # ════════════════════════════════════════════════════════════════
 
+
 class TestSchemaConsistency:
     def test_report_types_in_catalog(self):
-        from app.models.schemas.report import ReportType, REPORT_CATALOG
-        catalog_types = {r["type"] for cat in REPORT_CATALOG.values() for r in cat["reports"]}
+        from app.models.schemas.report import REPORT_CATALOG, ReportType
+
+        catalog_types = {
+            r["type"] for cat in REPORT_CATALOG.values() for r in cat["reports"]
+        }
         for rt in ReportType:
             assert rt.value in catalog_types
 
     def test_report_columns_complete(self):
         from app.models.schemas.report import ReportType
         from app.services.report_engine import REPORT_COLUMNS
+
         for rt in ReportType:
             assert rt in REPORT_COLUMNS
 
     def test_report_handlers_complete(self):
         from app.models.schemas.report import ReportType
-        from app.services.report_engine import REPORT_HANDLERS, AUDIT_HANDLERS
+        from app.services.report_engine import AUDIT_HANDLERS, REPORT_HANDLERS
+
         for rt in ReportType:
             assert rt in REPORT_HANDLERS or rt in AUDIT_HANDLERS
 
@@ -218,24 +269,75 @@ class TestSchemaConsistency:
 # Model Registry
 # ════════════════════════════════════════════════════════════════
 
+
 class TestModelRegistry:
     def test_all_models_importable(self):
         from app.models.database import (
-            User, Project, WBS, Resource, Supplier,
-            ResourceAssignment, Risk, ImportJob, ReportJob,
-            AuditLog, CostType, Region, ProbabilityLevel, SeverityLevel,
-            HelpTopic, HelpCategory,
+            WBS,
+            AuditLog,
+            CostType,
+            HelpCategory,
+            HelpTopic,
+            ImportJob,
+            ProbabilityLevel,
+            Project,
+            Region,
+            ReportJob,
+            Resource,
+            ResourceAssignment,
+            Risk,
+            SeverityLevel,
+            Supplier,
+            User,
         )
+
         assert User.__tablename__ == "tblUsers"
         assert ReportJob.__tablename__ == "tblReportJobs"
+        # Verify all models imported successfully
+        for model in [
+            WBS,
+            AuditLog,
+            CostType,
+            HelpCategory,
+            HelpTopic,
+            ImportJob,
+            ProbabilityLevel,
+            Project,
+            Region,
+            Resource,
+            ResourceAssignment,
+            Risk,
+            SeverityLevel,
+            Supplier,
+        ]:
+            assert hasattr(model, "__tablename__")
 
     def test_models_have_id(self):
         from app.models.database import (
-            User, Project, WBS, Resource, Supplier,
-            ResourceAssignment, Risk, ImportJob, ReportJob, AuditLog,
+            WBS,
+            AuditLog,
+            ImportJob,
+            Project,
+            ReportJob,
+            Resource,
+            ResourceAssignment,
+            Risk,
+            Supplier,
+            User,
         )
-        for m in [User, Project, WBS, Resource, Supplier,
-                  ResourceAssignment, Risk, ImportJob, ReportJob, AuditLog]:
+
+        for m in [
+            User,
+            Project,
+            WBS,
+            Resource,
+            Supplier,
+            ResourceAssignment,
+            Risk,
+            ImportJob,
+            ReportJob,
+            AuditLog,
+        ]:
             assert hasattr(m, "id")
 
 
@@ -243,28 +345,47 @@ class TestModelRegistry:
 # Migration Chain
 # ════════════════════════════════════════════════════════════════
 
+
+def _parse_migration_chain(versions_dir):
+    """Parse alembic migration files into a {revision: down_revision} map."""
+    import os
+
+    chain = {}
+    for f in os.listdir(versions_dir):
+        if not f.endswith(".py") or f.startswith("__"):
+            continue
+        with open(os.path.join(versions_dir, f)) as fh:
+            content = fh.read()
+        rev = down = None
+        for line in content.split("\n"):
+            if line.startswith("revision ="):
+                rev = line.split("=")[1].strip().strip('"').strip("'")
+            if line.startswith("down_revision ="):
+                down = line.split("=")[1].strip().strip('"').strip("'")
+        if rev:
+            chain[rev] = down
+    return chain
+
+
+def _is_hash_based_revision(rev):
+    """Check if a revision ID is a hash-based initial migration."""
+    return len(rev) <= 12 and all(c in "0123456789abcdef" for c in rev)
+
+
 class TestMigrationChain:
     def test_chain_integrity(self):
         import os
-        versions_dir = os.path.join(os.path.dirname(__file__), "..", "alembic", "versions")
+
+        versions_dir = os.path.join(
+            os.path.dirname(__file__), "..", "alembic", "versions"
+        )
         if not os.path.isdir(versions_dir):
             pytest.skip("alembic/versions not found")
-        chain = {}
-        for f in os.listdir(versions_dir):
-            if f.endswith(".py") and not f.startswith("__"):
-                with open(os.path.join(versions_dir, f)) as fh:
-                    content = fh.read()
-                    rev = down = None
-                    for line in content.split("\n"):
-                        if line.startswith("revision ="):
-                            rev = line.split("=")[1].strip().strip('"').strip("'")
-                        if line.startswith("down_revision ="):
-                            down = line.split("=")[1].strip().strip('"').strip("'")
-                    if rev:
-                        chain[rev] = down
+
+        chain = _parse_migration_chain(versions_dir)
         for rev, down in chain.items():
-            if down and down != "None" and down != "null":
-                # Allow missing initial migration (hash-based names like a41d9a15aea8)
-                if len(down) <= 12 and all(c in '0123456789abcdef' for c in down):
-                    continue  # Skip hash-based initial migration references
-                assert down in chain, f"Migration {rev} references missing {down}"
+            if not down or down in ("None", "null"):
+                continue
+            if _is_hash_based_revision(down):
+                continue
+            assert down in chain, f"Migration {rev} references missing {down}"

@@ -1,13 +1,17 @@
 """Report generation engine - orchestrates query, formatting, and export."""
+
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict
+
 from sqlalchemy.orm import Session
 
-from app.repositories.report_repository import ReportRepository
 from app.models.schemas.report import (
-    ReportRequest, ReportResult, ReportFilter, ReportType, ExportFormat, REPORT_CATALOG,
+    REPORT_CATALOG,
+    ReportRequest,
+    ReportResult,
+    ReportType,
 )
-
+from app.repositories.report_repository import ReportRepository
 
 # Column definitions per report type
 REPORT_COLUMNS = {
@@ -72,9 +76,15 @@ REPORT_COLUMNS = {
 
 # Default cost columns for generic cost reports
 _COST_COLUMNS = REPORT_COLUMNS[ReportType.COST_BY_WBS]
-for rt in [ReportType.COST_BY_RESOURCE, ReportType.COST_BY_SUPPLIER,
-           ReportType.COST_BY_EOC, ReportType.COST_BY_TECHNIQUE,
-           ReportType.COST_BY_REGION, ReportType.BOE_SUMMARY, ReportType.BOE_BY_WBS]:
+for rt in [
+    ReportType.COST_BY_RESOURCE,
+    ReportType.COST_BY_SUPPLIER,
+    ReportType.COST_BY_EOC,
+    ReportType.COST_BY_TECHNIQUE,
+    ReportType.COST_BY_REGION,
+    ReportType.BOE_SUMMARY,
+    ReportType.BOE_BY_WBS,
+]:
     REPORT_COLUMNS[rt] = _COST_COLUMNS
 
 for rt in [ReportType.RISK_SUMMARY]:
@@ -112,10 +122,18 @@ AUDIT_HANDLERS = {
 }
 
 # Friendly titles
-REPORT_TITLES = {rt.value: next(
-    (r["label"] for cat in REPORT_CATALOG.values() for r in cat["reports"] if r["type"] == rt.value),
-    rt.value.replace("_", " ").title()
-) for rt in ReportType}
+REPORT_TITLES = {
+    rt.value: next(
+        (
+            r["label"]
+            for cat in REPORT_CATALOG.values()
+            for r in cat["reports"]
+            if r["type"] == rt.value
+        ),
+        rt.value.replace("_", " ").title(),
+    )
+    for rt in ReportType
+}
 
 
 class ReportEngine:
@@ -143,10 +161,21 @@ class ReportEngine:
 
         # Compute totals for cost reports
         totals = None
-        numeric_keys = {"best_total", "likely_total", "worst_total", "pert_total",
-                        "std_dev", "confidence_80_low", "confidence_80_high",
-                        "assignment_count", "total_exposure", "risk_count", "exposure",
-                        "total_likely", "wbs_count"}
+        numeric_keys = {
+            "best_total",
+            "likely_total",
+            "worst_total",
+            "pert_total",
+            "std_dev",
+            "confidence_80_low",
+            "confidence_80_high",
+            "assignment_count",
+            "total_exposure",
+            "risk_count",
+            "exposure",
+            "total_likely",
+            "wbs_count",
+        }
         if rows:
             totals = {}
             for key in rows[0]:

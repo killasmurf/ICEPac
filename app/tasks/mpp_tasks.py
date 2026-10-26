@@ -1,6 +1,7 @@
 """
 Celery tasks for MS Project file parsing.
 """
+
 import logging
 from typing import Any, Dict
 

@@ -1,4 +1,5 @@
 """Generic repository for configuration/lookup tables."""
+
 from typing import Optional, Type
 
 from sqlalchemy import select

@@ -1,4 +1,5 @@
 """Resource service with business logic."""
+
 from typing import List, Optional
 
 from fastapi import HTTPException, status

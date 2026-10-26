@@ -1,6 +1,7 @@
 """
 Tests for the S3 storage service.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest

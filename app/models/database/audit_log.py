@@ -1,4 +1,5 @@
 """Audit log database model for tracking all system changes."""
+
 from datetime import datetime
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text

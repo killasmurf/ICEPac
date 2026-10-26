@@ -1,6 +1,7 @@
 """Rate limiting middleware using Redis sliding window."""
-import time
+
 import logging
+import time
 from typing import Optional
 
 from fastapi import Request, status
@@ -13,11 +14,11 @@ logger = logging.getLogger(__name__)
 
 # Rate limit configuration per path prefix
 RATE_LIMITS = {
-    "/api/v1/auth/login": {"requests": 5, "window": 60},      # 5 per minute
+    "/api/v1/auth/login": {"requests": 5, "window": 60},  # 5 per minute
     "/api/v1/reports/export": {"requests": 10, "window": 60},  # 10 per minute
     "/api/v1/reports/generate": {"requests": 30, "window": 60},
-    "/api/v1/projects/": {"requests": 60, "window": 60},       # default API
-    "/api/v1/": {"requests": 120, "window": 60},               # catch-all
+    "/api/v1/projects/": {"requests": 60, "window": 60},  # default API
+    "/api/v1/": {"requests": 120, "window": 60},  # catch-all
 }
 
 
@@ -42,9 +43,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if self._redis is None:
             try:
                 import redis as r
+
                 self._redis = r.from_url(
-                    self._redis_url, decode_responses=True,
-                    socket_connect_timeout=1, socket_timeout=1,
+                    self._redis_url,
+                    decode_responses=True,
+                    socket_connect_timeout=1,
+                    socket_timeout=1,
                 )
                 self._redis.ping()
             except Exception:
@@ -79,16 +83,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 request_count = results[2]
 
                 if request_count > max_requests:
-                    retry_after = int(window - (now - float(self.redis.zrange(key, 0, 0)[0])))
+                    retry_after = int(
+                        window - (now - float(self.redis.zrange(key, 0, 0)[0]))
+                    )
                     return JSONResponse(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        content={"detail": "Rate limit exceeded", "retry_after": max(retry_after, 1)},
+                        content={
+                            "detail": "Rate limit exceeded",
+                            "retry_after": max(retry_after, 1),
+                        },
                         headers={"Retry-After": str(max(retry_after, 1))},
                     )
 
                 response = await call_next(request)
                 response.headers["X-RateLimit-Limit"] = str(max_requests)
-                response.headers["X-RateLimit-Remaining"] = str(max(0, max_requests - request_count))
+                response.headers["X-RateLimit-Remaining"] = str(
+                    max(0, max_requests - request_count)
+                )
                 return response
             except Exception as exc:
                 logger.debug("Rate limit check failed, allowing request: %s", exc)

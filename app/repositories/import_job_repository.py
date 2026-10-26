@@ -1,4 +1,5 @@
 """Import job repository."""
+
 from typing import List, Optional
 
 from sqlalchemy import desc, select

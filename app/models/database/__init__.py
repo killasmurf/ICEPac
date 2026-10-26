@@ -1,4 +1,5 @@
 """Database models."""
+
 from app.models.database.assignment import ResourceAssignment
 from app.models.database.audit_log import AuditAction, AuditLog
 from app.models.database.config_tables import (

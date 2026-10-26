@@ -1,6 +1,7 @@
 """
 Pytest configuration and fixtures for ICEPac tests.
 """
+
 from unittest.mock import MagicMock
 
 import pytest

@@ -1,6 +1,7 @@
 """
 Celery application configuration and task autodiscovery.
 """
+
 from celery import Celery
 
 from app.core.config import settings

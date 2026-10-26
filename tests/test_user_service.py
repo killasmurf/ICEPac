@@ -1,6 +1,7 @@
 """
 Tests for the user service.
 """
+
 from unittest.mock import MagicMock
 
 import pytest

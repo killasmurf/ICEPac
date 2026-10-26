@@ -1,4 +1,5 @@
 """User database model."""
+
 import enum
 from datetime import datetime
 

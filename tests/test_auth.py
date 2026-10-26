@@ -1,6 +1,7 @@
 """
 Tests for authentication endpoints.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest

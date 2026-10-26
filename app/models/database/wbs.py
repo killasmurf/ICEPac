@@ -1,4 +1,5 @@
 """Work Breakdown Structure database model."""
+
 from datetime import datetime
 
 from sqlalchemy import (
@@ -27,7 +28,9 @@ class WBS(Base):
     __tablename__ = "tblWBS"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("tblProjects.id"), nullable=False, index=True)
+    project_id = Column(
+        Integer, ForeignKey("tblProjects.id"), nullable=False, index=True
+    )
     task_unique_id = Column(Integer, nullable=True, index=True)
     wbs_code = Column(String(100), nullable=True)
     wbs_title = Column(String(500), nullable=False)

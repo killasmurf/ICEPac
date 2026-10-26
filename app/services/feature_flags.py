@@ -1,9 +1,8 @@
 """Feature flag service for controlling circuit availability."""
-from typing import Dict, Optional
 
-from app.core.config import settings
+from typing import Dict
+
 from app.services.cache_service import cache
-
 
 # Default flags - all circuits enabled since all phases are complete
 DEFAULT_FLAGS: Dict[str, bool] = {

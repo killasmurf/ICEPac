@@ -1,4 +1,5 @@
 """Redis-backed cache service."""
+
 import json
 import logging
 from typing import Any, Optional
@@ -19,7 +20,9 @@ class CacheService:
     treated as a cache miss so the application keeps running without Redis.
     """
 
-    def __init__(self, url: str = settings.REDIS_URL, default_ttl: int = settings.CACHE_TTL):
+    def __init__(
+        self, url: str = settings.REDIS_URL, default_ttl: int = settings.CACHE_TTL
+    ):
         self._url = url
         self._default_ttl = default_ttl
         self._client: Optional[redis.Redis] = None
@@ -104,6 +107,7 @@ cache = CacheService()
 # ---------------------------------------------------------------------------
 # Convenience key builders
 # ---------------------------------------------------------------------------
+
 
 def project_key(project_id: int) -> str:
     return f"project:{project_id}"

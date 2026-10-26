@@ -42,11 +42,11 @@ class MPPReader:
                         "duration": str(task.getDuration()),
                         "start": str(task.getStart()),
                         "finish": str(task.getFinish()),
-                        "percent_complete": float(
-                            task.getPercentageComplete().floatValue()
-                        )
-                        if task.getPercentageComplete()
-                        else 0.0,
+                        "percent_complete": (
+                            float(task.getPercentageComplete().floatValue())
+                            if task.getPercentageComplete()
+                            else 0.0
+                        ),
                     }
                 )
         return tasks

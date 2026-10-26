@@ -1,4 +1,5 @@
 """WBS (Work Breakdown Structure) schemas."""
+
 from datetime import datetime
 from typing import Optional
 

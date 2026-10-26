@@ -11,6 +11,7 @@ enforced at the DB layer by the ck_risk_xor_parent CHECK constraint.
 The service layer filters explicitly by the appropriate parent column
 so the two scopes never accidentally mix.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

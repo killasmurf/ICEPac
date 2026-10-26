@@ -1,4 +1,5 @@
 """User service with business logic."""
+
 from datetime import datetime
 from typing import List, Optional
 

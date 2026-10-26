@@ -1,4 +1,5 @@
 """Global error handling middleware."""
+
 import logging
 
 from fastapi import Request, status

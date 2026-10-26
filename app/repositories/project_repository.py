@@ -1,4 +1,5 @@
 """Project repository."""
+
 from typing import List, Optional
 
 from sqlalchemy import func, select

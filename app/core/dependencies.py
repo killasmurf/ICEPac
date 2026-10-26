@@ -1,6 +1,7 @@
 """
 Common dependencies for FastAPI endpoints.
 """
+
 from typing import Optional
 
 from fastapi import Header, HTTPException, status

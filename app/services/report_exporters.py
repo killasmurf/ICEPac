@@ -1,10 +1,10 @@
 """Report exporters for PDF, Excel, Word, and CSV output formats."""
-import io
-import csv
-from datetime import datetime
-from typing import Optional
 
-from app.models.schemas.report import ReportResult, ExportFormat
+import csv
+import io
+from datetime import datetime
+
+from app.models.schemas.report import ExportFormat, ReportResult
 
 
 class ReportExporter:
@@ -12,7 +12,7 @@ class ReportExporter:
 
     @staticmethod
     def export(result: ReportResult, fmt: ExportFormat) -> tuple[bytes, str, str]:
-        """Export report to specified format. Returns (bytes, content_type, filename)."""
+        """Export to specified format. Returns (bytes, content_type, filename)."""
         safe_name = result.report_type.replace(" ", "_")
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         base_name = f"{safe_name}_{ts}"
@@ -57,7 +57,7 @@ class ExcelExporter:
     @staticmethod
     def export(result: ReportResult, base_name: str) -> tuple[bytes, str, str]:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
         wb = Workbook()
         ws = wb.active
@@ -65,21 +65,33 @@ class ExcelExporter:
 
         # Styles
         header_font = Font(bold=True, color="FFFFFF", size=11)
-        header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="1F4E79", end_color="1F4E79", fill_type="solid"
+        )
         title_font = Font(bold=True, size=14)
         subtitle_font = Font(italic=True, size=10, color="666666")
         total_font = Font(bold=True, size=11)
-        total_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        total_fill = PatternFill(
+            start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+        )
         thin_border = Border(
             bottom=Side(style="thin", color="D9D9D9"),
         )
-        money_fmt = '#,##0.00'
+        money_fmt = "#,##0.00"
 
         # Title block
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(result.columns))
+        ws.merge_cells(
+            start_row=1, start_column=1, end_row=1, end_column=len(result.columns)
+        )
         ws.cell(row=1, column=1, value=result.title).font = title_font
-        ws.cell(row=2, column=1, value=f"Project: {result.project_name}").font = subtitle_font
-        ws.cell(row=3, column=1, value=f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}").font = subtitle_font
+        ws.cell(row=2, column=1, value=f"Project: {result.project_name}").font = (
+            subtitle_font
+        )
+        ws.cell(
+            row=3,
+            column=1,
+            value=f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}",
+        ).font = subtitle_font
         ws.cell(row=4, column=1, value=f"Rows: {result.row_count}").font = subtitle_font
 
         # Headers (row 6)
@@ -92,11 +104,25 @@ class ExcelExporter:
             cell.alignment = Alignment(horizontal="center")
 
         # Data rows
-        money_keys = {"best_total", "likely_total", "worst_total", "pert_total",
-                       "std_dev", "confidence_80_low", "confidence_80_high", "exposure",
-                       "total_exposure", "total_likely", "total_pert", "combined_std_dev",
-                       "best_estimate", "likely_estimate", "worst_estimate", "pert_estimate",
-                       "risk_exposure"}
+        money_keys = {
+            "best_total",
+            "likely_total",
+            "worst_total",
+            "pert_total",
+            "std_dev",
+            "confidence_80_low",
+            "confidence_80_high",
+            "exposure",
+            "total_exposure",
+            "total_likely",
+            "total_pert",
+            "combined_std_dev",
+            "best_estimate",
+            "likely_estimate",
+            "worst_estimate",
+            "pert_estimate",
+            "risk_exposure",
+        }
         for ri, row in enumerate(result.rows, header_row + 1):
             for ci, key in enumerate(keys, 1):
                 val = row.get(key, "")
@@ -119,11 +145,17 @@ class ExcelExporter:
 
         # Auto-width columns
         for ci in range(1, len(keys) + 1):
-            ws.column_dimensions[ws.cell(row=header_row, column=ci).column_letter].width = 16
+            ws.column_dimensions[
+                ws.cell(row=header_row, column=ci).column_letter
+            ].width = 16
 
         buf = io.BytesIO()
         wb.save(buf)
-        return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", f"{base_name}.xlsx"
+        return (
+            buf.getvalue(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            f"{base_name}.xlsx",
+        )
 
 
 class PDFExporter:
@@ -131,20 +163,33 @@ class PDFExporter:
     def export(result: ReportResult, base_name: str) -> tuple[bytes, str, str]:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
 
         buf = io.BytesIO()
         page_size = landscape(A4) if len(result.columns) > 6 else A4
-        doc = SimpleDocTemplate(buf, pagesize=page_size, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        doc = SimpleDocTemplate(
+            buf, pagesize=page_size, topMargin=0.5 * inch, bottomMargin=0.5 * inch
+        )
         styles = getSampleStyleSheet()
         elements = []
 
         # Title
         elements.append(Paragraph(result.title, styles["Title"]))
         elements.append(Paragraph(f"Project: {result.project_name}", styles["Normal"]))
-        elements.append(Paragraph(f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
+        elements.append(
+            Paragraph(
+                f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}",
+                styles["Normal"],
+            )
+        )
         elements.append(Paragraph(f"Rows: {result.row_count}", styles["Normal"]))
         elements.append(Spacer(1, 0.3 * inch))
 
@@ -154,36 +199,56 @@ class PDFExporter:
         table_data = [headers]
 
         for row in result.rows[:500]:  # Cap at 500 for PDF
-            table_data.append([
-                str(row.get(k, ""))[:40] for k in keys  # Truncate long values
-            ])
+            table_data.append(
+                [str(row.get(k, ""))[:40] for k in keys]  # Truncate long values
+            )
 
         if result.totals:
-            table_data.append(["TOTALS"] + [str(result.totals.get(k, "")) for k in keys[1:]])
+            table_data.append(
+                ["TOTALS"] + [str(result.totals.get(k, "")) for k in keys[1:]]
+            )
 
-        col_widths = [max(page_size[0] - 1.5*inch, 600) / len(keys)] * len(keys)
+        col_widths = [max(page_size[0] - 1.5 * inch, 600) / len(keys)] * len(keys)
 
         t = Table(table_data, colWidths=col_widths, repeatRows=1)
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 8),
-            ("FONTSIZE", (0, 1), (-1, -1), 7),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("ALIGN", (0, 1), (0, -1), "LEFT"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F6FA")]),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("FONTSIZE", (0, 1), (-1, -1), 7),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 1), (0, -1), "LEFT"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#F2F6FA")],
+                    ),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
 
         if result.totals:
             last = len(table_data) - 1
-            t.setStyle(TableStyle([
-                ("BACKGROUND", (0, last), (-1, last), colors.HexColor("#E2EFDA")),
-                ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
-            ]))
+            t.setStyle(
+                TableStyle(
+                    [
+                        (
+                            "BACKGROUND",
+                            (0, last),
+                            (-1, last),
+                            colors.HexColor("#E2EFDA"),
+                        ),
+                        ("FONTNAME", (0, last), (-1, last), "Helvetica-Bold"),
+                    ]
+                )
+            )
 
         elements.append(t)
         doc.build(elements)
@@ -192,9 +257,50 @@ class PDFExporter:
 
 class WordExporter:
     @staticmethod
+    def _set_cell_font(cell, size, bold=False):
+        """Apply font styling to all runs in a cell."""
+        from docx.shared import Pt
+
+        for p in cell.paragraphs:
+            for run in p.runs:
+                run.font.size = Pt(size)
+                if bold:
+                    run.font.bold = True
+
+    @staticmethod
+    def _add_header_row(table, headers):
+        """Populate and style the header row."""
+        for ci, label in enumerate(headers):
+            cell = table.rows[0].cells[ci]
+            cell.text = label
+            WordExporter._set_cell_font(cell, 9, bold=True)
+
+    @staticmethod
+    def _add_data_rows(table, rows, keys):
+        """Add data rows (capped at 200 for Word)."""
+        for row in rows[:200]:
+            cells = table.add_row().cells
+            for ci, key in enumerate(keys):
+                val = row.get(key, "")
+                cells[ci].text = str(val) if val is not None else ""
+                WordExporter._set_cell_font(cells[ci], 8)
+
+    @staticmethod
+    def _add_totals_row(table, totals, keys):
+        """Add bold totals row if totals are present."""
+        if not totals:
+            return
+        cells = table.add_row().cells
+        cells[0].text = "TOTALS"
+        WordExporter._set_cell_font(cells[0], 8, bold=True)
+        for ci, key in enumerate(keys[1:], 1):
+            if key in totals:
+                cells[ci].text = str(totals[key])
+                WordExporter._set_cell_font(cells[ci], 8, bold=True)
+
+    @staticmethod
     def export(result: ReportResult, base_name: str) -> tuple[bytes, str, str]:
         from docx import Document
-        from docx.shared import Inches, Pt, RGBColor
         from docx.enum.table import WD_TABLE_ALIGNMENT
 
         doc = Document()
@@ -202,52 +308,29 @@ class WordExporter:
         # Title
         doc.add_heading(result.title, level=1)
         doc.add_paragraph(f"Project: {result.project_name}")
-        doc.add_paragraph(f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}")
+        doc.add_paragraph(
+            f"Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M')}"
+        )
         doc.add_paragraph(f"Total rows: {result.row_count}")
         doc.add_paragraph("")
 
         # Table
         keys = [col["key"] for col in result.columns]
         headers = [col["label"] for col in result.columns]
-        num_cols = len(headers)
 
-        table = doc.add_table(rows=1, cols=num_cols)
+        table = doc.add_table(rows=1, cols=len(headers))
         table.style = "Light Grid Accent 1"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        # Header row
-        for ci, label in enumerate(headers):
-            cell = table.rows[0].cells[ci]
-            cell.text = label
-            for p in cell.paragraphs:
-                for run in p.runs:
-                    run.font.bold = True
-                    run.font.size = Pt(9)
-
-        # Data rows (cap at 200 for Word)
-        for row in result.rows[:200]:
-            cells = table.add_row().cells
-            for ci, key in enumerate(keys):
-                val = row.get(key, "")
-                cells[ci].text = str(val) if val is not None else ""
-                for p in cells[ci].paragraphs:
-                    for run in p.runs:
-                        run.font.size = Pt(8)
-
-        # Totals row
-        if result.totals:
-            cells = table.add_row().cells
-            cells[0].text = "TOTALS"
-            for p in cells[0].paragraphs:
-                for run in p.runs:
-                    run.font.bold = True
-            for ci, key in enumerate(keys[1:], 1):
-                if key in result.totals:
-                    cells[ci].text = str(result.totals[key])
-                    for p in cells[ci].paragraphs:
-                        for run in p.runs:
-                            run.font.bold = True
+        WordExporter._add_header_row(table, headers)
+        WordExporter._add_data_rows(table, result.rows, keys)
+        WordExporter._add_totals_row(table, result.totals, keys)
 
         buf = io.BytesIO()
         doc.save(buf)
-        return buf.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", f"{base_name}.docx"
+        return (
+            buf.getvalue(),
+            "application/vnd.openxmlformats-officedocument"
+            ".wordprocessingml.document",
+            f"{base_name}.docx",
+        )

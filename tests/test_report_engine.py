@@ -1,23 +1,30 @@
 """Phase 5 Report Engine - Comprehensive Unit Tests."""
+
 import math
+from datetime import date, datetime
+from unittest.mock import MagicMock, patch
+
 import pytest
-from datetime import datetime, date
-from unittest.mock import MagicMock, patch, PropertyMock
-from decimal import Decimal
 
 from app.models.schemas.report import (
-    ReportRequest, ReportFilter, ReportType, ExportFormat,
-    ReportResult, REPORT_CATALOG, CostBreakdownRow,
+    REPORT_CATALOG,
+    CostBreakdownRow,
+    ExportFormat,
+    ReportFilter,
+    ReportRequest,
+    ReportResult,
+    ReportType,
 )
-
 
 # ════════════════════════════════════════════════════════════════
 # Fixtures
 # ════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def sample_filter():
     return ReportFilter(project_id=1)
+
 
 @pytest.fixture
 def sample_request(sample_filter):
@@ -27,18 +34,36 @@ def sample_request(sample_filter):
         export_format=ExportFormat.JSON,
     )
 
+
 @pytest.fixture
 def sample_cost_rows():
     return [
-        {"group_key": "1", "group_label": "1.0 - Project Management",
-         "best_total": 10000, "likely_total": 15000, "worst_total": 25000,
-         "pert_total": 15833.33, "std_dev": 2500, "confidence_80_low": 12633.33,
-         "confidence_80_high": 19033.33, "assignment_count": 5},
-        {"group_key": "2", "group_label": "2.0 - Engineering",
-         "best_total": 50000, "likely_total": 75000, "worst_total": 120000,
-         "pert_total": 78333.33, "std_dev": 11666.67, "confidence_80_low": 63400,
-         "confidence_80_high": 93266.67, "assignment_count": 12},
+        {
+            "group_key": "1",
+            "group_label": "1.0 - Project Management",
+            "best_total": 10000,
+            "likely_total": 15000,
+            "worst_total": 25000,
+            "pert_total": 15833.33,
+            "std_dev": 2500,
+            "confidence_80_low": 12633.33,
+            "confidence_80_high": 19033.33,
+            "assignment_count": 5,
+        },
+        {
+            "group_key": "2",
+            "group_label": "2.0 - Engineering",
+            "best_total": 50000,
+            "likely_total": 75000,
+            "worst_total": 120000,
+            "pert_total": 78333.33,
+            "std_dev": 11666.67,
+            "confidence_80_low": 63400,
+            "confidence_80_high": 93266.67,
+            "assignment_count": 12,
+        },
     ]
+
 
 @pytest.fixture
 def sample_result(sample_cost_rows):
@@ -62,6 +87,7 @@ def sample_result(sample_cost_rows):
 # ════════════════════════════════════════════════════════════════
 # Schema Tests
 # ════════════════════════════════════════════════════════════════
+
 
 class TestReportSchemas:
 
@@ -97,9 +123,13 @@ class TestReportSchemas:
 
     def test_filter_with_all_params(self):
         f = ReportFilter(
-            project_id=1, date_from=date(2026, 1, 1), date_to=date(2026, 12, 31),
-            wbs_ids=[1, 2, 3], cost_type_codes=["LABOR"],
-            approval_status="approved", include_inactive=True,
+            project_id=1,
+            date_from=date(2026, 1, 1),
+            date_to=date(2026, 12, 31),
+            wbs_ids=[1, 2, 3],
+            cost_type_codes=["LABOR"],
+            approval_status="approved",
+            include_inactive=True,
         )
         assert len(f.wbs_ids) == 3
         assert f.approval_status == "approved"
@@ -115,9 +145,14 @@ class TestReportSchemas:
 
     def test_cost_breakdown_row(self):
         row = CostBreakdownRow(
-            group_key="LABOR", group_label="Labor",
-            best_total=1000, likely_total=1500, worst_total=2500,
-            pert_total=1583.33, std_dev=250, assignment_count=3,
+            group_key="LABOR",
+            group_label="Labor",
+            best_total=1000,
+            likely_total=1500,
+            worst_total=2500,
+            pert_total=1583.33,
+            std_dev=250,
+            assignment_count=3,
         )
         assert row.pert_total == 1583.33
 
@@ -125,6 +160,7 @@ class TestReportSchemas:
 # ════════════════════════════════════════════════════════════════
 # Report Engine Tests
 # ════════════════════════════════════════════════════════════════
+
 
 class TestReportEngine:
 
@@ -135,6 +171,7 @@ class TestReportEngine:
         mock_repo.get_project_name.return_value = "Test Project"
 
         from app.services.report_engine import ReportEngine
+
         engine = ReportEngine.__new__(ReportEngine)
         engine.repo = mock_repo
 
@@ -152,6 +189,7 @@ class TestReportEngine:
         mock_repo.get_project_name.return_value = "Empty Project"
 
         from app.services.report_engine import ReportEngine
+
         engine = ReportEngine.__new__(ReportEngine)
         engine.repo = mock_repo
 
@@ -167,12 +205,19 @@ class TestReportEngine:
     def test_generate_audit_report(self, MockRepo):
         mock_repo = MockRepo.return_value
         mock_repo.audit_log_query.return_value = [
-            {"timestamp": "2026-01-01", "user_id": 1, "action": "CREATE",
-             "entity_type": "resource_assignment", "entity_id": 5, "details": ""},
+            {
+                "timestamp": "2026-01-01",
+                "user_id": 1,
+                "action": "CREATE",
+                "entity_type": "resource_assignment",
+                "entity_id": 5,
+                "details": "",
+            },
         ]
         mock_repo.get_project_name.return_value = "Audit Project"
 
         from app.services.report_engine import ReportEngine
+
         engine = ReportEngine.__new__(ReportEngine)
         engine.repo = mock_repo
 
@@ -186,6 +231,7 @@ class TestReportEngine:
 
     def test_get_catalog(self):
         from app.services.report_engine import ReportEngine
+
         engine = ReportEngine.__new__(ReportEngine)
         catalog = engine.get_catalog()
         assert "cost_control" in catalog
@@ -196,6 +242,7 @@ class TestReportEngine:
 
     def test_report_columns_defined_for_all_types(self):
         from app.services.report_engine import REPORT_COLUMNS
+
         for rt in ReportType:
             assert rt in REPORT_COLUMNS, f"Missing columns for {rt}"
             assert len(REPORT_COLUMNS[rt]) > 0
@@ -205,10 +252,12 @@ class TestReportEngine:
 # Exporter Tests
 # ════════════════════════════════════════════════════════════════
 
+
 class TestExporters:
 
     def test_csv_export(self, sample_result):
         from app.services.report_exporters import CSVExporter
+
         content, content_type, filename = CSVExporter.export(sample_result, "test")
         assert content_type == "text/csv"
         assert filename.endswith(".csv")
@@ -219,6 +268,7 @@ class TestExporters:
 
     def test_excel_export(self, sample_result):
         from app.services.report_exporters import ExcelExporter
+
         content, content_type, filename = ExcelExporter.export(sample_result, "test")
         assert "spreadsheetml" in content_type
         assert filename.endswith(".xlsx")
@@ -226,6 +276,7 @@ class TestExporters:
 
     def test_pdf_export(self, sample_result):
         from app.services.report_exporters import PDFExporter
+
         content, content_type, filename = PDFExporter.export(sample_result, "test")
         assert content_type == "application/pdf"
         assert filename.endswith(".pdf")
@@ -233,6 +284,7 @@ class TestExporters:
 
     def test_word_export(self, sample_result):
         from app.services.report_exporters import WordExporter
+
         content, content_type, filename = WordExporter.export(sample_result, "test")
         assert "wordprocessingml" in content_type
         assert filename.endswith(".docx")
@@ -240,17 +292,29 @@ class TestExporters:
 
     def test_exporter_factory(self, sample_result):
         from app.services.report_exporters import ReportExporter
-        for fmt in [ExportFormat.CSV, ExportFormat.XLSX, ExportFormat.PDF, ExportFormat.DOCX]:
+
+        for fmt in [
+            ExportFormat.CSV,
+            ExportFormat.XLSX,
+            ExportFormat.PDF,
+            ExportFormat.DOCX,
+        ]:
             content, ct, fn = ReportExporter.export(sample_result, fmt)
             assert len(content) > 0
 
     def test_csv_handles_empty_rows(self):
         result = ReportResult(
-            report_type="test", title="Empty", generated_at=datetime.utcnow(),
-            project_name="P", filters_applied={},
-            columns=[{"key": "a", "label": "A"}], rows=[], row_count=0,
+            report_type="test",
+            title="Empty",
+            generated_at=datetime.utcnow(),
+            project_name="P",
+            filters_applied={},
+            columns=[{"key": "a", "label": "A"}],
+            rows=[],
+            row_count=0,
         )
         from app.services.report_exporters import CSVExporter
+
         content, _, _ = CSVExporter.export(result, "test")
         assert b"A" in content
 
@@ -258,6 +322,7 @@ class TestExporters:
 # ════════════════════════════════════════════════════════════════
 # PERT Calculation Verification
 # ════════════════════════════════════════════════════════════════
+
 
 class TestPERTCalculations:
 
@@ -282,7 +347,7 @@ class TestPERTCalculations:
 
     def test_combined_std_deviation(self):
         std_devs = [2500, 11666.67]
-        combined = math.sqrt(sum(s ** 2 for s in std_devs))
+        combined = math.sqrt(sum(s**2 for s in std_devs))
         assert round(combined, 2) == 11931.52
 
     def test_risk_exposure(self):
@@ -297,14 +362,17 @@ class TestPERTCalculations:
 # Report Job Model Tests
 # ════════════════════════════════════════════════════════════════
 
+
 class TestReportJobModel:
 
     def test_report_job_defaults(self):
         from app.models.database.report import ReportJob
+
         assert ReportJob.__tablename__ == "report_jobs"
 
     def test_report_job_response_schema(self):
         from app.models.schemas.report import ReportJobResponse
+
         job = MagicMock()
         job.id = 1
         job.report_type = "cost_by_wbs"

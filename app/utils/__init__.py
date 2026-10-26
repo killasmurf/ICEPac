@@ -1,6 +1,7 @@
 """
 Utility functions and helpers.
 """
+
 from app.utils.validators import (
     ALLOWED_EXTENSIONS,
     CONTENT_TYPE_MAP,

@@ -1,6 +1,7 @@
 """
 Tests for the config service.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest

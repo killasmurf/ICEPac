@@ -4,6 +4,7 @@ Tests for the enhanced MPP parser (app.services.mpp_parser).
 These tests use mock objects to simulate MPXJ/JPype behavior,
 so they run without requiring Java or the MPXJ JAR.
 """
+
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
