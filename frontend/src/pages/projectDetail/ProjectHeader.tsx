@@ -144,7 +144,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project, estimation, esti
           label="Total PERT estimate"
           icon={<PaidOutlinedIcon />}
           loading={estimationLoading}
-          value={figure(estimation ? formatCurrency(estimation.total_pert_estimate) : dash)}
+          value={figure(estimation ? formatCurrency(estimation.total_pert_estimate, { maximumFractionDigits: 0 }) : dash)}
           hint={estimation ? `Risk-adjusted ${formatCurrency(estimation.risk_adjusted_estimate, { compact: true })}` : undefined}
         />
         <StatCard

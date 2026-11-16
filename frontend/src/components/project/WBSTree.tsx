@@ -138,7 +138,7 @@ const TreeRow = React.memo(function TreeRow({
           <StatusChip kind="approval" value={node.approval_status} />
           {pert !== undefined && pert > 0 && (
             <Typography variant="caption" className="tabular-nums" sx={{ fontWeight: 600 }}>
-              {formatCurrency(pert)}
+              {formatCurrency(pert, { maximumFractionDigits: 0 })}
             </Typography>
           )}
           <Typography variant="caption" color="text.secondary" className="tabular-nums">

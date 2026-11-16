@@ -110,8 +110,9 @@ test('desktop: split view shows a prompt, then the node summary', async ({ page 
   expect(treeBox?.width ?? 0).toBeGreaterThanOrEqual(280);
 
   await item(page, /Steelwork/).click();
+  await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Steelwork' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.MuiDrawer-paper')).toBeHidden();
+  await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByRole('heading', { level: 2, name: 'Steelwork' })).toBeVisible();
   await page.getByRole('button', { name: 'Open estimate details' }).click();
   await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Steelwork' })).toBeVisible();

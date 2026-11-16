@@ -66,7 +66,7 @@ const NodeSummary: React.FC<SummaryProps> = ({ node, pert, onOpen }) => (
           PERT estimate
         </Typography>
         <Typography variant="body2" className="tabular-nums">
-          {pert !== undefined ? formatCurrency(pert) : '—'}
+          {pert !== undefined ? formatCurrency(pert, { maximumFractionDigits: 0 }) : '—'}
         </Typography>
       </Box>
       <Box>
