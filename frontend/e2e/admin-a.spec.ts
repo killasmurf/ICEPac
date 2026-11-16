@@ -46,6 +46,12 @@ test.afterEach(() => {
   expect(api.unmatched, 'API requests without a mock').toEqual([]);
 });
 
+/** Narrow screens scroll the grid sideways; the actions column is last and virtualised until scrolled into view. */
+const revealActions = (page: Page) =>
+  page.locator('.MuiDataGrid-virtualScroller').evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+  });
+
 const noHorizontalScroll = async (page: Page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -138,6 +144,7 @@ test.describe('users actions', () => {
 
   test('edit puts changes without a password', async ({ page }) => {
     await page.goto('/admin/users');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Edit user2' }).click();
     await expect(page.getByRole('dialog').getByLabel('Password')).toHaveCount(0);
     await page.getByRole('dialog').getByLabel('Full name').fill('Renamed User');
@@ -151,9 +158,10 @@ test.describe('users actions', () => {
 
   test('reset password sends the new password', async ({ page }) => {
     await page.goto('/admin/users');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Reset password for user2' }).click();
     await page.getByRole('dialog').getByLabel('Current password').fill('oldpassword');
-    await page.getByRole('dialog').getByLabel('New password', { exact: true }).fill('brandnewpass1');
+    await page.getByRole('dialog').getByLabel(/^New password/).fill('brandnewpass1');
     await page.getByRole('dialog').getByLabel('Confirm new password').fill('brandnewpass1');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/users/2/password'));
     await page.getByRole('button', { name: 'Update password' }).click();
@@ -163,6 +171,7 @@ test.describe('users actions', () => {
 
   test('delete asks for confirmation then issues DELETE', async ({ page }) => {
     await page.goto('/admin/users');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Delete user2' }).click();
     const req = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/admin/users/2'));
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
@@ -173,7 +182,9 @@ test.describe('users actions', () => {
   test('the signed-in user cannot delete or deactivate themselves', async ({ page }) => {
     await page.goto('/admin/users');
     await expect(page.getByText('Test User 2')).toBeVisible();
+    await revealActions(page);
     await expect(page.getByRole('button', { name: 'Delete jordan' })).toBeDisabled();
+    await revealActions(page);
     await page.getByRole('button', { name: 'Edit jordan' }).click();
     await expect(page.getByRole('dialog').getByRole('combobox', { name: 'Status' })).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByText('You cannot deactivate your own account')).toBeVisible();
@@ -182,7 +193,7 @@ test.describe('users actions', () => {
   test('role and status filters narrow the table', async ({ page }) => {
     await page.goto('/admin/users');
     await expect(page.getByText('Test User 2')).toBeVisible();
-    await page.getByLabel('Role').click();
+    await page.getByRole('combobox', { name: 'Role' }).click();
     await page.getByRole('option', { name: 'Manager' }).click();
     await expect(page.getByText('Test User 2')).toHaveCount(0);
     await expect(page.getByText('Test User 1')).toHaveCount(0);
@@ -196,7 +207,7 @@ test.describe('resources actions', () => {
     await page.getByRole('dialog').getByLabel('Resource code').fill('new-001');
     await page.getByRole('dialog').getByLabel('Description').fill('New resource');
     await page.getByRole('dialog').getByLabel('EOC (element of cost)').fill('Labour');
-    await page.getByRole('dialog').getByLabel('Cost').fill('250');
+    await page.getByRole('dialog').getByRole('spinbutton', { name: 'Cost' }).fill('250');
     await page.getByRole('dialog').getByLabel('Units').fill('hours');
     const req = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/admin/resources'));
     await page.getByRole('button', { name: 'Create resource' }).click();
@@ -206,8 +217,9 @@ test.describe('resources actions', () => {
 
   test('edit puts the changed cost', async ({ page }) => {
     await page.goto('/admin/resources');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Edit RES-001' }).click();
-    await page.getByRole('dialog').getByLabel('Cost').fill('300');
+    await page.getByRole('dialog').getByRole('spinbutton', { name: 'Cost' }).fill('300');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/resources/1'));
     await page.getByRole('button', { name: 'Save changes' }).click();
     expect((await req).postDataJSON()).toMatchObject({ resource_code: 'RES-001', cost: 300 });
@@ -216,6 +228,7 @@ test.describe('resources actions', () => {
 
   test('delete asks for confirmation then issues DELETE', async ({ page }) => {
     await page.goto('/admin/resources');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Delete RES-001' }).click();
     const req = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/admin/resources/1'));
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
@@ -228,8 +241,9 @@ test.describe('resources actions', () => {
     await expect(page.getByText('$100.50')).toBeVisible();
     await page.getByLabel('EOC', { exact: true }).click();
     await expect(page.getByRole('option', { name: 'Materials' })).toBeVisible();
-    await page.getByRole('option', { name: 'Travel' }).click();
+    await page.getByRole('option', { name: 'Materials' }).click();
     await expect(page.getByText('Resource 2 description')).toHaveCount(0);
+    await expect(page.getByText('Resource 1 description')).toBeVisible();
   });
 
   test('search and active-only map to the API parameters', async ({ page }) => {
@@ -257,6 +271,7 @@ test.describe('suppliers actions', () => {
 
   test('edit puts the changed contact', async ({ page }) => {
     await page.goto('/admin/suppliers');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Edit Supplier 1 Pty Ltd' }).click();
     await page.getByRole('dialog').getByLabel('Contact').fill('Pat Example');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/suppliers/1'));
@@ -267,6 +282,7 @@ test.describe('suppliers actions', () => {
 
   test('delete asks for confirmation then issues DELETE', async ({ page }) => {
     await page.goto('/admin/suppliers');
+    await revealActions(page);
     await page.getByRole('button', { name: 'Delete Supplier 1 Pty Ltd' }).click();
     const req = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/admin/suppliers/1'));
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();

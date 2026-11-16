@@ -191,7 +191,7 @@ export default function UserManagement() {
       minWidth: 160,
       sortable: false,
       valueGetter: (_v, row) => row.full_name ?? '',
-      renderCell: ({ row }) => row.full_name || <Typography component="span" color="text.secondary">Not set</Typography>,
+      renderCell: ({ row }) => row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>,
     },
     { field: 'username', headerName: 'Username', flex: 1, minWidth: 130, sortable: false },
     { field: 'email', headerName: 'Email', flex: 1.3, minWidth: 200, sortable: false },
