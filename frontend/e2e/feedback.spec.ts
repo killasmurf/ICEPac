@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, loginAs } from './fixtures/mockApi';
 
-// The Projects page still fetches with plain useEffect (Phase 4 converts it to useQuery),
-// so no toast fires for its failure yet. This spec proves the app boots and degrades
-// gracefully with QueryClientProvider and ToastProvider mounted. Once Phase 4 converts the
-// page, extend it to assert getByRole('alert') for the error toast.
+// The Projects page fetches with useQuery, so a failed list raises the global error toast
+// and the page shows its own error state.
 test('projects page renders its error state when the list API returns 500', async ({ page }) => {
   await mockApi(page);
   await page.route(/\/api\/v1\/projects(\?.*)?$/, (route) =>
@@ -17,6 +15,7 @@ test('projects page renders its error state when the list API returns 500', asyn
   );
   await loginAs(page, 'admin');
   await page.goto('/projects');
-  await expect(page.getByText('Failed to load projects.')).toBeVisible();
+  await expect(page.getByText('Could not load projects')).toBeVisible();
+  await expect(page.getByRole('alert').first()).toBeVisible();
   await expect(page.getByRole('banner')).toBeVisible();
 });

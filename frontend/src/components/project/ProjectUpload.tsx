@@ -1,397 +1,342 @@
 /**
- * ProjectUpload Component
+ * ProjectUpload
  *
- * Drag-and-drop file upload zone for MS Project files (.mpp, .mpx, .xml).
- * Starts an async import, polls for status, and displays progress.
+ * Drag-and-drop (or "Choose file") upload for MS Project files (.mpp, .mpx, .xml).
+ * Uploads with progress, polls the import job until it completes or fails,
+ * shows a result summary and the project's import history.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import LinearProgress from '@mui/material/LinearProgress';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  uploadProjectFile,
-  getImportStatus,
   getImportHistory,
-  ImportJob,
-  ImportStartResponse,
+  getImportStatus,
+  uploadProjectFile,
+  type ImportJob,
 } from '../../api/projects';
-
-// ============================================================
-// Types
-// ============================================================
+import { EmptyState } from '../common/EmptyState';
+import ErrorState from '../common/ErrorState';
+import StatusChipAA from './StatusChipAA';
+import { TableSkeleton } from '../common/TableSkeleton';
+import { useToast } from '../feedback/ToastProvider';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import {
+  ALLOWED_EXTENSIONS,
+  JOB_STATUS_DETAIL,
+  MAX_FILE_BYTES,
+  formatFileSize,
+  isTerminalStatus,
+  jobProgress,
+  uploadErrorMessage,
+  validateUploadFile,
+} from './projectUploadUtils';
 
 interface ProjectUploadProps {
   projectId: number;
   onImportComplete?: () => void;
 }
 
-// ============================================================
-// Styles
-// ============================================================
-
-const styles = {
-  container: {
-    padding: '24px',
-  },
-  dropZone: {
-    border: '2px dashed #ccc',
-    borderRadius: '8px',
-    padding: '48px 24px',
-    textAlign: 'center' as const,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    backgroundColor: '#fafafa',
-  },
-  dropZoneActive: {
-    border: '2px dashed #1976d2',
-    backgroundColor: '#e3f2fd',
-  },
-  dropZoneDisabled: {
-    opacity: 0.6,
-    cursor: 'not-allowed',
-  },
-  dropIcon: {
-    fontSize: '48px',
-    marginBottom: '12px',
-  },
-  dropText: {
-    fontSize: '16px',
-    color: '#666',
-    marginBottom: '8px',
-  },
-  dropSubText: {
-    fontSize: '13px',
-    color: '#999',
-  },
-  selectedFile: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 16px',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '6px',
-    marginTop: '16px',
-  },
-  fileName: {
-    fontWeight: 500 as const,
-    color: '#333',
-  },
-  fileSize: {
-    fontSize: '13px',
-    color: '#999',
-  },
-  uploadButton: {
-    display: 'inline-block',
-    padding: '10px 24px',
-    backgroundColor: '#1976d2',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: 500 as const,
-    cursor: 'pointer',
-    marginTop: '16px',
-  },
-  uploadButtonDisabled: {
-    backgroundColor: '#bbb',
-    cursor: 'not-allowed',
-  },
-  progressContainer: {
-    marginTop: '24px',
-  },
-  progressBar: {
-    width: '100%',
-    height: '8px',
-    backgroundColor: '#e0e0e0',
-    borderRadius: '4px',
-    overflow: 'hidden' as const,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#1976d2',
-    borderRadius: '4px',
-    transition: 'width 0.3s ease',
-  },
-  progressText: {
-    fontSize: '13px',
-    color: '#666',
-    marginTop: '8px',
-  },
-  successMessage: {
-    padding: '16px',
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-    borderRadius: '6px',
-    marginTop: '16px',
-  },
-  errorMessage: {
-    padding: '16px',
-    backgroundColor: '#fce4ec',
-    color: '#c62828',
-    borderRadius: '6px',
-    marginTop: '16px',
-  },
-  historySection: {
-    marginTop: '32px',
-  },
-  historyTitle: {
-    fontSize: '16px',
-    fontWeight: 600 as const,
-    marginBottom: '12px',
-  },
-  historyItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 16px',
-    borderBottom: '1px solid #eee',
-  },
-  statusBadge: {
-    display: 'inline-block',
-    padding: '2px 8px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: 500 as const,
-  },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  uploading: 'Uploading',
-  parsing: 'Parsing file...',
-  creating_records: 'Creating WBS records...',
-  completed: 'Completed',
-  failed: 'Failed',
-};
-
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  pending: { bg: '#fff3e0', color: '#e65100' },
-  uploading: { bg: '#e3f2fd', color: '#1565c0' },
-  parsing: { bg: '#e3f2fd', color: '#1565c0' },
-  creating_records: { bg: '#e3f2fd', color: '#1565c0' },
-  completed: { bg: '#e8f5e9', color: '#2e7d32' },
-  failed: { bg: '#fce4ec', color: '#c62828' },
-};
-
-const ALLOWED_EXTENSIONS = ['.mpp', '.mpx', '.xml'];
-
-// ============================================================
-// Component
-// ============================================================
+const POLL_INTERVAL_MS = 2000;
+const tint = (color: string) => `color-mix(in srgb, ${color} 14%, transparent)`;
 
 const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComplete }) => {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [currentJob, setCurrentJob] = useState<ImportJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<ImportJob[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollRef = useRef<number | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [uploadPercent, setUploadPercent] = useState(0);
+  const [jobId, setJobId] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const notifiedJob = useRef<number | null>(null);
 
-  // Load import history
-  useEffect(() => {
-    getImportHistory(projectId)
-      .then((res) => setHistory(res.items))
-      .catch(() => {});
-  }, [projectId, currentJob]);
+  const historyKey = ['projects', projectId, 'imports'] as const;
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
+  const history = useQuery({
+    queryKey: historyKey,
+    queryFn: () => getImportHistory(projectId),
+  });
 
-  const validateFile = useCallback((file: File): boolean => {
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      setError(`Invalid file type "${ext}". Supported: ${ALLOWED_EXTENSIONS.join(', ')}`);
-      return false;
-    }
-    if (file.size > 100 * 1024 * 1024) {
-      setError('File too large. Maximum size: 100 MB');
-      return false;
-    }
-    return true;
-  }, []);
+  const job = useQuery({
+    queryKey: [...historyKey, jobId],
+    queryFn: () => getImportStatus(projectId, jobId as number),
+    enabled: jobId != null,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isTerminalStatus(query.state.data?.status) ? false : POLL_INTERVAL_MS,
+  });
 
-  const handleFileSelect = useCallback((file: File) => {
-    setError(null);
-    if (validateFile(file)) {
-      setSelectedFile(file);
-    }
-  }, [validateFile]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
-  }, [handleFileSelect]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const startPolling = (jobId: number) => {
-    pollRef.current = window.setInterval(async () => {
-      try {
-        const job = await getImportStatus(projectId, jobId);
-        setCurrentJob(job);
-        if (job.status === 'completed' || job.status === 'failed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
-          setIsUploading(false);
-          if (job.status === 'completed' && onImportComplete) {
-            onImportComplete();
-          }
-        }
-      } catch {
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = null;
-        setIsUploading(false);
-      }
-    }, 2000);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile || isUploading) return;
-    setError(null);
-    setIsUploading(true);
-    setCurrentJob(null);
-
-    try {
-      const result: ImportStartResponse = await uploadProjectFile(projectId, selectedFile);
-      startPolling(result.job_id);
+  const upload = useMutation({
+    meta: { silent: true },
+    mutationFn: (file: File) => uploadProjectFile(projectId, file, setUploadPercent),
+    onSuccess: (result) => {
       setSelectedFile(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Upload failed');
-      setIsUploading(false);
+      setJobId(result.job_id);
+      queryClient.invalidateQueries({ queryKey: historyKey });
+    },
+  });
+
+  const currentJob: ImportJob | undefined = job.data;
+  const jobRunning = jobId != null && !isTerminalStatus(currentJob?.status) && !job.isError;
+  const busy = upload.isPending || jobRunning;
+
+  // Fire completion side effects once per job.
+  useEffect(() => {
+    if (!currentJob || !isTerminalStatus(currentJob.status) || notifiedJob.current === currentJob.id) return;
+    notifiedJob.current = currentJob.id;
+    queryClient.invalidateQueries({ queryKey: historyKey });
+    if (currentJob.status === 'completed') {
+      toast.success('Import completed');
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      onImportComplete?.();
+    } else {
+      toast.error(currentJob.error_message || 'Import failed');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentJob]);
+
+  const chooseFile = useCallback((file: File | undefined) => {
+    if (!file) return;
+    const message = validateUploadFile(file);
+    setValidationError(message);
+    if (!message) {
+      upload.reset();
+      setSelectedFile(file);
+    } else {
+      setSelectedFile(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!busy) chooseFile(e.dataTransfer.files[0]);
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!busy) setIsDragging(true);
   };
 
-  const formatDate = (dateStr: string): string => {
-    return new Date(dateStr).toLocaleString();
+  const startImport = () => {
+    if (!selectedFile || busy) return;
+    setUploadPercent(0);
+    setJobId(null);
+    upload.mutate(selectedFile);
   };
+
+  const accepted = ALLOWED_EXTENSIONS.join(', ');
+  const problem = validationError ?? (upload.isError ? uploadErrorMessage(upload.error) : null);
 
   return (
-    <div style={styles.container}>
-      {/* Drop Zone */}
-      <div
-        style={{
-          ...styles.dropZone,
-          ...(isDragging ? styles.dropZoneActive : {}),
-          ...(isUploading ? styles.dropZoneDisabled : {}),
-        }}
+    <Box sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box
+        data-testid="upload-dropzone"
+        data-dragging={isDragging}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={() => !isUploading && fileInputRef.current?.click()}
+        onDragLeave={() => setIsDragging(false)}
+        sx={[
+          {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 1,
+            textAlign: 'center',
+            px: 3,
+            py: { xs: 4, sm: 6 },
+            border: 2,
+            borderStyle: 'dashed',
+            borderRadius: 1,
+            borderColor: 'divider',
+            bgcolor: 'action.hover',
+            opacity: busy ? 0.6 : 1,
+            transition: 'border-color 150ms, background-color 150ms',
+          },
+          // Gold is the secondary colour in light mode and the primary colour in dark mode.
+          isDragging && ((theme) => ({ borderColor: 'secondary.main', bgcolor: tint((theme.vars ?? theme).palette.secondary.main) })),
+          isDragging &&
+            ((theme) =>
+              theme.applyStyles('dark', {
+                borderColor: 'primary.main',
+                bgcolor: tint((theme.vars ?? theme).palette.primary.main),
+              })),
+        ]}
       >
-        <div style={styles.dropIcon}>&#128193;</div>
-        <div style={styles.dropText}>
-          {isDragging ? 'Drop file here' : 'Drag & drop an MS Project file, or click to browse'}
-        </div>
-        <div style={styles.dropSubText}>Supported: .mpp, .mpx, .xml (max 100 MB)</div>
+        <Box aria-hidden sx={{ color: 'text.secondary', display: 'flex', '& svg': { fontSize: 48 } }}>
+          <CloudUploadOutlined />
+        </Box>
+        <Typography variant="h6" component="p">
+          {isDragging ? 'Drop the file to select it' : 'Drag and drop an MS Project file here'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          or
+        </Typography>
+        <Button variant="outlined" onClick={() => inputRef.current?.click()} disabled={busy}>
+          Choose file
+        </Button>
         <input
-          ref={fileInputRef}
+          ref={inputRef}
           type="file"
-          accept=".mpp,.mpx,.xml"
-          style={{ display: 'none' }}
+          hidden
+          accept={ALLOWED_EXTENSIONS.join(',')}
+          aria-label="MS Project file"
+          data-testid="upload-input"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFileSelect(file);
+            chooseFile(e.target.files?.[0]);
+            e.target.value = '';
           }}
         />
-      </div>
+        <Typography variant="body2" color="text.secondary">
+          Accepted types: {accepted}. Maximum size: {formatFileSize(MAX_FILE_BYTES)}.
+        </Typography>
+      </Box>
 
-      {/* Selected File */}
-      {selectedFile && (
-        <div style={styles.selectedFile}>
-          <div>
-            <div style={styles.fileName}>{selectedFile.name}</div>
-            <div style={styles.fileSize}>{formatFileSize(selectedFile.size)}</div>
-          </div>
-          <button
-            style={{
-              ...styles.uploadButton,
-              ...(isUploading ? styles.uploadButtonDisabled : {}),
-            }}
-            onClick={handleUpload}
-            disabled={isUploading}
-          >
-            {isUploading ? 'Importing...' : 'Start Import'}
-          </button>
-        </div>
+      {problem && (
+        <Alert severity="error" role="alert">
+          {problem}
+        </Alert>
       )}
 
-      {/* Progress */}
-      {currentJob && currentJob.status !== 'completed' && currentJob.status !== 'failed' && (
-        <div style={styles.progressContainer}>
-          <div style={styles.progressBar}>
-            <div style={{ ...styles.progressFill, width: `${currentJob.progress}%` }} />
-          </div>
-          <div style={styles.progressText}>
-            {STATUS_LABELS[currentJob.status] || currentJob.status} ({Math.round(currentJob.progress)}%)
-          </div>
-        </div>
+      {selectedFile && !busy && (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            p: 2,
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontWeight={600} sx={{ overflowWrap: 'anywhere' }}>
+              {selectedFile.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {formatFileSize(selectedFile.size)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button color="inherit" onClick={() => setSelectedFile(null)}>
+              Remove
+            </Button>
+            <Button variant="contained" onClick={startImport}>
+              Start import
+            </Button>
+          </Box>
+        </Box>
       )}
 
-      {/* Success */}
+      {upload.isPending && (
+        <Box>
+          <LinearProgress variant="determinate" value={uploadPercent} aria-label="Upload progress" />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Uploading... {uploadPercent}%
+          </Typography>
+        </Box>
+      )}
+
+      {jobRunning && (
+        <Box>
+          <LinearProgress
+            variant={currentJob ? 'determinate' : 'indeterminate'}
+            value={currentJob ? jobProgress(currentJob) : undefined}
+            aria-label="Import progress"
+          />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} role="status">
+            {currentJob ? `${JOB_STATUS_DETAIL[currentJob.status] ?? currentJob.status} (${jobProgress(currentJob)}%)` : 'Starting import'}
+          </Typography>
+        </Box>
+      )}
+
       {currentJob?.status === 'completed' && (
-        <div style={styles.successMessage}>
-          Import completed: {currentJob.task_count} tasks, {currentJob.resource_count} resources,{' '}
-          {currentJob.assignment_count} assignments
-        </div>
+        <Alert severity="success">
+          Import completed: {formatNumber(currentJob.task_count)} tasks, {formatNumber(currentJob.resource_count)} resources,{' '}
+          {formatNumber(currentJob.assignment_count)} assignments created.
+        </Alert>
+      )}
+      {currentJob?.status === 'failed' && (
+        <Alert severity="error">Import failed: {currentJob.error_message || 'no error message was recorded.'}</Alert>
       )}
 
-      {/* Error */}
-      {(error || currentJob?.status === 'failed') && (
-        <div style={styles.errorMessage}>
-          {error || currentJob?.error_message || 'Import failed'}
-        </div>
-      )}
-
-      {/* Import History */}
-      {history.length > 0 && (
-        <div style={styles.historySection}>
-          <div style={styles.historyTitle}>Import History</div>
-          {history.map((job) => {
-            const statusStyle = STATUS_COLORS[job.status] || { bg: '#eee', color: '#333' };
-            return (
-              <div key={job.id} style={styles.historyItem}>
-                <div>
-                  <div style={{ fontWeight: 500 }}>{job.filename}</div>
-                  <div style={{ fontSize: '12px', color: '#999' }}>
-                    {formatDate(job.created_at)}
-                    {job.task_count > 0 && ` — ${job.task_count} tasks`}
-                  </div>
-                </div>
-                <span
-                  style={{
-                    ...styles.statusBadge,
-                    backgroundColor: statusStyle.bg,
-                    color: statusStyle.color,
-                  }}
-                >
-                  {STATUS_LABELS[job.status] || job.status}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      <Box component="section" aria-labelledby="import-history-title">
+        <Typography id="import-history-title" variant="h6" component="h2" sx={{ mb: 1.5 }}>
+          Import history
+        </Typography>
+        {history.isPending ? (
+          <TableSkeleton rows={3} columns={5} />
+        ) : history.isError ? (
+          <ErrorState
+            title="Could not load import history"
+            action={
+              <Button variant="outlined" onClick={() => history.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        ) : history.data.items.length === 0 ? (
+          <EmptyState title="No imports yet" description="Imports of MS Project files for this project will be listed here." />
+        ) : (
+          <TableContainer sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <Table size="small" aria-label="Import history">
+              <TableHead>
+                <TableRow>
+                  <TableCell>File</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Tasks</TableCell>
+                  <TableCell align="right">Resources</TableCell>
+                  <TableCell align="right">Size</TableCell>
+                  <TableCell>Started</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {history.data.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell sx={{ overflowWrap: 'anywhere' }}>
+                      {item.filename}
+                      {item.status === 'failed' && item.error_message && (
+                        <Typography variant="caption" color="error" component="div">
+                          {item.error_message}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <StatusChipAA kind="job" value={item.status} />
+                    </TableCell>
+                    <TableCell align="right" className="tabular-nums">
+                      {formatNumber(item.task_count)}
+                    </TableCell>
+                    <TableCell align="right" className="tabular-nums">
+                      {formatNumber(item.resource_count)}
+                    </TableCell>
+                    <TableCell align="right" className="tabular-nums">
+                      {formatFileSize(item.file_size)}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(item.started_at ?? item.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Box>
+    </Box>
   );
 };
 

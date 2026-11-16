@@ -18,8 +18,7 @@ const pages: { name: string; path: string; auth: boolean; ready: string; exclude
   { name: 'login', path: '/login', auth: false, ready: 'ICEPac Login' },
   // TODO(phase-4): Dashboard spinners have no accessible name (aria-progressbar-name); goes away with StatCard skeletons.
   { name: 'dashboard', path: '/', auth: true, ready: 'Dashboard', exclude: ['main .MuiCircularProgress-root'] },
-  // TODO(phase-4): the per-row archive icon buttons in the Projects table have no label (button-name); DataTable row actions fix this.
-  { name: 'projects', path: '/projects', auth: true, ready: 'Harbour Bridge Refurbishment', exclude: ['main tbody button'] },
+  { name: 'projects', path: '/projects', auth: true, ready: 'Harbour Bridge Refurbishment' },
 ];
 
 for (const scheme of ['light', 'dark'] as const) {
