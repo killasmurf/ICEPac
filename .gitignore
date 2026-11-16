@@ -50,3 +50,8 @@ icepac/
 
 nul
 .claude/worktrees/
+
+# Frontend e2e artefacts
+frontend/e2e/__screenshots__/
+frontend/playwright-report/
+frontend/test-results/
