@@ -115,29 +115,34 @@ export interface SupplierUpdate {
 
 export interface ConfigItem {
   id: number;
-  name: string;
-  description?: string;
-  code?: string;
+  code: string;
+  description: string;
+  /** Present on weighted tables only (probability, severity, PMB). Normalised to a number. */
   weight?: number;
-  level?: number;
-  category?: string;
   is_active: boolean;
-  sort_order: number;
   created_at: string;
-  updated_at: string;
+}
+
+/** Create/update body for config items. `weight` is only accepted by weighted tables. */
+export interface ConfigItemInput {
+  code?: string;
+  description?: string;
+  weight?: number;
+  is_active?: boolean;
 }
 
 export interface AuditLog {
   id: number;
-  user_id: number;
-  username: string;
+  user_id: number | null;
+  username: string | null;
   action: string;
   entity_type: string;
-  entity_id?: number;
-  details?: string;
-  old_values?: string;
-  new_values?: string;
-  ip_address?: string;
+  entity_id: number | null;
+  /** Server sends a JSON object; kept as unknown so the UI can handle any shape. */
+  old_values: unknown;
+  new_values: unknown;
+  ip_address: string | null;
+  user_agent: string | null;
   created_at: string;
 }
 
@@ -149,7 +154,9 @@ export interface PaginatedResponse<T> {
 }
 
 export interface ConfigTableInfo {
-  name: string;
+  /** URL key used in /admin/config/{key}, for example "cost-types". */
+  key: string;
+  /** Display name, for example "Cost Types". */
   label: string;
   description: string;
   weighted: boolean;
@@ -220,29 +227,74 @@ export const suppliersApi = {
 
 // ── Config Tables ────────────────────────────────────────────
 
+interface RawConfigTable {
+  name: string;
+  description: string;
+  weighted: boolean;
+}
+
+/** Turn a display name ("Cost Types") into the route key ("cost-types"). */
+export const configTableKey = (label: string) =>
+  label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * GET /admin/config returns `{ tables: [{ name, description, weighted }] }` where `name` is the
+ * display label (the route key is overwritten server-side), so the key is derived from the label.
+ */
+export const normalizeConfigTables = (raw: { tables?: RawConfigTable[] } | RawConfigTable[] | null | undefined) => {
+  const list = Array.isArray(raw) ? raw : (raw?.tables ?? []);
+  return list.map<ConfigTableInfo>((t) => ({
+    key: configTableKey(t.name),
+    label: t.name,
+    description: t.description,
+    weighted: Boolean(t.weighted),
+  }));
+};
+
+/** The API serialises Decimal weights as strings; convert to numbers. */
+export const normalizeConfigItem = (item: Omit<ConfigItem, 'weight'> & { weight?: number | string | null }): ConfigItem => {
+  const { weight, ...rest } = item;
+  if (weight === undefined || weight === null) return rest;
+  const n = Number(weight);
+  return Number.isNaN(n) ? rest : { ...rest, weight: n };
+};
+
 export const configApi = {
-  listTables: () => client.get<ConfigTableInfo[]>(`${API_BASE}/config`).then((r) => r.data),
+  listTables: () =>
+    client.get<{ tables: RawConfigTable[] }>(`${API_BASE}/config`).then((r) => normalizeConfigTables(r.data)),
   // The config list route takes only `active_only` (no pagination).
   listItems: (table: string, params?: { skip?: number; limit?: number; is_active?: boolean }) =>
     client
-      .get<{ items: ConfigItem[]; total: number; table_name: string }>(`${API_BASE}/config/${table}`, {
+      .get<{ items: Parameters<typeof normalizeConfigItem>[0][]; total: number }>(`${API_BASE}/config/${table}`, {
         params: { active_only: params?.is_active ? true : undefined },
       })
-      .then((r) => r.data),
+      .then((r) => ({ ...r.data, table_name: table, items: r.data.items.map(normalizeConfigItem) })),
   getItem: (table: string, id: number) =>
-    client.get<ConfigItem>(`${API_BASE}/config/${table}/${id}`).then((r) => r.data),
-  createItem: (table: string, data: Partial<ConfigItem>) =>
-    client.post<ConfigItem>(`${API_BASE}/config/${table}`, data).then((r) => r.data),
-  updateItem: (table: string, id: number, data: Partial<ConfigItem>) =>
-    client.put<ConfigItem>(`${API_BASE}/config/${table}/${id}`, data).then((r) => r.data),
+    client.get<ConfigItem>(`${API_BASE}/config/${table}/${id}`).then((r) => normalizeConfigItem(r.data)),
+  createItem: (table: string, data: ConfigItemInput) =>
+    client.post<ConfigItem>(`${API_BASE}/config/${table}`, data).then((r) => normalizeConfigItem(r.data)),
+  updateItem: (table: string, id: number, data: ConfigItemInput) =>
+    client.put<ConfigItem>(`${API_BASE}/config/${table}/${id}`, data).then((r) => normalizeConfigItem(r.data)),
   deleteItem: (table: string, id: number) =>
     client.delete<void>(`${API_BASE}/config/${table}/${id}`).then((r) => r.data),
 };
 
 // ── Audit Logs ───────────────────────────────────────────────
 
+export interface AuditLogParams {
+  skip?: number;
+  limit?: number;
+  action?: string;
+  entity_type?: string;
+  user_id?: number;
+}
+
 export const auditApi = {
-  list: (params?: { skip?: number; limit?: number; action?: string; entity_type?: string; user_id?: number }) =>
+  list: (params?: AuditLogParams) =>
     client.get<PaginatedResponse<AuditLog>>(`${API_BASE}/audit-logs`, { params }).then((r) => r.data),
   get: (id: number) => client.get<AuditLog>(`${API_BASE}/audit-logs/${id}`).then((r) => r.data),
 };
