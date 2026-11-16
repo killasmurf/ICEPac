@@ -13,3 +13,21 @@ export async function login(username: string, password: string): Promise<TokenRe
   });
   return res.data;
 }
+
+export interface CurrentUser {
+  id: number;
+  email: string;
+  username: string;
+  full_name: string | null;
+  role: 'admin' | 'manager' | 'user' | 'viewer';
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  last_login: string | null;
+}
+
+export async function getMe(): Promise<CurrentUser> {
+  const res = await client.get<CurrentUser>('/auth/me');
+  return res.data;
+}
