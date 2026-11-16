@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, auditApi, AuditLog } from '../../api/admin';
+import { AuditLog } from '../../api/admin';
 
 // Mock data for development
 const MOCK_STATS = { total_resources: 128, total_suppliers: 24, recent_activity_count: 342 };
