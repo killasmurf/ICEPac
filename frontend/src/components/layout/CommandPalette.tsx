@@ -90,9 +90,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
       onClose={onClose}
       fullWidth
       maxWidth="sm"
-      aria-label="Command palette"
       sx={{ '& .MuiDialog-container': { alignItems: 'flex-start' } }}
-      slotProps={{ paper: { sx: { mt: { xs: 2, sm: 12 }, mx: 2, width: '100%' } } }}
+      slotProps={{ paper: { 'aria-label': 'Command palette', sx: { mt: { xs: 2, sm: 12 }, mx: 2, width: '100%' } } }}
     >
       <Autocomplete<PaletteOption>
         open

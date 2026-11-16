@@ -41,6 +41,8 @@ const Sidebar: React.FC<SidebarProps> = ({ desktop, collapsed, mobileOpen, onMob
           justifyContent: rail ? 'center' : 'flex-start',
           px: rail ? 0 : 2.5,
           borderBottom: `1px solid ${onSurface(0.08)}`,
+          // Keep the "by Adalex Consulting" line on one row inside the 248px sidebar.
+          '& .MuiTypography-overline': { whiteSpace: 'nowrap', fontSize: '0.625rem' },
         }}
       >
         <BrandMark variant="dark" collapsed={rail} />

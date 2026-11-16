@@ -23,7 +23,8 @@ const routes: Record<string, Handler> = {
   'GET /help/topics': () => loadFixture('help-topics'),
   'GET /auth/me': () => loadFixture('auth-me'),
   'POST /auth/login': () => ({ access_token: fakeJwt('admin'), refresh_token: fakeJwt('admin'), token_type: 'bearer' }),
-  'GET /projects/1': () => (loadFixture<{ items: unknown[] }>('projects').items[0]),
+  'GET /projects/1': () => loadFixture<{ items: unknown[] }>('projects').items[0],
+  'GET /projects/2': () => loadFixture<{ items: unknown[] }>('projects').items[1],
 };
 
 const CORS_HEADERS = {

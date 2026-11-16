@@ -9,6 +9,8 @@ export interface AuthContextValue {
   /** Role from the JWT claim (available immediately, before /auth/me returns). */
   role: Role | null;
   isAuthenticated: boolean;
+  /** True after an explicit sign-out, so guards redirect to plain /login without ?next=. */
+  signedOut: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -23,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() => validToken(getToken()));
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -43,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const tokens = await loginRequest(username, password);
     setTokens(tokens.access_token, tokens.refresh_token);
     setToken(validToken(tokens.access_token));
+    setSignedOut(false);
   }, []);
 
   const logout = useCallback(() => {
@@ -50,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // TODO(phase-3): clear query cache
     setToken(null);
     setUser(null);
+    setSignedOut(true);
     navigate('/login', { replace: true });
   }, [navigate]);
 
@@ -58,10 +63,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user: token ? user : null,
       role: token ? roleFromPayload(decodeJwt(token)) : null,
       isAuthenticated: token !== null,
+      signedOut,
       login,
       logout,
     }),
-    [token, user, login, logout],
+    [token, user, signedOut, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

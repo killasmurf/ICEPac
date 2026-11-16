@@ -6,10 +6,11 @@ import type { Role } from './token';
 
 /** Layout route: redirects to /login?next=<path> when there is no unexpired token. */
 export const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, signedOut } = useAuth();
   const { pathname, search } = useLocation();
   if (!isAuthenticated) {
-    return <Navigate to={`/login?next=${encodeURIComponent(pathname + search)}`} replace />;
+    const next = signedOut ? '' : `?next=${encodeURIComponent(pathname + search)}`;
+    return <Navigate to={`/login${next}`} replace />;
   }
   return <>{children ?? <Outlet />}</>;
 };

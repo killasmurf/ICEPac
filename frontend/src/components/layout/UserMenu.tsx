@@ -34,7 +34,7 @@ const UserMenu: React.FC = () => {
         sx={{ ml: 0.5 }}
       >
         <Avatar sx={{ width: 34, height: 34, fontSize: '0.8125rem', fontWeight: 700, bgcolor: brand.navy, color: brand.white }}>
-          {initials || <PersonOutlineIcon fontSize="small" />}
+          {initials ? <span aria-hidden="true">{initials}</span> : <PersonOutlineIcon fontSize="small" />}
         </Avatar>
       </IconButton>
       <Menu
