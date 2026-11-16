@@ -1,5 +1,4 @@
 import React from 'react';
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -16,6 +15,7 @@ import {
   type GridSortModel,
 } from '@mui/x-data-grid';
 import { EmptyState } from './EmptyState';
+import ErrorState from './ErrorState';
 import { TableSkeleton } from './TableSkeleton';
 
 declare module '@mui/x-data-grid' {
@@ -99,13 +99,11 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
       {toolbar && <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>{toolbar}</Box>}
       {error != null && (
-        // TODO(integration): use ErrorState
-        <Alert
-          severity="error"
-          action={onRetry && <Button color="inherit" size="small" onClick={onRetry}>Retry</Button>}
-        >
-          Could not load data.
-        </Alert>
+        <ErrorState
+          title="Could not load data"
+          description="Something went wrong while loading. Check your connection and try again."
+          action={onRetry && <Button variant="outlined" onClick={onRetry}>Retry</Button>}
+        />
       )}
       <Box sx={{ width: '100%', minHeight: 240 }}>
         <DataGrid<R>

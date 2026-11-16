@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { GridColDef } from '@mui/x-data-grid';
 import { renderWithProviders } from '../../test/renderWithProviders';
@@ -66,8 +66,8 @@ describe('DataTable', () => {
   it('shows an inline error with Retry', async () => {
     const onRetry = vi.fn();
     renderWithProviders(<DataTable<Row> rows={[]} columns={columns} error={new Error('x')} onRetry={onRetry} disableVirtualization />);
-    const alert = screen.getByRole('alert');
-    await userEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+    expect(screen.getByText('Could not load data')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 

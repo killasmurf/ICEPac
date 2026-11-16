@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useNavigate } from 'react-router-dom';
 import { login as loginRequest, getMe, type CurrentUser } from '../api/auth';
 import { clearTokens, decodeJwt, getToken, isExpired, roleFromPayload, setTokens, type Role } from './token';
+import { queryClient } from '../app/queryClient';
 
 export interface AuthContextValue {
   /** Profile from GET /auth/me; null until loaded or when signed out. */
@@ -51,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     clearTokens();
-    // TODO(phase-3): clear query cache
+    queryClient.clear();
     setToken(null);
     setUser(null);
     setSignedOut(true);
