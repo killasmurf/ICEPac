@@ -1,6 +1,6 @@
 """Dashboard API — aggregates stats from all circuits for the main dashboard."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,11 @@ from app.models.database.resource import Resource, Supplier
 from app.models.database.risk import Risk
 from app.models.database.user import User
 from app.models.database.wbs import WBS
+from app.models.schemas.dashboard import (
+    ApprovalTotals,
+    PortfolioProject,
+    PortfolioResponse,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -88,6 +93,94 @@ async def dashboard_stats(
         },
         "recent_activity": _recent_activity(db),
     }
+
+
+@router.get("/portfolio", response_model=PortfolioResponse)
+async def dashboard_portfolio(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Per-project portfolio summary, ordered by total PERT estimate (desc).
+
+    Uses separate grouped aggregate queries (never joined together, to avoid
+    fan-out) and combines them in Python.
+    """
+    # WBS counts per (project, approval status)
+    wbs_counts: dict = {}
+    approval_totals = {"draft": 0, "submitted": 0, "approved": 0, "rejected": 0}
+    rows = (
+        db.query(WBS.project_id, WBS.approval_status, func.count(WBS.id))
+        .group_by(WBS.project_id, WBS.approval_status)
+        .all()
+    )
+    for project_id, approval_status, count in rows:
+        per_project = wbs_counts.setdefault(project_id, {})
+        per_project[approval_status] = count
+        if approval_status in approval_totals:
+            approval_totals[approval_status] += count
+
+    # PERT total per project (assignment -> WBS -> project)
+    pert_rows = (
+        db.query(
+            WBS.project_id,
+            func.sum(
+                (
+                    ResourceAssignment.best_estimate
+                    + 4 * ResourceAssignment.likely_estimate
+                    + ResourceAssignment.worst_estimate
+                )
+                / 6
+            ),
+        )
+        .join(WBS, ResourceAssignment.wbs_id == WBS.id)
+        .group_by(WBS.project_id)
+        .all()
+    )
+    pert_by_project = {pid: float(total or 0) for pid, total in pert_rows}
+
+    # Risks: WBS-level (via WBS) and project-level (direct); XOR, so no overlap
+    risk_by_project: dict = {}
+    wbs_risk_rows = (
+        db.query(WBS.project_id, func.count(Risk.id))
+        .join(WBS, Risk.wbs_id == WBS.id)
+        .group_by(WBS.project_id)
+        .all()
+    )
+    for pid, count in wbs_risk_rows:
+        risk_by_project[pid] = risk_by_project.get(pid, 0) + count
+    direct_risk_rows = (
+        db.query(Risk.project_id, func.count(Risk.id))
+        .filter(Risk.project_id.isnot(None))
+        .group_by(Risk.project_id)
+        .all()
+    )
+    for pid, count in direct_risk_rows:
+        risk_by_project[pid] = risk_by_project.get(pid, 0) + count
+
+    projects = []
+    for project_id, name, status in db.query(
+        Project.id, Project.project_name, Project.status
+    ).all():
+        counts = wbs_counts.get(project_id, {})
+        projects.append(
+            PortfolioProject(
+                project_id=project_id,
+                name=name,
+                status=getattr(status, "value", status),
+                wbs_total=sum(counts.values()),
+                wbs_approved=counts.get("approved", 0),
+                wbs_submitted=counts.get("submitted", 0),
+                total_pert=round(pert_by_project.get(project_id, 0.0), 2),
+                risk_count=risk_by_project.get(project_id, 0),
+            )
+        )
+    projects.sort(key=lambda p: (-p.total_pert, p.name))
+
+    return PortfolioResponse(
+        projects=projects[:limit],
+        approval_totals=ApprovalTotals(**approval_totals),
+    )
 
 
 @router.get("/health-detailed")
