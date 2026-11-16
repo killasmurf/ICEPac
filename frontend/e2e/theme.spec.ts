@@ -41,7 +41,7 @@ async function checkBothModes(page: Page, testInfo: Parameters<typeof saveScreen
 
 test('login page uses the Adalex theme in light and dark', async ({ page }, testInfo) => {
   await page.goto('/login');
-  await expect(page.getByRole('heading', { name: 'ICEPac Login' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
   // Login has no header, so switch mode through the stored preference instead of the toggle.
   await page.evaluate(() => document.fonts.ready);
   await expect.poll(async () => (await bodyStyle(page)).bg).toBe(LIGHT_BG);
