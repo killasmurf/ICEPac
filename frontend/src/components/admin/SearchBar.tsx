@@ -14,7 +14,7 @@ export default function SearchBar({
   value: externalValue, onChange, placeholder = 'Search...', debounceMs = 300,
 }: SearchBarProps) {
   const [value, setValue] = useState(externalValue || '');
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (externalValue !== undefined) setValue(externalValue);

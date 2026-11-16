@@ -17,7 +17,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProject, updateProject, Project, ProjectUpdateInput, WBSItem } from '../api/projects';
-import { getResources, getSuppliers, getConfigItems } from '../api/admin';
+import { resourcesApi, suppliersApi, configApi } from '../api/admin';
 import ProjectUpload from '../components/project/ProjectUpload';
 import WBSTree from '../components/project/WBSTree';
 import EstimationSummary from '../components/estimation/EstimationSummary';
@@ -88,29 +88,29 @@ const ProjectDetail: React.FC = () => {
         probabilityRes,
         severityRes,
       ] = await Promise.all([
-        getResources(0, 500, undefined, true),
-        getSuppliers(0, 500, undefined, true),
-        getConfigItems('cost-types', true),
-        getConfigItems('regions', true),
-        getConfigItems('business-areas', true),
-        getConfigItems('estimating-techniques', true),
-        getConfigItems('risk-categories', true),
-        getConfigItems('probability-levels', true),
-        getConfigItems('severity-levels', true),
+        resourcesApi.list({ is_active: true, limit: 1000 }),
+        suppliersApi.list({ is_active: true, limit: 1000 }),
+        configApi.listItems('cost-types', { is_active: true }),
+        configApi.listItems('regions', { is_active: true }),
+        configApi.listItems('business-areas', { is_active: true }),
+        configApi.listItems('estimating-techniques', { is_active: true }),
+        configApi.listItems('risk-categories', { is_active: true }),
+        configApi.listItems('probability-levels', { is_active: true }),
+        configApi.listItems('severity-levels', { is_active: true }),
       ]);
 
       setResources(resourcesRes.items.map((r) => ({ code: r.resource_code, description: r.description })));
-      setSuppliers(suppliersRes.items.map((s) => ({ code: s.supplier_code, name: s.name })));
-      setCostTypes(costTypesRes.items.map((i) => ({ code: i.code, description: i.description })));
-      setRegions(regionsRes.items.map((i) => ({ code: i.code, description: i.description })));
-      setBusinessAreas(businessAreasRes.items.map((i) => ({ code: i.code, description: i.description })));
-      setEstimatingTechniques(estTechniquesRes.items.map((i) => ({ code: i.code, description: i.description })));
-      setRiskCategories(riskCategoriesRes.items.map((i) => ({ code: i.code, description: i.description })));
+      setSuppliers(suppliersRes.items.map((s) => ({ code: s.supplier_code ?? '', name: s.name })));
+      setCostTypes(costTypesRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
+      setRegions(regionsRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
+      setBusinessAreas(businessAreasRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
+      setEstimatingTechniques(estTechniquesRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
+      setRiskCategories(riskCategoriesRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
       setProbabilityLevels(
-        probabilityRes.items.map((i: any) => ({ code: i.code, description: i.description, weight: i.weight || 0 }))
+        probabilityRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '', weight: i.weight || 0 }))
       );
       setSeverityLevels(
-        severityRes.items.map((i: any) => ({ code: i.code, description: i.description, weight: i.weight || 0 }))
+        severityRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '', weight: i.weight || 0 }))
       );
     } catch {
       // Lookup data is optional – estimation panel will still work with empty dropdowns

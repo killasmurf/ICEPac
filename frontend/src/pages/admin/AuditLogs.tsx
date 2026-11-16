@@ -36,8 +36,8 @@ export default function AuditLogs() {
     { key: 'ip_address', label: 'IP', width: '120px', render: v => v || '—' },
   ];
 
-  const actions = [...new Set(logs.map(l => l.action))];
-  const entities = [...new Set(logs.map(l => l.entity_type))];
+  const actions = Array.from(new Set(logs.map(l => l.action)));
+  const entities = Array.from(new Set(logs.map(l => l.entity_type)));
 
   const filtered = logs.filter(l => {
     if (actionFilter && l.action !== actionFilter) return false;

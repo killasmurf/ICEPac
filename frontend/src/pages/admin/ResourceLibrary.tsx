@@ -65,7 +65,7 @@ export default function ResourceLibrary() {
     { key: 'is_active', label: 'Status', width: '90px', render: (v) => <StatusBadge active={v} /> },
   ];
 
-  const eocs = [...new Set(resources.map(r => r.eoc).filter(Boolean))];
+  const eocs = Array.from(new Set(resources.map(r => r.eoc).filter(Boolean)));
   const filtered = resources.filter(r => {
     if (search && !r.resource_code.toLowerCase().includes(search.toLowerCase()) && !r.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (eocFilter && r.eoc !== eocFilter) return false;
