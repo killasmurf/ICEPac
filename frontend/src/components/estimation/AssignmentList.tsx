@@ -17,6 +17,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Assignment } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 
 interface AssignmentListProps {
   assignments: Assignment[];
@@ -25,9 +26,6 @@ interface AssignmentListProps {
   onDelete: (assignment: Assignment) => void;
   readonly?: boolean;
 }
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 const AssignmentList: React.FC<AssignmentListProps> = ({
   assignments,

@@ -23,6 +23,7 @@ import {
   CostBreakdownItem,
   SupplierBreakdownItem,
 } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 
 interface EstimationSummaryProps {
   projectId: number;
@@ -39,9 +40,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
     {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
   </div>
 );
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 interface SummaryCardProps {
   title: string;

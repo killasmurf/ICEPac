@@ -18,6 +18,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Risk } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 
 interface RiskListProps {
   risks: Risk[];
@@ -26,9 +27,6 @@ interface RiskListProps {
   onDelete: (risk: Risk) => void;
   readonly?: boolean;
 }
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 const getSeverityColor = (code: string | null): 'default' | 'success' | 'warning' | 'error' => {
   if (!code) return 'default';

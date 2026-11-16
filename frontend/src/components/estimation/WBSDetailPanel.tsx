@@ -37,6 +37,7 @@ import {
   getWBSEstimation,
 } from '../../api/estimation';
 import { WBSItem } from '../../api/projects';
+import { formatCurrency } from '../../utils/format';
 
 interface WBSDetailPanelProps {
   open: boolean;
@@ -79,9 +80,6 @@ const fetchDetails = async (projectId: number, wbsId: number) => {
 };
 
 type WBSDetails = Awaited<ReturnType<typeof fetchDetails>>;
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   open,

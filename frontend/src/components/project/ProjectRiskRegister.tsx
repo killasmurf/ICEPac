@@ -44,6 +44,7 @@ import {
   ProjectRiskUpdate,
 } from '../../api/project-risks';
 import { configApi, ConfigItem } from '../../api/admin';
+import { formatCurrency } from '../../utils/format';
 
 interface Props {
   projectId: number;
@@ -51,8 +52,7 @@ interface Props {
 
 const formatMoney = (raw: string | number) => {
   const n = typeof raw === 'string' ? parseFloat(raw) : raw;
-  if (Number.isNaN(n)) return '$0';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return formatCurrency(Number.isNaN(n) ? 0 : n, { maximumFractionDigits: 0 });
 };
 
 // Severity → display colour (matches WBS-risk component convention).
