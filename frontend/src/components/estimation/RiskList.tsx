@@ -18,6 +18,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Risk } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 
 interface RiskListProps {
   risks: Risk[];
@@ -26,9 +27,6 @@ interface RiskListProps {
   onDelete: (risk: Risk) => void;
   readonly?: boolean;
 }
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 const getSeverityColor = (code: string | null): 'default' | 'success' | 'warning' | 'error' => {
   if (!code) return 'default';
@@ -78,7 +76,7 @@ const RiskList: React.FC<RiskListProps> = ({
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.100' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell>Category</TableCell>
                 <TableCell align="right">Cost</TableCell>
                 <TableCell align="center">Probability</TableCell>

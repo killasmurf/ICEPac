@@ -23,6 +23,7 @@ import {
   CostBreakdownItem,
   SupplierBreakdownItem,
 } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 
 interface EstimationSummaryProps {
   projectId: number;
@@ -39,9 +40,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
     {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
   </div>
 );
-
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 interface SummaryCardProps {
   title: string;
@@ -77,7 +75,7 @@ const BreakdownTable: React.FC<BreakdownTableProps> = ({ items, nameField }) => 
   <TableContainer component={Paper} variant="outlined">
     <Table size="small">
       <TableHead>
-        <TableRow sx={{ bgcolor: 'grey.100' }}>
+        <TableRow sx={{ bgcolor: 'action.hover' }}>
           <TableCell>Code</TableCell>
           <TableCell>{nameField === 'description' ? 'Description' : 'Name'}</TableCell>
           <TableCell align="right">Total PERT</TableCell>
@@ -198,7 +196,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.100' }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell>WBS Code</TableCell>
                   <TableCell>Title</TableCell>
                   <TableCell align="right">Assignments</TableCell>
@@ -231,7 +229,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
                               ? 'info.100'
                               : wbs.approval_status === 'rejected'
                               ? 'error.100'
-                              : 'grey.200',
+                              : 'action.selected',
                         }}
                       >
                         {wbs.approval_status}
