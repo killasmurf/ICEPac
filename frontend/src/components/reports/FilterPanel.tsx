@@ -1,86 +1,97 @@
 /**
- * FilterPanel - Collapsible filter controls for report generation.
+ * FilterPanel - filter inputs for the selected report. Only filters the backend applies to that report are shown.
  */
-import React, { useState } from 'react';
-import { ReportFilter } from '../../api/reports';
+import React from 'react';
+import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import type { Project } from '../../api/projects';
+import type { ReportType } from '../../api/reports';
+import { APPROVAL_STATUSES, CODE_FILTERS, dateRangeError, supportedFilters, type FilterValues } from './reportFilters';
 
 interface FilterPanelProps {
-  filters: ReportFilter;
-  onChange: (filters: ReportFilter) => void;
-  projects: { id: number; name: string }[];
+  reportType: ReportType;
+  values: FilterValues;
+  /** Receives only the changed fields so rapid edits never overwrite each other. */
+  onChange: (patch: Partial<FilterValues>) => void;
+  projects: Pick<Project, 'id' | 'project_name'>[];
+  projectsLoading?: boolean;
 }
 
-export default function FilterPanel({ filters, onChange, projects }: FilterPanelProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  const update = (patch: Partial<ReportFilter>) => onChange({ ...filters, ...patch });
-
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' };
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' };
+export default function FilterPanel({ reportType, values, onChange, projects, projectsLoading }: FilterPanelProps) {
+  const supported = new Set(supportedFilters(reportType));
+  const update = onChange;
+  const rangeError = dateRangeError(values);
+  const projectKnown = values.project_id === undefined || projects.some((p) => p.id === values.project_id);
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '16px', marginBottom: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Filters</span>
-        <button onClick={() => setExpanded(!expanded)}
-          style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
-          {expanded ? 'Less Filters ▲' : 'More Filters ▼'}
-        </button>
-      </div>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 2 }}>
+      <TextField
+        select
+        required
+        label="Project"
+        value={projectKnown ? (values.project_id ?? '') : ''}
+        onChange={(e) => update({ project_id: e.target.value === '' ? undefined : Number(e.target.value) })}
+        disabled={projectsLoading}
+        helperText={projectsLoading ? 'Loading projects' : undefined}
+        slotProps={{ select: { displayEmpty: false } }}
+      >
+        {projects.map((p) => (
+          <MenuItem key={p.id} value={p.id}>
+            {p.project_name}
+          </MenuItem>
+        ))}
+      </TextField>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginTop: '12px' }}>
-        <div>
-          <label style={labelStyle}>Project</label>
-          <select style={{ ...inputStyle, cursor: 'pointer' }} value={filters.project_id} onChange={e => update({ project_id: Number(e.target.value) })}>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Date From</label>
-          <input style={inputStyle} type="date" value={filters.date_from || ''} onChange={e => update({ date_from: e.target.value || undefined })} />
-        </div>
-        <div>
-          <label style={labelStyle}>Date To</label>
-          <input style={inputStyle} type="date" value={filters.date_to || ''} onChange={e => update({ date_to: e.target.value || undefined })} />
-        </div>
-        <div>
-          <label style={labelStyle}>Approval Status</label>
-          <select style={{ ...inputStyle, cursor: 'pointer' }} value={filters.approval_status || ''} onChange={e => update({ approval_status: e.target.value || undefined })}>
-            <option value="">All</option>
-            <option value="draft">Draft</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-      </div>
-
-      {expanded && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginTop: '12px' }}>
-          <div>
-            <label style={labelStyle}>Cost Type Codes</label>
-            <input style={inputStyle} placeholder="LBR, MAT, SUB..." value={(filters.cost_type_codes || []).join(', ')}
-              onChange={e => update({ cost_type_codes: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined })} />
-          </div>
-          <div>
-            <label style={labelStyle}>Region Codes</label>
-            <input style={inputStyle} placeholder="US, EU, APAC..." value={(filters.region_codes || []).join(', ')}
-              onChange={e => update({ region_codes: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined })} />
-          </div>
-          <div>
-            <label style={labelStyle}>Resource Codes</label>
-            <input style={inputStyle} placeholder="RES001, RES002..." value={(filters.resource_codes || []).join(', ')}
-              onChange={e => update({ resource_codes: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : undefined })} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <label style={{ fontSize: '13px', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input type="checkbox" checked={filters.include_inactive || false}
-                onChange={e => update({ include_inactive: e.target.checked })} />
-              Include Inactive
-            </label>
-          </div>
-        </div>
+      {supported.has('date_from') && (
+        <TextField
+          type="date"
+          label="From date"
+          value={values.date_from ?? ''}
+          onChange={(e) => update({ date_from: e.target.value || undefined })}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
       )}
-    </div>
+      {supported.has('date_to') && (
+        <TextField
+          type="date"
+          label="To date"
+          value={values.date_to ?? ''}
+          onChange={(e) => update({ date_to: e.target.value || undefined })}
+          error={rangeError !== null}
+          helperText={rangeError ?? undefined}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+      )}
+
+      {supported.has('approval_status') && (
+        <TextField
+          select
+          label="Approval status"
+          value={values.approval_status ?? ''}
+          onChange={(e) => update({ approval_status: e.target.value || undefined })}
+          slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+        >
+          <MenuItem value="">All statuses</MenuItem>
+          {APPROVAL_STATUSES.map((s) => (
+            <MenuItem key={s.value} value={s.value}>
+              {s.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
+
+      {CODE_FILTERS.filter((f) => supported.has(f.key)).map((f) => (
+        <TextField
+          key={f.key}
+          label={f.label}
+          placeholder={f.placeholder}
+          value={values[f.key] ?? ''}
+          onChange={(e) => update({ [f.key]: e.target.value || undefined })}
+          helperText="Comma-separated"
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+      ))}
+    </Box>
   );
 }

@@ -96,7 +96,7 @@ Added because an application needs states the marketing site does not. All pass 
 - **Light mode:** page `mist`, cards white with a 1px `line` border and no shadow at rest, headings `navy`, body `slate`, primary buttons `navy` with white text.
 - **Gold is the accent, used sparingly:** the single most important action on a screen (for example "New Project", "Sign in"), the active item marker in the sidebar, and headline figures on dark surfaces. Gold buttons always carry `navyDeep` text.
 - **Sidebar is dark in both modes:** `navyDeep` background, white text at 70% opacity, active item white text with a 3px gold bar on the left.
-- **Dark mode:** page `navyDeep`, cards `darkPaper`, primary buttons gold with `navyDeep` text (mirrors the Adalex hero).
+- **Dark mode:** page `navyDeep`, cards `darkPaper`, primary and key-action (`secondary`) buttons both gold with `navyDeep` text (mirrors the Adalex hero).
 - **Charts:** series colours in this order: `#153351`, `#C4A46F`, `#004773`, `#2F7FB3`, `#86693A`, `#5B8A72`, `#8E6C8A`, `#596872`. In dark mode swap the first for `#7FB8E0`. Every chart needs a legend or direct labels; never rely on colour alone.
 - **Shape:** 8px radius on cards, inputs and buttons; 999px on chips.
 - **Product naming:** the app is "ICEPac"; the brand line is "by Adalex Consulting".

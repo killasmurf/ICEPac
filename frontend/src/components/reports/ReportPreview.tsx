@@ -1,83 +1,103 @@
 /**
- * ReportPreview - Renders the report result as a formatted table with totals.
+ * ReportPreview - report result as a client-mode DataTable with a totals summary row.
  */
-import React from 'react';
-import { ReportResult } from '../../api/reports';
+import React, { useMemo } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import type { GridColDef } from '@mui/x-data-grid';
+import type { ReportResult } from '../../api/reports';
+import { DataTable } from '../common/DataTable';
+import { EmptyState } from '../common/EmptyState';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import { columnKind, formatCell, isNumericKind, type ColumnKind } from './reportColumns';
 
 interface ReportPreviewProps {
-  result: ReportResult | null;
-  loading?: boolean;
+  result: ReportResult;
 }
 
-const MONEY_KEYS = new Set([
-  'best_total', 'likely_total', 'worst_total', 'pert_total', 'std_dev',
-  'confidence_80_low', 'confidence_80_high', 'exposure', 'total_exposure',
-  'total_likely', 'total_pert', 'combined_std_dev', 'risk_exposure',
-  'best_estimate', 'likely_estimate', 'worst_estimate', 'pert_estimate',
-]);
-
-function formatValue(key: string, value: any): string {
-  if (value === null || value === undefined || value === '') return '—';
-  if (MONEY_KEYS.has(key) && typeof value === 'number') {
-    return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  if (typeof value === 'number') return value.toLocaleString();
-  return String(value);
+interface PreviewRow {
+  id: number;
+  [key: string]: unknown;
 }
 
-export default function ReportPreview({ result, loading }: ReportPreviewProps) {
-  const s: Record<string, React.CSSProperties> = {
-    wrapper: { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-    header: { padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    title: { fontSize: '16px', fontWeight: 600, color: '#0f172a' },
-    meta: { fontSize: '12px', color: '#94a3b8' },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
-    th: { padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', whiteSpace: 'nowrap', fontSize: '12px' },
-    td: { padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#1e293b' },
-    totalRow: { backgroundColor: '#f0fdf4', fontWeight: 600 },
-    loading: { padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '15px' },
-    empty: { padding: '60px', textAlign: 'center', color: '#94a3b8' },
-  };
+const LONG_TEXT_KEYS = /(mitigation|assumptions|details|title)/;
 
-  if (loading) return <div style={s.wrapper}><div style={s.loading}>Generating report...</div></div>;
-  if (!result) return <div style={s.wrapper}><div style={s.empty}>Select a report type and click Generate</div></div>;
-  if (result.row_count === 0) return <div style={s.wrapper}><div style={s.empty}>No data found for the selected filters</div></div>;
+export default function ReportPreview({ result }: ReportPreviewProps) {
+  const { kinds, columns, rows } = useMemo(() => {
+    const kinds = new Map<string, ColumnKind>(result.columns.map((c) => [c.key, columnKind(c, result.rows, result.totals)]));
+    const columns: GridColDef<PreviewRow>[] = result.columns.map((c) => {
+      const kind = kinds.get(c.key) ?? 'text';
+      const numeric = isNumericKind(kind);
+      return {
+        field: c.key,
+        headerName: c.label,
+        type: numeric ? 'number' : 'string',
+        align: numeric ? 'right' : 'left',
+        headerAlign: numeric ? 'right' : 'left',
+        flex: 1,
+        minWidth: numeric ? 130 : LONG_TEXT_KEYS.test(c.key) ? 220 : 150,
+        cellClassName: numeric ? 'tabular-nums' : undefined,
+        valueFormatter: (value: unknown) => formatCell(kind, value),
+      };
+    });
+    const rows: PreviewRow[] = result.rows.map((r, i) => ({ ...r, id: i }));
+    return { kinds, columns, rows };
+  }, [result]);
 
-  const keys = result.columns.map(c => c.key);
+  const totalEntries = result.columns.filter((c) => result.totals && c.key in result.totals);
 
   return (
-    <div style={s.wrapper}>
-      <div style={s.header}>
-        <div>
-          <div style={s.title}>{result.title}</div>
-          <div style={s.meta}>{result.project_name} • {result.row_count} rows • Generated {new Date(result.generated_at).toLocaleString()}</div>
-        </div>
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={s.table}>
-          <thead>
-            <tr>{result.columns.map(col => <th key={col.key} style={{ ...s.th, textAlign: MONEY_KEYS.has(col.key) ? 'right' : 'left' }}>{col.label}</th>)}</tr>
-          </thead>
-          <tbody>
-            {result.rows.map((row, i) => (
-              <tr key={i}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                {keys.map(k => <td key={k} style={{ ...s.td, textAlign: MONEY_KEYS.has(k) ? 'right' : 'left', fontVariantNumeric: MONEY_KEYS.has(k) ? 'tabular-nums' : 'normal' }}>{formatValue(k, row[k])}</td>)}
-              </tr>
-            ))}
-            {result.totals && (
-              <tr style={s.totalRow}>
-                {keys.map((k, i) => (
-                  <td key={k} style={{ ...s.td, textAlign: MONEY_KEYS.has(k) ? 'right' : 'left', fontVariantNumeric: 'tabular-nums' }}>
-                    {i === 0 ? 'TOTALS' : (k in result.totals! ? formatValue(k, result.totals![k]) : '')}
-                  </td>
-                ))}
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+      <Box>
+        <Typography variant="h4" component="h3">
+          {result.title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {result.project_name} · {formatNumber(result.row_count)} {result.row_count === 1 ? 'row' : 'rows'} · Generated{' '}
+          {formatDateTime(result.generated_at)}
+        </Typography>
+      </Box>
+
+      {result.row_count === 0 ? (
+        <EmptyState
+          icon={<DescriptionOutlined />}
+          title="No data for these filters"
+          description="Try a different project or loosen the filters, then generate again."
+        />
+      ) : (
+        <>
+          <DataTable<PreviewRow> rows={rows} columns={columns} ariaLabel={`${result.title} report data`} />
+          {totalEntries.length > 0 && (
+            <Box
+              component="dl"
+              aria-label="Report totals"
+              sx={{
+                m: 0,
+                p: 2,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                gap: 2,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+                bgcolor: 'action.hover',
+              }}
+            >
+              {totalEntries.map((c) => (
+                <Box key={c.key} sx={{ minWidth: 0 }}>
+                  <Typography component="dt" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Total {c.label}
+                  </Typography>
+                  <Typography component="dd" variant="subtitle1" className="tabular-nums" sx={{ m: 0 }}>
+                    {formatCell(kinds.get(c.key) ?? 'text', result.totals?.[c.key])}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </>
+      )}
+    </Box>
   );
 }

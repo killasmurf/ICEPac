@@ -1,0 +1,21 @@
+{
+  "cost_control": {
+    "label": "Cost Control Reports",
+    "reports": [
+      { "type": "cost_by_wbs", "label": "Cost by WBS", "description": "Cost rollup by Work Breakdown Structure" },
+      { "type": "cost_by_resource", "label": "Cost by Resource", "description": "Cost breakdown by resource code" }
+    ]
+  },
+  "risk": {
+    "label": "Risk Reports",
+    "reports": [
+      { "type": "risk_summary", "label": "Risk Summary", "description": "Risk summary with exposure totals" }
+    ]
+  },
+  "audit": {
+    "label": "Audit Reports",
+    "reports": [
+      { "type": "change_history", "label": "Change History", "description": "All changes to project estimates" }
+    ]
+  }
+}
