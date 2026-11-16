@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -23,6 +23,20 @@ interface RiskFormProps {
   severityLevels: { code: string; description: string; weight: number }[];
 }
 
+const toFormData = (risk?: Risk | null) => (risk ? {
+    risk_category_code: risk.risk_category_code,
+    risk_cost: risk.risk_cost,
+    probability_code: risk.probability_code || '',
+    severity_code: risk.severity_code || '',
+    mitigation_plan: risk.mitigation_plan || '',
+  } : {
+    risk_category_code: '',
+    risk_cost: 0,
+    probability_code: '',
+    severity_code: '',
+    mitigation_plan: '',
+  });
+
 const RiskForm: React.FC<RiskFormProps> = ({
   open,
   onClose,
@@ -32,34 +46,15 @@ const RiskForm: React.FC<RiskFormProps> = ({
   probabilityLevels,
   severityLevels,
 }) => {
-  const [formData, setFormData] = useState({
-    risk_category_code: '',
-    risk_cost: 0,
-    probability_code: '',
-    severity_code: '',
-    mitigation_plan: '',
-  });
+  const [formData, setFormData] = useState(() => toFormData(risk));
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (risk) {
-      setFormData({
-        risk_category_code: risk.risk_category_code,
-        risk_cost: risk.risk_cost,
-        probability_code: risk.probability_code || '',
-        severity_code: risk.severity_code || '',
-        mitigation_plan: risk.mitigation_plan || '',
-      });
-    } else {
-      setFormData({
-        risk_category_code: '',
-        risk_cost: 0,
-        probability_code: '',
-        severity_code: '',
-        mitigation_plan: '',
-      });
-    }
-  }, [risk, open]);
+  // Reset the form when the dialog opens or the edited item changes
+  // (adjusting state during render rather than in an effect).
+  const [formSource, setFormSource] = useState({ risk, open });
+  if (formSource.risk !== risk || formSource.open !== open) {
+    setFormSource({ risk, open });
+    setFormData(toFormData(risk));
+  }
 
   const handleChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.type === 'number' ? parseFloat(event.target.value) || 0 : event.target.value;

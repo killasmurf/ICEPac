@@ -22,10 +22,15 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "lint": "eslint src e2e --max-warnings 0",
+    "style-budget": "node scripts/style-budget.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
+    "verify": "npm run typecheck && npm run lint && npm run style-budget && npm test && npm run build && npm run e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "1.63.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -33,8 +38,12 @@
     "@testing-library/user-event": "^14.6.12",
     "@types/node": "^22.20.5",
     "@vitejs/plugin-react": "^6.3.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "jsdom": "^31.0.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
   }

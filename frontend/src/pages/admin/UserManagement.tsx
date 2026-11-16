@@ -1,12 +1,12 @@
 /**
  * UserManagement - Admin page for managing users with full CRUD.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import DataGrid, { Column, StatusBadge, RoleBadge } from '../../components/admin/DataGrid';
 import FormDialog from '../../components/admin/FormDialog';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import SearchBar from '../../components/admin/SearchBar';
-import { User, usersApi } from '../../api/admin';
+import { User } from '../../api/admin';
 
 // Mock data for development
 const MOCK_USERS: User[] = [
@@ -20,12 +20,12 @@ const EMPTY_FORM = { username: '', email: '', full_name: '', password: '', role:
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [total, setTotal] = useState(MOCK_USERS.length);
+  const [, setTotal] = useState(MOCK_USERS.length);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showDelete, setShowDelete] = useState(false);

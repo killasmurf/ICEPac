@@ -10,7 +10,6 @@ import {
   Tabs,
   Tab,
   Chip,
-  Drawer,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -75,19 +74,8 @@ const ProjectDetail: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  const loadLookupData = useCallback(async () => {
-    try {
-      const [
-        resourcesRes,
-        suppliersRes,
-        costTypesRes,
-        regionsRes,
-        businessAreasRes,
-        estTechniquesRes,
-        riskCategoriesRes,
-        probabilityRes,
-        severityRes,
-      ] = await Promise.all([
+  const loadLookupData = useCallback(() => {
+    Promise.all([
         resourcesApi.list({ is_active: true, limit: 1000 }),
         suppliersApi.list({ is_active: true, limit: 1000 }),
         configApi.listItems('cost-types', { is_active: true }),
@@ -97,8 +85,17 @@ const ProjectDetail: React.FC = () => {
         configApi.listItems('risk-categories', { is_active: true }),
         configApi.listItems('probability-levels', { is_active: true }),
         configApi.listItems('severity-levels', { is_active: true }),
-      ]);
-
+    ]).then(([
+        resourcesRes,
+        suppliersRes,
+        costTypesRes,
+        regionsRes,
+        businessAreasRes,
+        estTechniquesRes,
+        riskCategoriesRes,
+        probabilityRes,
+        severityRes,
+    ]) => {
       setResources(resourcesRes.items.map((r) => ({ code: r.resource_code, description: r.description })));
       setSuppliers(suppliersRes.items.map((s) => ({ code: s.supplier_code ?? '', name: s.name })));
       setCostTypes(costTypesRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '' })));
@@ -112,14 +109,41 @@ const ProjectDetail: React.FC = () => {
       setSeverityLevels(
         severityRes.items.map((i) => ({ code: i.code ?? '', description: i.description ?? '', weight: i.weight || 0 }))
       );
-    } catch {
+    }).catch(() => {
       // Lookup data is optional – estimation panel will still work with empty dropdowns
       console.warn('Failed to load some lookup data for estimation forms');
-    }
+    });
   }, []);
 
+  // Show the spinner again when navigating to another project (adjusting state during render).
+  const [loadedId, setLoadedId] = useState(id);
+  if (loadedId !== id) {
+    setLoadedId(id);
+    if (id) setLoading(true);
+  }
+
   useEffect(() => {
-    loadProject();
+    if (!id) return;
+    let cancelled = false;
+    getProject(Number(id))
+      .then((data) => {
+        if (cancelled) return;
+        setProject(data);
+        setForm({
+          project_name: data.project_name,
+          project_manager: data.project_manager || '',
+          description: data.description || '',
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load project.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Load lookup data once when entering estimation-related tabs
