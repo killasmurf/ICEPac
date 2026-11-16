@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "email": "jordan.lee@example.com",
+  "username": "jordan",
+  "full_name": "Jordan Lee",
+  "role": "admin",
+  "is_active": true,
+  "is_verified": true,
+  "created_at": "2026-01-05T00:00:00Z",
+  "updated_at": "2026-01-05T00:00:00Z",
+  "last_login": "2026-11-15T09:30:00Z"
+}

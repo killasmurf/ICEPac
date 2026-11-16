@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { login } from '../api/auth';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+
+/** Only same-origin absolute paths are allowed as a post-login target. */
+function safeNext(next: string | null): string {
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login') ? next : '/';
+}
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -13,10 +20,8 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      const tokens = await login(username, password);
-      localStorage.setItem('access_token', tokens.access_token);
-      localStorage.setItem('refresh_token', tokens.refresh_token);
-      navigate('/');
+      await login(username, password);
+      navigate(safeNext(params.get('next')), { replace: true });
     } catch {
       setError('Invalid credentials');
     }
