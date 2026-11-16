@@ -1,7 +1,7 @@
 /**
  * SearchBar - Debounced search input component.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface SearchBarProps {
   value?: string;
@@ -14,11 +14,14 @@ export default function SearchBar({
   value: externalValue, onChange, placeholder = 'Search...', debounceMs = 300,
 }: SearchBarProps) {
   const [value, setValue] = useState(externalValue || '');
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  useEffect(() => {
+  // Follow the controlled value when it changes (adjusting state during render).
+  const [lastExternal, setLastExternal] = useState(externalValue);
+  if (lastExternal !== externalValue) {
+    setLastExternal(externalValue);
     if (externalValue !== undefined) setValue(externalValue);
-  }, [externalValue]);
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;

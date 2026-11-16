@@ -4,7 +4,6 @@ import FolderIcon from '@mui/icons-material/Folder';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PeopleIcon from '@mui/icons-material/People';
 import HelpIcon from '@mui/icons-material/Help';
-import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { getProjects } from '../api/projects';

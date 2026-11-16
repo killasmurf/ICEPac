@@ -112,22 +112,30 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
-  useEffect(() => {
-    loadSummary();
-  }, [projectId]);
-
-  const loadSummary = async () => {
+  // Show the spinner again when the project changes (adjusting state during render).
+  const [loadedFor, setLoadedFor] = useState(projectId);
+  if (loadedFor !== projectId) {
+    setLoadedFor(projectId);
     setLoading(true);
     setError(null);
-    try {
-      const data = await getProjectEstimation(projectId);
-      setSummary(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load estimation summary');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjectEstimation(projectId)
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.response?.data?.detail || 'Failed to load estimation summary');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   if (loading) {
     return (
@@ -149,21 +157,21 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
     <Box>
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Total PERT Estimate"
             value={formatCurrency(summary.total_pert_estimate)}
             subtitle={`${summary.total_assignments} assignments`}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="80% Confidence Range"
             value={`${formatCurrency(summary.confidence_80_low)} - ${formatCurrency(summary.confidence_80_high)}`}
             subtitle={`Std Dev: ${formatCurrency(summary.total_std_deviation)}`}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Risk Exposure"
             value={formatCurrency(summary.total_risk_exposure)}
@@ -171,7 +179,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
             color="warning.main"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Risk-Adjusted Estimate"
             value={formatCurrency(summary.risk_adjusted_estimate)}

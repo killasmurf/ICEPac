@@ -51,7 +51,22 @@ const Projects: React.FC = () => {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    loadProjects();
+    let cancelled = false;
+    getProjects(0, 100)
+      .then((data) => {
+        if (cancelled) return;
+        setProjects(data.items);
+        setTotal(data.total);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load projects.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadProjects = async (search?: string) => {

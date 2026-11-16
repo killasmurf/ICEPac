@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import client from '../api/client';
+import { login } from '../api/auth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -13,8 +13,9 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      const response = await client.post('/auth/login', { username, password });
-      localStorage.setItem('access_token', response.data.access_token);
+      const tokens = await login(username, password);
+      localStorage.setItem('access_token', tokens.access_token);
+      localStorage.setItem('refresh_token', tokens.refresh_token);
       navigate('/');
     } catch {
       setError('Invalid credentials');

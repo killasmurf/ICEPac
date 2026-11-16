@@ -11,14 +11,32 @@ const HelpTopic: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Reset to the loading state when the topic id changes (adjusting state during render).
+  const [loadedId, setLoadedId] = useState(id);
+  if (loadedId !== id) {
+    setLoadedId(id);
+    if (id) {
+      setLoading(true);
+      setError('');
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setError('');
+    let cancelled = false;
     getTopic(Number(id))
-      .then(setTopic)
-      .catch(() => setError('Failed to load help topic.'))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) setTopic(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load help topic.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (loading) {

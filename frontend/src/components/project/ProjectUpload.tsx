@@ -201,7 +201,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
     };
   }, []);
 
-  const validateFile = (file: File): boolean => {
+  const validateFile = useCallback((file: File): boolean => {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       setError(`Invalid file type "${ext}". Supported: ${ALLOWED_EXTENSIONS.join(', ')}`);
@@ -212,21 +212,21 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
       return false;
     }
     return true;
-  };
+  }, []);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = useCallback((file: File) => {
     setError(null);
     if (validateFile(file)) {
       setSelectedFile(file);
     }
-  };
+  }, [validateFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFileSelect(file);
-  }, []);
+  }, [handleFileSelect]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

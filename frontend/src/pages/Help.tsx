@@ -25,18 +25,29 @@ const Help: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadCategories();
-    loadTopics();
+    let cancelled = false;
+    getCategories()
+      .then((data) => {
+        if (!cancelled) setCategories(data);
+      })
+      .catch(() => {
+        // Categories are optional, don't block on error
+      });
+    getTopics()
+      .then((data) => {
+        if (!cancelled) setTopics(data.items);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load help topics.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const loadCategories = async () => {
-    try {
-      const data = await getCategories();
-      setCategories(data);
-    } catch {
-      // Categories are optional, don't block on error
-    }
-  };
 
   const loadTopics = async () => {
     setLoading(true);

@@ -73,6 +73,19 @@ const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'warning
 
 type LookupItem = ConfigItem;
 
+const fetchRegister = async (projectId: number) => {
+  const [list, cost, cats, probs, sevs] = await Promise.all([
+    projectRiskApi.list(projectId),
+    projectRiskApi.totalCost(projectId),
+    configApi.listItems('risk-categories'),
+    configApi.listItems('probability-levels'),
+    configApi.listItems('severity-levels'),
+  ]);
+  return { list, cost, cats, probs, sevs };
+};
+
+type RegisterData = Awaited<ReturnType<typeof fetchRegister>>;
+
 export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
   const [risks, setRisks] = useState<ProjectRisk[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,32 +110,42 @@ export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const applyRegister = useCallback((data: RegisterData) => {
+    setRisks(data.list.items);
+    setTotalCost(data.cost.total_risk_cost);
+    setCategories(data.cats.items);
+    setProbabilities(data.probs.items);
+    setSeverities(data.sevs.items);
+    setError('');
+  }, []);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [list, cost, cats, probs, sevs] = await Promise.all([
-        projectRiskApi.list(projectId),
-        projectRiskApi.totalCost(projectId),
-        configApi.listItems('risk-categories'),
-        configApi.listItems('probability-levels'),
-        configApi.listItems('severity-levels'),
-      ]);
-      setRisks(list.items);
-      setTotalCost(cost.total_risk_cost);
-      setCategories(cats.items);
-      setProbabilities(probs.items);
-      setSeverities(sevs.items);
-      setError('');
+      applyRegister(await fetchRegister(projectId));
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? 'Failed to load project risk register.');
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, applyRegister]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    fetchRegister(projectId)
+      .then((data) => {
+        if (!cancelled) applyRegister(data);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setError(e?.response?.data?.detail ?? 'Failed to load project risk register.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, applyRegister]);
 
   const openCreate = () => {
     setEditing(null);

@@ -250,18 +250,33 @@ const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick }) => {
   const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
+  // Show the spinner again when the project changes (adjusting state during render).
+  const [loadedFor, setLoadedFor] = useState(projectId);
+  if (loadedFor !== projectId) {
+    setLoadedFor(projectId);
     setLoading(true);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     getWBSTree(projectId)
       .then((res) => {
+        if (cancelled) return;
         setTree(res.items);
         setTotal(res.total);
         // Auto-expand first level
         const firstLevelIds = new Set(res.items.map((n) => n.id));
         setExpandedIds(firstLevelIds);
       })
-      .catch((err) => setError(err?.message || 'Failed to load WBS'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!cancelled) setError(err?.message || 'Failed to load WBS');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   const toggleExpand = (id: number) => {

@@ -1,7 +1,7 @@
 /**
  * Reports - Main reports page with selector, filters, preview, and export.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ReportSelector, FilterPanel, ReportPreview, ExportOptions } from '../components/reports';
 import { ReportCatalog, ReportFilter, ReportRequest, ReportResult, ReportType, reportsApi } from '../api/reports';
 
@@ -57,7 +57,7 @@ const MOCK_PROJECTS = [
 ];
 
 export default function Reports() {
-  const [catalog, setCatalog] = useState<ReportCatalog>(MOCK_CATALOG);
+  const [catalog] = useState<ReportCatalog>(MOCK_CATALOG);
   const [selectedType, setSelectedType] = useState<ReportType | null>(null);
   const [filters, setFilters] = useState<ReportFilter>({ project_id: MOCK_PROJECTS[0].id });
   const [result, setResult] = useState<ReportResult | null>(null);

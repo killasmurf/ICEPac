@@ -1,9 +1,9 @@
 /**
  * AdminDashboard - Overview page with stats and recent activity.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi, auditApi, AuditLog } from '../../api/admin';
+import { AuditLog } from '../../api/admin';
 
 // Mock data for development
 const MOCK_STATS = { total_resources: 128, total_suppliers: 24, recent_activity_count: 342 };
@@ -15,8 +15,8 @@ const MOCK_ACTIVITY: AuditLog[] = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState(MOCK_STATS);
-  const [activity, setActivity] = useState<AuditLog[]>(MOCK_ACTIVITY);
+  const [stats] = useState(MOCK_STATS);
+  const [activity] = useState<AuditLog[]>(MOCK_ACTIVITY);
 
   const statCards = [
     { label: 'Resources', value: stats.total_resources, icon: '📦', color: '#3b82f6', path: '/admin/resources' },
@@ -52,8 +52,9 @@ export default function AdminDashboard() {
     create: { bg: '#dcfce7', fg: '#166534' }, update: { bg: '#dbeafe', fg: '#1e40af' }, delete: { bg: '#fee2e2', fg: '#991b1b' },
   };
 
+  const [now] = useState(() => Date.now());
   const timeAgo = (dt: string) => {
-    const mins = Math.floor((Date.now() - new Date(dt).getTime()) / 60000);
+    const mins = Math.floor((now - new Date(dt).getTime()) / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
     if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;

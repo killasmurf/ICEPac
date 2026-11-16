@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Drawer,
   Box,
@@ -68,6 +68,18 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
   </div>
 );
 
+const fetchDetails = async (projectId: number, wbsId: number) => {
+  const [assignments, risks, approval, estimation] = await Promise.all([
+    getAssignments(projectId, wbsId),
+    getRisks(projectId, wbsId),
+    getApprovalStatus(projectId, wbsId),
+    getWBSEstimation(projectId, wbsId),
+  ]);
+  return { assignments, risks, approval, estimation };
+};
+
+type WBSDetails = Awaited<ReturnType<typeof fetchDetails>>;
+
 const formatCurrency = (value: number) =>
   value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
@@ -103,27 +115,49 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   const [riskFormOpen, setRiskFormOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
 
-  useEffect(() => {
-    if (open && wbs) {
-      loadData();
+  const wbsId = wbs?.id;
+
+  const applyDetails = useCallback((details: WBSDetails) => {
+    setAssignments(details.assignments.items);
+    setRisks(details.risks.items);
+    setApprovalStatus(details.approval);
+    setEstimation(details.estimation);
+  }, []);
+
+  // Show the spinner when the panel opens or the WBS item changes (adjusting state during render).
+  const [loadedFor, setLoadedFor] = useState({ open, wbsId });
+  if (loadedFor.open !== open || loadedFor.wbsId !== wbsId) {
+    setLoadedFor({ open, wbsId });
+    if (open && wbsId !== undefined) {
+      setLoading(true);
+      setError(null);
     }
-  }, [open, wbs?.id]);
+  }
+
+  useEffect(() => {
+    if (!open || wbsId === undefined) return;
+    let cancelled = false;
+    fetchDetails(projectId, wbsId)
+      .then((details) => {
+        if (!cancelled) applyDetails(details);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.response?.data?.detail || 'Failed to load WBS details');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, wbsId, projectId, applyDetails]);
 
   const loadData = async () => {
     if (!wbs) return;
     setLoading(true);
     setError(null);
     try {
-      const [assignmentsRes, risksRes, approvalRes, estimationRes] = await Promise.all([
-        getAssignments(projectId, wbs.id),
-        getRisks(projectId, wbs.id),
-        getApprovalStatus(projectId, wbs.id),
-        getWBSEstimation(projectId, wbs.id),
-      ]);
-      setAssignments(assignmentsRes.items);
-      setRisks(risksRes.items);
-      setApprovalStatus(approvalRes);
-      setEstimation(estimationRes);
+      applyDetails(await fetchDetails(projectId, wbs.id));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load WBS details');
     } finally {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -33,19 +33,20 @@ interface AssignmentFormProps {
   estimatingTechniques: { code: string; description: string }[];
 }
 
-const AssignmentForm: React.FC<AssignmentFormProps> = ({
-  open,
-  onClose,
-  onSubmit,
-  assignment,
-  resources,
-  suppliers,
-  costTypes,
-  regions,
-  businessAreas,
-  estimatingTechniques,
-}) => {
-  const [formData, setFormData] = useState({
+const toFormData = (assignment?: Assignment | null) => (assignment ? {
+    resource_code: assignment.resource_code,
+    supplier_code: assignment.supplier_code || '',
+    cost_type_code: assignment.cost_type_code || '',
+    region_code: assignment.region_code || '',
+    bus_area_code: assignment.bus_area_code || '',
+    estimating_technique_code: assignment.estimating_technique_code || '',
+    best_estimate: assignment.best_estimate,
+    likely_estimate: assignment.likely_estimate,
+    worst_estimate: assignment.worst_estimate,
+    duty_pct: assignment.duty_pct,
+    import_content_pct: assignment.import_content_pct,
+    aii_pct: assignment.aii_pct,
+  } : {
     resource_code: '',
     supplier_code: '',
     cost_type_code: '',
@@ -59,41 +60,28 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
     import_content_pct: 0,
     aii_pct: 0,
   });
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (assignment) {
-      setFormData({
-        resource_code: assignment.resource_code,
-        supplier_code: assignment.supplier_code || '',
-        cost_type_code: assignment.cost_type_code || '',
-        region_code: assignment.region_code || '',
-        bus_area_code: assignment.bus_area_code || '',
-        estimating_technique_code: assignment.estimating_technique_code || '',
-        best_estimate: assignment.best_estimate,
-        likely_estimate: assignment.likely_estimate,
-        worst_estimate: assignment.worst_estimate,
-        duty_pct: assignment.duty_pct,
-        import_content_pct: assignment.import_content_pct,
-        aii_pct: assignment.aii_pct,
-      });
-    } else {
-      setFormData({
-        resource_code: '',
-        supplier_code: '',
-        cost_type_code: '',
-        region_code: '',
-        bus_area_code: '',
-        estimating_technique_code: '',
-        best_estimate: 0,
-        likely_estimate: 0,
-        worst_estimate: 0,
-        duty_pct: 0,
-        import_content_pct: 0,
-        aii_pct: 0,
-      });
-    }
-  }, [assignment, open]);
+const AssignmentForm: React.FC<AssignmentFormProps> = ({
+  open,
+  onClose,
+  onSubmit,
+  assignment,
+  resources,
+  suppliers,
+  costTypes,
+  regions,
+  businessAreas,
+  estimatingTechniques,
+}) => {
+  const [formData, setFormData] = useState(() => toFormData(assignment));
+  const [loading, setLoading] = useState(false);
+  // Reset the form when the dialog opens or the edited item changes
+  // (adjusting state during render rather than in an effect).
+  const [formSource, setFormSource] = useState({ assignment, open });
+  if (formSource.assignment !== assignment || formSource.open !== open) {
+    setFormSource({ assignment, open });
+    setFormData(toFormData(assignment));
+  }
 
   const handleChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.type === 'number' ? parseFloat(event.target.value) || 0 : event.target.value;
@@ -122,7 +110,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
           {/* Resource Selection */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -140,7 +128,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Supplier Selection */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -158,7 +146,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Cost Type */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -176,7 +164,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Region */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -194,7 +182,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Business Area */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -212,7 +200,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Estimating Technique */}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               fullWidth
@@ -229,7 +217,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             </TextField>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle1" gutterBottom>
               Three-Point Estimation
@@ -237,7 +225,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Three-Point Estimates */}
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
@@ -248,7 +236,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
@@ -259,7 +247,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
@@ -271,7 +259,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Live Preview */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 PERT Estimate: <strong>${pert.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
@@ -281,7 +269,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             </Box>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle1" gutterBottom>
               Additional Factors
@@ -289,7 +277,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
           </Grid>
 
           {/* Percentages */}
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
@@ -300,7 +288,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
@@ -311,7 +299,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               fullWidth
               type="number"
