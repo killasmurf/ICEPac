@@ -6,7 +6,9 @@ import LinearProgress from '@mui/material/LinearProgress';
 import InboxOutlined from '@mui/icons-material/InboxOutlined';
 import {
   DataGrid,
+  gridDataRowIdsSelector,
   useGridApiContext,
+  useGridSelector,
   type GridColDef,
   type GridPaginationModel,
   type GridRowId,
@@ -64,7 +66,7 @@ function NoRowsOverlay({ emptyTitle, emptyDescription, emptyAction }: {
 /** Skeleton on first load (no rows yet), thin progress bar when refreshing existing rows. */
 function LoadingOverlay() {
   const apiRef = useGridApiContext();
-  const hasRows = apiRef.current.getRowsCount() > 0;
+  const hasRows = useGridSelector(apiRef, gridDataRowIdsSelector).length > 0;
   return hasRows ? <LinearProgress /> : (
     <Box sx={{ p: 2 }}>
       <TableSkeleton rows={5} columns={4} />
