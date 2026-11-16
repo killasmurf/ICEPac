@@ -6,14 +6,15 @@ import { calculate80ConfidenceInterval, calculatePERT, calculateStdDeviation } f
 // expected numbers without changing the backend model as well.
 describe('calculatePERT', () => {
   it('weights the likely value four times: (best + 4*likely + worst) / 6', () => {
-    expect(calculatePERT(100, 200, 400)).toBe(250);
+    expect(calculatePERT(100, 200, 400)).toBeCloseTo(1300 / 6, 12);
+    expect(calculatePERT(100, 100, 100)).toBe(100);
     expect(calculatePERT(0, 0, 0)).toBe(0);
     expect(calculatePERT(10, 10, 10)).toBe(10);
     expect(calculatePERT(60, 120, 240)).toBe(130);
   });
 
   it('does not validate or reorder its inputs', () => {
-    expect(calculatePERT(400, 200, 100)).toBe(250);
+    expect(calculatePERT(400, 200, 100)).toBeCloseTo(1300 / 6, 12);
     expect(calculatePERT(-60, 0, 60)).toBe(0);
   });
 
@@ -57,8 +58,9 @@ describe('calculate80ConfidenceInterval', () => {
     const pert = calculatePERT(100, 200, 400);
     const sd = calculateStdDeviation(100, 400);
     const { low, high } = calculate80ConfidenceInterval(pert, sd);
-    expect([pert, sd]).toEqual([250, 50]);
-    expect(low).toBeCloseTo(186, 10);
-    expect(high).toBeCloseTo(314, 10);
+    expect(pert).toBeCloseTo(1300 / 6, 12);
+    expect(sd).toBe(50);
+    expect(low).toBeCloseTo(1300 / 6 - 64, 10);
+    expect(high).toBeCloseTo(1300 / 6 + 64, 10);
   });
 });
