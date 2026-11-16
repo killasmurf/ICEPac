@@ -117,10 +117,10 @@ test.describe('users actions', () => {
   test('create posts the new user and shows a toast', async ({ page }) => {
     await page.goto('/admin/users');
     await page.getByRole('button', { name: 'Add user' }).first().click();
-    await page.getByLabel('Username').fill('newuser');
-    await page.getByLabel('Email').fill('new@example.com');
-    await page.getByLabel('Password').fill('longenough1');
-    await page.getByLabel('Role').click();
+    await page.getByRole('dialog').getByLabel('Username').fill('newuser');
+    await page.getByRole('dialog').getByLabel('Email').fill('new@example.com');
+    await page.getByRole('dialog').getByLabel('Password').fill('longenough1');
+    await page.getByRole('dialog').getByLabel('Role').click();
     await page.getByRole('option', { name: 'Viewer' }).click();
     const req = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/admin/users'));
     await page.getByRole('button', { name: 'Create user' }).click();
@@ -139,8 +139,8 @@ test.describe('users actions', () => {
   test('edit puts changes without a password', async ({ page }) => {
     await page.goto('/admin/users');
     await page.getByRole('button', { name: 'Edit user2' }).click();
-    await expect(page.getByLabel('Password')).toHaveCount(0);
-    await page.getByLabel('Full name').fill('Renamed User');
+    await expect(page.getByRole('dialog').getByLabel('Password')).toHaveCount(0);
+    await page.getByRole('dialog').getByLabel('Full name').fill('Renamed User');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/users/2'));
     await page.getByRole('button', { name: 'Save changes' }).click();
     const body = (await req).postDataJSON();
@@ -152,9 +152,9 @@ test.describe('users actions', () => {
   test('reset password sends the new password', async ({ page }) => {
     await page.goto('/admin/users');
     await page.getByRole('button', { name: 'Reset password for user2' }).click();
-    await page.getByLabel('Current password').fill('oldpassword');
-    await page.getByLabel('New password', { exact: true }).fill('brandnewpass1');
-    await page.getByLabel('Confirm new password').fill('brandnewpass1');
+    await page.getByRole('dialog').getByLabel('Current password').fill('oldpassword');
+    await page.getByRole('dialog').getByLabel('New password', { exact: true }).fill('brandnewpass1');
+    await page.getByRole('dialog').getByLabel('Confirm new password').fill('brandnewpass1');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/users/2/password'));
     await page.getByRole('button', { name: 'Update password' }).click();
     expect((await req).postDataJSON()).toEqual({ current_password: 'oldpassword', new_password: 'brandnewpass1' });
@@ -175,7 +175,7 @@ test.describe('users actions', () => {
     await expect(page.getByText('Test User 2')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete jordan' })).toBeDisabled();
     await page.getByRole('button', { name: 'Edit jordan' }).click();
-    await expect(page.getByRole('combobox', { name: 'Status' })).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('dialog').getByRole('combobox', { name: 'Status' })).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByText('You cannot deactivate your own account')).toBeVisible();
   });
 
@@ -193,11 +193,11 @@ test.describe('resources actions', () => {
   test('create posts the new resource and shows a toast', async ({ page }) => {
     await page.goto('/admin/resources');
     await page.getByRole('button', { name: 'Add resource' }).first().click();
-    await page.getByLabel('Resource code').fill('new-001');
-    await page.getByLabel('Description').fill('New resource');
-    await page.getByLabel('EOC (element of cost)').fill('Labour');
-    await page.getByLabel('Cost').fill('250');
-    await page.getByLabel('Units').fill('hours');
+    await page.getByRole('dialog').getByLabel('Resource code').fill('new-001');
+    await page.getByRole('dialog').getByLabel('Description').fill('New resource');
+    await page.getByRole('dialog').getByLabel('EOC (element of cost)').fill('Labour');
+    await page.getByRole('dialog').getByLabel('Cost').fill('250');
+    await page.getByRole('dialog').getByLabel('Units').fill('hours');
     const req = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/admin/resources'));
     await page.getByRole('button', { name: 'Create resource' }).click();
     expect((await req).postDataJSON()).toEqual({ resource_code: 'new-001', description: 'New resource', eoc: 'Labour', cost: 250, units: 'hours', is_active: true });
@@ -207,7 +207,7 @@ test.describe('resources actions', () => {
   test('edit puts the changed cost', async ({ page }) => {
     await page.goto('/admin/resources');
     await page.getByRole('button', { name: 'Edit RES-001' }).click();
-    await page.getByLabel('Cost').fill('300');
+    await page.getByRole('dialog').getByLabel('Cost').fill('300');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/resources/1'));
     await page.getByRole('button', { name: 'Save changes' }).click();
     expect((await req).postDataJSON()).toMatchObject({ resource_code: 'RES-001', cost: 300 });
@@ -247,8 +247,8 @@ test.describe('suppliers actions', () => {
   test('create posts the new supplier and shows a toast', async ({ page }) => {
     await page.goto('/admin/suppliers');
     await page.getByRole('button', { name: 'Add supplier' }).first().click();
-    await page.getByLabel('Supplier code').fill('new-001');
-    await page.getByLabel('Name').fill('New Supplier');
+    await page.getByRole('dialog').getByLabel('Supplier code').fill('new-001');
+    await page.getByRole('dialog').getByLabel('Name').fill('New Supplier');
     const req = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/admin/suppliers'));
     await page.getByRole('button', { name: 'Create supplier' }).click();
     expect((await req).postDataJSON()).toMatchObject({ supplier_code: 'new-001', name: 'New Supplier', is_active: true });
@@ -258,7 +258,7 @@ test.describe('suppliers actions', () => {
   test('edit puts the changed contact', async ({ page }) => {
     await page.goto('/admin/suppliers');
     await page.getByRole('button', { name: 'Edit Supplier 1 Pty Ltd' }).click();
-    await page.getByLabel('Contact').fill('Pat Example');
+    await page.getByRole('dialog').getByLabel('Contact').fill('Pat Example');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/suppliers/1'));
     await page.getByRole('button', { name: 'Save changes' }).click();
     expect((await req).postDataJSON()).toMatchObject({ supplier_code: 'SUP-001', contact: 'Pat Example' });

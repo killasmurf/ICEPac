@@ -274,10 +274,10 @@ export default function ResourceLibrary() {
         onSubmit={submit}
         loading={saveMutation.isPending}
       >
-        <TextField label="Resource code" required value={form.resource_code} onChange={(e) => setForm({ ...form, resource_code: e.target.value })} error={Boolean(errors.resource_code)} helperText={errors.resource_code ?? 'Saved in upper case'} autoComplete="off" />
-        <TextField label="Description" required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} error={Boolean(errors.description)} helperText={errors.description} />
+        <TextField label="Resource code" slotProps={{ inputLabel: { required: true } }} value={form.resource_code} onChange={(e) => setForm({ ...form, resource_code: e.target.value })} error={Boolean(errors.resource_code)} helperText={errors.resource_code ?? 'Saved in upper case'} autoComplete="off" />
+        <TextField label="Description" slotProps={{ inputLabel: { required: true } }} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} error={Boolean(errors.description)} helperText={errors.description} />
         <TextField label="EOC (element of cost)" value={form.eoc} onChange={(e) => setForm({ ...form, eoc: e.target.value })} />
-        <TextField label="Cost" required type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} error={Boolean(errors.cost)} helperText={errors.cost} slotProps={{ htmlInput: { min: 0, step: '0.01' } }} />
+        <TextField label="Cost" type="number" slotProps={{ inputLabel: { required: true }, htmlInput: { min: 0, step: '0.01' } }} value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} error={Boolean(errors.cost)} helperText={errors.cost} />
         <TextField label="Units" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} />
         <TextField select label="Status" value={form.is_active ? 'active' : 'inactive'} onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}>
           <MenuItem value="active">Active</MenuItem>

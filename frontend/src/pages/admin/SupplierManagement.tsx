@@ -237,8 +237,8 @@ export default function SupplierManagement() {
         onSubmit={submit}
         loading={saveMutation.isPending}
       >
-        <TextField label="Supplier code" required value={form.supplier_code} onChange={(e) => setForm({ ...form, supplier_code: e.target.value })} error={Boolean(errors.supplier_code)} helperText={errors.supplier_code ?? 'Saved in upper case'} autoComplete="off" />
-        <TextField label="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} error={Boolean(errors.name)} helperText={errors.name} />
+        <TextField label="Supplier code" slotProps={{ inputLabel: { required: true } }} value={form.supplier_code} onChange={(e) => setForm({ ...form, supplier_code: e.target.value })} error={Boolean(errors.supplier_code)} helperText={errors.supplier_code ?? 'Saved in upper case'} autoComplete="off" />
+        <TextField label="Name" slotProps={{ inputLabel: { required: true } }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} error={Boolean(errors.name)} helperText={errors.name} />
         <TextField label="Contact" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
         <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={Boolean(errors.email)} helperText={errors.email} autoComplete="off" />
         <TextField label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

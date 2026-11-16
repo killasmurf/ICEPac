@@ -340,11 +340,11 @@ export default function UserManagement() {
         onSubmit={submit}
         loading={saveMutation.isPending}
       >
-        <TextField label="Username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} error={Boolean(errors.username)} helperText={errors.username ?? 'At least 3 characters'} autoComplete="off" />
-        <TextField label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={Boolean(errors.email)} helperText={errors.email} autoComplete="off" />
+        <TextField label="Username" slotProps={{ inputLabel: { required: true } }} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} error={Boolean(errors.username)} helperText={errors.username ?? 'At least 3 characters'} autoComplete="off" />
+        <TextField label="Email" type="email" slotProps={{ inputLabel: { required: true } }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={Boolean(errors.email)} helperText={errors.email} autoComplete="off" />
         <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
         {!editing && (
-          <TextField label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={Boolean(errors.password)} helperText={errors.password ?? 'At least 8 characters'} autoComplete="new-password" />
+          <TextField label="Password" type="password" slotProps={{ inputLabel: { required: true } }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={Boolean(errors.password)} helperText={errors.password ?? 'At least 8 characters'} autoComplete="new-password" />
         )}
         <TextField select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
           {ROLES.map((r) => (
@@ -376,9 +376,9 @@ export default function UserManagement() {
         onSubmit={submitPassword}
         loading={passwordMutation.isPending}
       >
-        <TextField label="Current password" type="password" required value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'The API verifies the existing password before changing it'} autoComplete="off" />
-        <TextField label="New password" type="password" required value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} error={Boolean(passwordErrors.next)} helperText={passwordErrors.next ?? 'At least 8 characters'} autoComplete="new-password" />
-        <TextField label="Confirm new password" type="password" required value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} error={Boolean(passwordErrors.confirm)} helperText={passwordErrors.confirm} autoComplete="new-password" />
+        <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'The API verifies the existing password before changing it'} autoComplete="off" />
+        <TextField label="New password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} error={Boolean(passwordErrors.next)} helperText={passwordErrors.next ?? 'At least 8 characters'} autoComplete="new-password" />
+        <TextField label="Confirm new password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} error={Boolean(passwordErrors.confirm)} helperText={passwordErrors.confirm} autoComplete="new-password" />
       </FormDialog>
 
       <ConfirmDialog
