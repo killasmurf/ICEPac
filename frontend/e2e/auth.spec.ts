@@ -25,7 +25,7 @@ test('no token: /projects redirects to /login?next, and login returns to /projec
 test('Sign out returns to /login and clears the token', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect(await page.evaluate(() => localStorage.getItem('access_token'))).toBeNull();

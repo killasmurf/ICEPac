@@ -33,8 +33,20 @@ const UserMenu: React.FC = () => {
         size="small"
         sx={{ ml: 0.5 }}
       >
-        <Avatar sx={{ width: 34, height: 34, fontSize: '0.8125rem', fontWeight: 700, bgcolor: brand.navy, color: brand.white }}>
-          {initials ? <span aria-hidden="true">{initials}</span> : <PersonOutlineIcon fontSize="small" />}
+        {/* Initials are drawn with CSS so the button's accessible name is just "Account menu". */}
+        <Avatar
+          data-initials={initials}
+          sx={{
+            width: 34,
+            height: 34,
+            fontSize: '0.8125rem',
+            fontWeight: 700,
+            bgcolor: brand.navy,
+            color: brand.white,
+            '&::after': { content: 'attr(data-initials)' },
+          }}
+        >
+          {!initials && <PersonOutlineIcon fontSize="small" />}
         </Avatar>
       </IconButton>
       <Menu

@@ -39,12 +39,16 @@ test('opens from the header button and closes on Escape', async ({ page }) => {
 
 test('actions: toggle colour mode and sign out', async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible(); // shell is mounted
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox').fill('Toggle');
   await page.keyboard.press('Enter');
   await expect(page.locator('html')).toHaveClass(/dark/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('Control+k');
+  await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
   await page.getByRole('combobox').fill('Sign out');
+  await expect(page.getByRole('option', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/login$/);
 });

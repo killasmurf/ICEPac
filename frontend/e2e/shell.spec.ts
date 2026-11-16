@@ -97,7 +97,7 @@ test('admin sees Administration and exactly one nav landmark on /admin/users', a
     await page.getByRole('button', { name: 'Open navigation menu' }).click();
   }
   await expect(page.locator('nav')).toHaveCount(1);
-  await expect(page.getByText('Administration', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('navigation').getByText('Administration', { exact: true })).toBeVisible();
 });
 
 test('header has breadcrumbs, search, colour toggle and avatar', async ({ page }) => {
