@@ -5,8 +5,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_current_user,
+)
 from app.models.schemas.auth import TokenRefreshRequest, TokenResponse
+from app.models.schemas.user import UserResponse
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/auth")
@@ -60,3 +66,9 @@ async def refresh_token(
     )
     new_refresh_token = create_refresh_token(data={"sub": str(user.id)})
     return TokenResponse(access_token=access_token, refresh_token=new_refresh_token)
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_current_user(current_user=Depends(get_current_user)):
+    """Return the currently authenticated user (never the password hash)."""
+    return current_user
