@@ -26,7 +26,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         border: 1,
         borderStyle: 'dashed',
         borderColor: 'divider',
-        borderRadius: 2,
+        borderRadius: 1,
       }}
     >
       {icon && (
