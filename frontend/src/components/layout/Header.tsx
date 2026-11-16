@@ -2,6 +2,7 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, IconButton } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircle from '@mui/icons-material/AccountCircle';
+import ColorModeToggle from './ColorModeToggle';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -22,6 +23,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
           ICEPac
         </Typography>
+        <ColorModeToggle />
         <IconButton color="inherit">
           <AccountCircle />
         </IconButton>
