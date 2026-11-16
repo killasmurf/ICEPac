@@ -42,17 +42,19 @@ export interface ReportColumn {
   label: string;
 }
 
+export type ReportRow = Record<string, unknown>;
+
 export interface ReportResult {
   report_type: string;
   title: string;
   generated_at: string;
   project_name: string;
-  filters_applied: Record<string, any>;
+  filters_applied: Record<string, unknown>;
   columns: ReportColumn[];
-  rows: Record<string, any>[];
-  totals?: Record<string, any>;
+  rows: ReportRow[];
+  totals?: ReportRow | null;
   row_count: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ReportCatalogEntry {
@@ -80,6 +82,44 @@ export interface ReportJob {
   completed_at?: string;
 }
 
+export interface ExportedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/** Extract the filename from a Content-Disposition header, or return the fallback. */
+export function filenameFromDisposition(header: string | undefined | null, fallback: string): string {
+  if (!header) return fallback;
+  const encoded = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(header);
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      /* fall through to the plain filename */
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : fallback;
+}
+
+/** Filename used when the browser cannot read Content-Disposition (cross-origin without expose headers). */
+export function fallbackFilename(reportType: string, format: ExportFormat, now: Date = new Date()): string {
+  const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  return `${reportType.replace(/_/g, '-')}-${stamp}.${format}`;
+}
+
+/** Trigger a browser download for a blob. */
+export function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ── API Functions ────────────────────────────────────────────
 
 export const reportsApi = {
@@ -92,20 +132,15 @@ export const reportsApi = {
   generate: (request: ReportRequest) =>
     client.post<ReportResult>('/reports/generate', request).then(r => r.data),
 
-  export: async (request: ReportRequest): Promise<void> => {
-    const resp = await client.post('/reports/export', request, { responseType: 'blob' });
-    const blob = new Blob([resp.data]);
-    const contentDisp = resp.headers['content-disposition'] || '';
-    const match = contentDisp.match(/filename="?([^"]+)"?/);
-    const filename = match ? match[1] : `report.${request.export_format || 'pdf'}`;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  /** Generate and download the report file; returns the blob and the filename the server (or fallback) chose. */
+  export: async (request: ReportRequest): Promise<ExportedFile> => {
+    const resp = await client.post<Blob>('/reports/export', request, { responseType: 'blob' });
+    const format = request.export_format ?? 'pdf';
+    const filename = filenameFromDisposition(
+      resp.headers['content-disposition'] as string | undefined,
+      fallbackFilename(request.report_type, format),
+    );
+    return { blob: new Blob([resp.data]), filename };
   },
 
   // Convenience endpoints

@@ -16,8 +16,8 @@ test('no token: /projects redirects to /login?next, and login returns to /projec
   await page.goto('/projects');
   await expect(page).toHaveURL(/\/login\?next=%2Fprojects$/);
   await page.getByLabel('Username').fill('jordan');
-  await page.getByLabel('Password').fill('secret');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.getByLabel('Password', { exact: true }).fill('secret');
+  await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByText('Harbour Bridge Refurbishment')).toBeVisible();
 });

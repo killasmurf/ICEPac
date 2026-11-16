@@ -41,9 +41,9 @@ describe('Login page', () => {
 
     await userEvent.type(screen.getByLabelText('Username'), 'alice');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong');
-    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByText('Invalid credentials')).toBeInTheDocument();
+    expect(await screen.findByText(/Invalid credentials/)).toBeInTheDocument();
     expect(localStorage.getItem('access_token')).toBeNull();
   });
 
@@ -54,7 +54,7 @@ describe('Login page', () => {
 
     await userEvent.type(screen.getByLabelText('Username'), 'alice');
     await userEvent.type(screen.getByLabelText('Password'), 'right');
-    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText('Home page')).toBeInTheDocument();
     expect(localStorage.getItem('access_token')).toBe(access);
@@ -67,7 +67,7 @@ describe('Login page', () => {
     renderLogin('/login?next=%2Fprojects');
     await userEvent.type(screen.getByLabelText('Username'), 'a');
     await userEvent.type(screen.getByLabelText('Password'), 'b');
-    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Projects page')).toBeInTheDocument();
   });
 });

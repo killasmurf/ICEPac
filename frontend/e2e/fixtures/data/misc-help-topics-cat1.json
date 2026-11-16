@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "category_id": 1,
+      "title": "Getting started with ICEPac",
+      "content": "Create a project, import a schedule and begin estimating.",
+      "display_order": 1,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z",
+      "descriptions": []
+    }
+  ],
+  "total": 1,
+  "skip": 0,
+  "limit": 100
+}
