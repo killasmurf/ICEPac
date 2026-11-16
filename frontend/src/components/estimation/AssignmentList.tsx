@@ -66,7 +66,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.100' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell>Resource</TableCell>
                 <TableCell>Supplier</TableCell>
                 <TableCell align="right">Best</TableCell>

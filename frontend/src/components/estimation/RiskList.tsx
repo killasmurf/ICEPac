@@ -76,7 +76,7 @@ const RiskList: React.FC<RiskListProps> = ({
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.100' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell>Category</TableCell>
                 <TableCell align="right">Cost</TableCell>
                 <TableCell align="center">Probability</TableCell>

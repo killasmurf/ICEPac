@@ -311,11 +311,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
                     Cost Summary
                   </Typography>
                   <Box sx={{ display: 'grid', gap: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                       <Typography>PERT Estimate</Typography>
                       <Typography fontWeight="bold">{formatCurrency(estimation.total_pert_estimate)}</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                       <Typography>Standard Deviation</Typography>
                       <Typography fontWeight="bold">{formatCurrency(estimation.total_std_deviation)}</Typography>
                     </Box>

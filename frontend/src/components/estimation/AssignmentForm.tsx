@@ -260,7 +260,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
 
           {/* Live Preview */}
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
+            <Box sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 PERT Estimate: <strong>${pert.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
                 {' | '}
