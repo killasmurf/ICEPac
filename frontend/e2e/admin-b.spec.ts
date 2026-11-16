@@ -269,8 +269,8 @@ test.describe('admin overview', () => {
     await expect(page.getByText('Update')).toBeVisible();
     await expect(page.getByText('Resource #45')).toBeVisible();
     await expect(page.getByText('by System')).toBeVisible();
-    await expect(page.getByRole('link', { name: /^Audit Logs/ })).toHaveAttribute('href', '/admin/audit-logs');
-    await expect(page.getByRole('link', { name: /^Config Tables/ })).toHaveAttribute('href', '/admin/config');
+    await expect(page.getByRole('main').getByRole('link', { name: /^Audit Logs/ })).toHaveAttribute('href', '/admin/audit-logs');
+    await expect(page.getByRole('main').getByRole('link', { name: /^Config Tables/ })).toHaveAttribute('href', '/admin/config');
     expect(await noHorizontalScroll(page)).toBe(true);
     await saveScreenshot(page, testInfo, 'phase-4', 'admin-overview-light');
   });

@@ -150,7 +150,7 @@ export default function ConfigTables() {
         filterable: false,
         disableColumnMenu: true,
         renderCell: (p) => (
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
             <Tooltip title="Edit">
               <IconButton size="small" aria-label={`Edit ${p.row.code}`} onClick={() => openEdit(p.row)}>
                 <EditOutlinedIcon fontSize="small" />
