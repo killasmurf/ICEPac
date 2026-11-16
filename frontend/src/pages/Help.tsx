@@ -1,172 +1,154 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  TextField,
-  List,
-  ListItemButton,
-  ListItemText,
-  Paper,
-  InputAdornment,
-  CircularProgress,
-  Chip,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import { useNavigate } from 'react-router-dom';
-import { getTopics, searchTopics, getCategories, getTopicsByCategory, HelpTopic, HelpCategory } from '../api/help';
+import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardActionArea from '@mui/material/CardActionArea';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Typography from '@mui/material/Typography';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router-dom';
+import { getCategories, getTopics, getTopicsByCategory, searchTopics, type HelpTopic } from '../api/help';
+import CardSkeleton from '../components/common/CardSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
+import PageHeader from '../components/common/PageHeader';
+import SearchField from '../components/common/SearchField';
+
+const EXCERPT_LENGTH = 140;
+
+function excerpt(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > EXCERPT_LENGTH ? `${flat.slice(0, EXCERPT_LENGTH).trimEnd()}...` : flat;
+}
 
 const Help: React.FC = () => {
-  const navigate = useNavigate();
-  const [topics, setTopics] = useState<HelpTopic[]>([]);
-  const [categories, setCategories] = useState<HelpCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  // Bumped when a category is chosen so the search box clears with it.
+  const [searchKey, setSearchKey] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    getCategories()
-      .then((data) => {
-        if (!cancelled) setCategories(data);
-      })
-      .catch(() => {
-        // Categories are optional, don't block on error
-      });
-    getTopics()
-      .then((data) => {
-        if (!cancelled) setTopics(data.items);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load help topics.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const query = search.trim();
 
+  const categories = useQuery({
+    queryKey: ['help', 'categories'],
+    queryFn: getCategories,
+    meta: { silent: true }, // categories are optional; the topic list still works without them
+  });
 
-  const loadTopics = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getTopics();
-      setTopics(data.items);
-    } catch {
-      setError('Failed to load help topics.');
-    } finally {
-      setLoading(false);
-    }
+  const topics = useQuery({
+    queryKey: ['help', 'topics', { search: query, category: query ? null : categoryId }],
+    queryFn: async (): Promise<HelpTopic[]> => {
+      if (query) return (await searchTopics(query)).items;
+      if (categoryId !== null) return (await getTopicsByCategory(categoryId)).items;
+      return (await getTopics()).items;
+    },
+  });
+
+  const selectCategory = (id: number | null) => {
+    setCategoryId(id);
+    setSearch('');
+    setSearchKey((k) => k + 1);
   };
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    setSelectedCategory(null);
-    if (!query.trim()) {
-      loadTopics();
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const data = await searchTopics(query);
-      setTopics(data.items);
-    } catch {
-      setError('Search failed.');
-    } finally {
-      setLoading(false);
-    }
+  const onSearch = (value: string) => {
+    setSearch(value);
+    if (value.trim()) setCategoryId(null);
   };
 
-  const handleCategorySelect = async (categoryId: number | null) => {
-    setSelectedCategory(categoryId);
-    setSearchQuery('');
-    setLoading(true);
-    setError('');
-    try {
-      if (categoryId === null) {
-        const data = await getTopics();
-        setTopics(data.items);
-      } else {
-        const data = await getTopicsByCategory(categoryId);
-        setTopics(data.items);
-      }
-    } catch {
-      setError('Failed to load topics.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const items = topics.data ?? [];
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Help
-      </Typography>
+      <PageHeader title="Help" subtitle="Guides and answers for estimating in ICEPac." />
 
-      <TextField
-        fullWidth
-        placeholder="Search help topics..."
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        sx={{ mb: 2 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon />
-            </InputAdornment>
-          ),
-        }}
-      />
+      <Box sx={{ maxWidth: 560, mb: 2 }}>
+        <SearchField
+          key={searchKey}
+          fullWidth
+          label="Search help topics"
+          placeholder="Search help topics"
+          onChange={onSearch}
+        />
+      </Box>
 
-      {categories.length > 0 && (
-        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      {categories.data && categories.data.length > 0 && (
+        <Box role="group" aria-label="Categories" sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Chip
             label="All"
-            onClick={() => handleCategorySelect(null)}
-            color={selectedCategory === null ? 'primary' : 'default'}
-            variant={selectedCategory === null ? 'filled' : 'outlined'}
+            clickable
+            aria-pressed={categoryId === null && !query}
+            onClick={() => selectCategory(null)}
+            color={categoryId === null && !query ? 'primary' : 'default'}
+            variant={categoryId === null && !query ? 'filled' : 'outlined'}
           />
-          {categories.map((cat) => (
+          {categories.data.map((cat) => (
             <Chip
               key={cat.id}
               label={cat.name}
-              onClick={() => handleCategorySelect(cat.id)}
-              color={selectedCategory === cat.id ? 'primary' : 'default'}
-              variant={selectedCategory === cat.id ? 'filled' : 'outlined'}
+              clickable
+              aria-pressed={categoryId === cat.id}
+              onClick={() => selectCategory(cat.id)}
+              color={categoryId === cat.id ? 'primary' : 'default'}
+              variant={categoryId === cat.id ? 'filled' : 'outlined'}
             />
           ))}
         </Box>
       )}
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
+      {topics.isLoading ? (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+          <CardSkeleton lines={1} />
+          <CardSkeleton lines={1} />
+          <CardSkeleton lines={1} />
         </Box>
-      ) : error ? (
-        <Typography color="error">{error}</Typography>
-      ) : topics.length === 0 ? (
-        <Typography color="text.secondary">No help topics found.</Typography>
+      ) : topics.isError ? (
+        <ErrorState
+          title="Could not load help topics"
+          description="Something went wrong while loading help. Try again."
+          action={
+            <Button variant="outlined" onClick={() => topics.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<HelpOutlineIcon />}
+          title={query ? 'No matching topics' : 'No help topics yet'}
+          description={query ? `Nothing matched "${query}". Try a different search term.` : 'There are no topics in this category.'}
+          action={
+            query || categoryId !== null ? (
+              <Button variant="outlined" onClick={() => selectCategory(null)}>
+                Show all topics
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
-        <Paper variant="outlined">
-          <List disablePadding>
-            {topics.map((topic, index) => (
-              <ListItemButton
-                key={topic.id}
-                divider={index < topics.length - 1}
-                onClick={() => navigate(`/help/${topic.id}`)}
-              >
-                <ListItemText
-                  primary={topic.title}
-                  secondary={topic.content.substring(0, 120) + (topic.content.length > 120 ? '...' : '')}
-                />
-              </ListItemButton>
-            ))}
-          </List>
-        </Paper>
+        <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1.5 }}>
+          {items.map((topic) => (
+            <li key={topic.id}>
+              <Card>
+                <CardActionArea component={RouterLink} to={`/help/${topic.id}`}>
+                  <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 600 }}>
+                        {topic.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {excerpt(topic.content)}
+                      </Typography>
+                    </Box>
+                    <ChevronRightIcon aria-hidden sx={{ color: 'text.secondary' }} />
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </li>
+          ))}
+        </Box>
       )}
     </Box>
   );
