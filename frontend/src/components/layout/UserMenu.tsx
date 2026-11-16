@@ -46,7 +46,8 @@ const UserMenu: React.FC = () => {
             '&::after': { content: 'attr(data-initials)' },
           }}
         >
-          {!initials && <PersonOutlineIcon fontSize="small" />}
+          {/* an empty child stops Avatar drawing its default person icon */}
+          {initials ? <span /> : <PersonOutlineIcon fontSize="small" />}
         </Avatar>
       </IconButton>
       <Menu
