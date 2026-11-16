@@ -30,7 +30,7 @@ import ErrorState from '../components/common/ErrorState';
 import FormDialog from '../components/common/FormDialog';
 import PageHeader from '../components/common/PageHeader';
 import SearchField from '../components/common/SearchField';
-import StatusChipAA from '../components/project/StatusChipAA';
+import StatusChip from '../components/common/StatusChip';
 import { useToast } from '../components/feedback/ToastProvider';
 import { formatDate, formatNumber } from '../utils/format';
 import {
@@ -199,7 +199,7 @@ const Projects: React.FC = () => {
       ),
     },
     { field: 'project_manager', headerName: 'Manager', flex: 1, minWidth: 140, sortable: false, valueGetter: (_v, row) => row.project_manager ?? '—' },
-    { field: 'status', headerName: 'Status', width: 140, sortable: false, renderCell: ({ row }) => (row.status ? <StatusChipAA kind="project" value={row.status} /> : '—') },
+    { field: 'status', headerName: 'Status', width: 140, sortable: false, renderCell: ({ row }) => (row.status ? <StatusChip kind="project" value={row.status} /> : '—') },
     {
       field: 'task_count',
       headerName: 'Tasks',
@@ -283,7 +283,7 @@ const Projects: React.FC = () => {
                   {project.project_manager ? `Manager: ${project.project_manager}` : 'No manager assigned'}
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-                  {project.status && <StatusChipAA kind="project" value={project.status} />}
+                  {project.status && <StatusChip kind="project" value={project.status} />}
                   {project.task_count > 0 && (
                     <Typography variant="body2" color="text.secondary" className="tabular-nums">
                       {formatNumber(project.task_count)} {project.task_count === 1 ? 'task' : 'tasks'}

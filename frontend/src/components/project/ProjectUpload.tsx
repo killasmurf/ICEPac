@@ -28,7 +28,7 @@ import {
 } from '../../api/projects';
 import { EmptyState } from '../common/EmptyState';
 import ErrorState from '../common/ErrorState';
-import StatusChipAA from './StatusChipAA';
+import { StatusChip } from '../common/StatusChip';
 import { TableSkeleton } from '../common/TableSkeleton';
 import { useToast } from '../feedback/ToastProvider';
 import { formatDateTime, formatNumber } from '../../utils/format';
@@ -317,7 +317,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
                       )}
                     </TableCell>
                     <TableCell>
-                      <StatusChipAA kind="job" value={item.status} />
+                      <StatusChip kind="job" value={item.status} />
                     </TableCell>
                     <TableCell align="right" className="tabular-nums">
                       {formatNumber(item.task_count)}
