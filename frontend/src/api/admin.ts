@@ -9,12 +9,14 @@ const API_BASE = '/admin';
 
 // ── Types ────────────────────────────────────────────────────
 
+export type UserRole = 'admin' | 'manager' | 'user' | 'viewer';
+
 export interface User {
   id: number;
   email: string;
   username: string;
   full_name: string | null;
-  role: 'admin' | 'manager' | 'user' | 'viewer';
+  role: UserRole;
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
@@ -22,20 +24,21 @@ export interface User {
   last_login: string | null;
 }
 
+/** POST /admin/users (UserCreate). Password is 8 to 128 characters. */
 export interface UserCreate {
   email: string;
   username: string;
   password: string;
   full_name?: string;
-  role?: string;
-  is_active?: boolean;
+  role?: UserRole;
 }
 
+/** PUT /admin/users/{id} (UserUpdate). */
 export interface UserUpdate {
   email?: string;
   username?: string;
   full_name?: string;
-  role?: string;
+  role?: UserRole;
   is_active?: boolean;
 }
 
@@ -43,72 +46,66 @@ export interface Resource {
   id: number;
   resource_code: string;
   description: string;
-  eoc?: string;
-  cost: number;
-  units?: string;
-  supplier_id?: number;
-  supplier_name?: string;
-  notes?: string;
+  eoc: string | null;
+  /** Pydantic serialises Decimal as a JSON string, so accept both. */
+  cost: number | string;
+  units: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
+/** POST /admin/resources (ResourceCreate). */
 export interface ResourceCreate {
   resource_code: string;
   description: string;
   eoc?: string;
   cost: number;
   units?: string;
-  supplier_id?: number;
-  supplier_name?: string;
-  notes?: string;
+  is_active?: boolean;
 }
 
+/** PUT /admin/resources/{id} (ResourceUpdate). */
 export interface ResourceUpdate {
   resource_code?: string;
   description?: string;
   eoc?: string;
   cost?: number;
   units?: string;
-  supplier_id?: number;
-  supplier_name?: string;
-  notes?: string;
   is_active?: boolean;
 }
 
 export interface Supplier {
   id: number;
-  supplier_code?: string;
+  supplier_code: string;
   name: string;
-  contact_name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  website?: string;
-  notes?: string;
+  contact: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
+/** POST /admin/suppliers (SupplierCreate). */
 export interface SupplierCreate {
+  supplier_code: string;
   name: string;
-  contact_name?: string;
+  contact?: string;
   email?: string;
   phone?: string;
-  address?: string;
-  website?: string;
   notes?: string;
+  is_active?: boolean;
 }
 
+/** PUT /admin/suppliers/{id} (SupplierUpdate). */
 export interface SupplierUpdate {
+  supplier_code?: string;
   name?: string;
-  contact_name?: string;
+  contact?: string;
   email?: string;
   phone?: string;
-  address?: string;
-  website?: string;
   notes?: string;
   is_active?: boolean;
 }
@@ -157,12 +154,11 @@ export interface ConfigTableInfo {
 
 // ── Users ────────────────────────────────────────────────────
 
-// Query parameters below are limited to those the backend route accepts
-// (see app/routes/admin.py). Optional filter fields kept on the types for
-// source compatibility but not supported by the server are not sent.
+// Query parameters below are limited to those the backend routes accept
+// (see app/routes/admin.py). The users route has no search or filters.
 
 export const usersApi = {
-  list: (params?: { skip?: number; limit?: number; search?: string; role?: string; is_active?: boolean }) =>
+  list: (params?: { skip?: number; limit?: number }) =>
     client
       .get<PaginatedResponse<User>>(`${API_BASE}/users`, { params: { skip: params?.skip, limit: params?.limit } })
       .then((r) => r.data),
@@ -179,7 +175,7 @@ export const usersApi = {
 // ── Resources ────────────────────────────────────────────────
 
 export const resourcesApi = {
-  list: (params?: { skip?: number; limit?: number; search?: string; eoc?: string; is_active?: boolean }) =>
+  list: (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean }) =>
     client
       .get<PaginatedResponse<Resource>>(`${API_BASE}/resources`, {
         params: {

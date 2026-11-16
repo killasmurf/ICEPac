@@ -1,0 +1,139 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "resource_code": "RES-001",
+      "description": "Resource 1 description",
+      "eoc": "Materials",
+      "cost": "100.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "resource_code": "RES-002",
+      "description": "Resource 2 description",
+      "eoc": "Travel",
+      "cost": "200.50",
+      "units": "each",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "resource_code": "RES-003",
+      "description": "Resource 3 description",
+      "eoc": "Subcontract",
+      "cost": "300.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 4,
+      "resource_code": "RES-004",
+      "description": "Resource 4 description",
+      "eoc": "Labour",
+      "cost": "400.50",
+      "units": "each",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "resource_code": "RES-005",
+      "description": "Resource 5 description",
+      "eoc": "Materials",
+      "cost": "500.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 6,
+      "resource_code": "RES-006",
+      "description": "Resource 6 description",
+      "eoc": "Travel",
+      "cost": "600.50",
+      "units": "each",
+      "is_active": false,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 7,
+      "resource_code": "RES-007",
+      "description": "Resource 7 description",
+      "eoc": "Subcontract",
+      "cost": "700.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 8,
+      "resource_code": "RES-008",
+      "description": "Resource 8 description",
+      "eoc": "Labour",
+      "cost": "800.50",
+      "units": "each",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 9,
+      "resource_code": "RES-009",
+      "description": "Resource 9 description",
+      "eoc": "Materials",
+      "cost": "900.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 10,
+      "resource_code": "RES-010",
+      "description": "Resource 10 description",
+      "eoc": "Travel",
+      "cost": "1000.50",
+      "units": "each",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 11,
+      "resource_code": "RES-011",
+      "description": "Resource 11 description",
+      "eoc": "Subcontract",
+      "cost": "1100.50",
+      "units": "hours",
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 12,
+      "resource_code": "RES-012",
+      "description": "Resource 12 description",
+      "eoc": "Labour",
+      "cost": "1200.50",
+      "units": "each",
+      "is_active": false,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    }
+  ],
+  "total": 12,
+  "skip": 0,
+  "limit": 100
+}

@@ -1,110 +1,264 @@
 /**
- * SupplierManagement - Admin page for managing suppliers.
+ * SupplierManagement - Admin page for managing suppliers (list, search, create, edit, delete).
  */
 import React, { useState } from 'react';
-import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
-import FormDialog from '../../components/admin/FormDialog';
-import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import SearchBar from '../../components/admin/SearchBar';
-import { Supplier } from '../../api/admin';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import { suppliersApi, type Supplier, type SupplierCreate } from '../../api/admin';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import DataTable from '../../components/common/DataTable';
+import ErrorState from '../../components/common/ErrorState';
+import FormDialog from '../../components/common/FormDialog';
+import PageHeader from '../../components/common/PageHeader';
+import SearchField from '../../components/common/SearchField';
+import StatusChip from '../../components/common/StatusChip';
+import { useToast } from '../../components/feedback/ToastProvider';
+import RowActionButton from './RowActionButton';
 
-const MOCK_SUPPLIERS: Supplier[] = [
-  { id: 1, name: 'Acme Corp', contact_name: 'John Doe', email: 'john@acme.com', phone: '555-0100', address: '123 Main St', website: 'https://acme.com', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-15' },
-  { id: 2, name: 'Dell Inc', contact_name: 'Jane Wilson', email: 'jane@dell.com', phone: '555-0200', is_active: true, created_at: '2026-01-03', updated_at: '2026-01-12' },
-  { id: 3, name: 'QA Partners', contact_name: 'Bob Lee', email: 'bob@qapartners.com', phone: '555-0300', is_active: true, created_at: '2026-01-05', updated_at: '2026-01-10' },
-  { id: 4, name: 'Old Vendor', contact_name: 'Ex Contact', email: 'ex@old.com', is_active: false, created_at: '2025-06-01', updated_at: '2025-12-01' },
-];
+interface SupplierForm {
+  supplier_code: string;
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  notes: string;
+  is_active: boolean;
+}
 
-const EMPTY_FORM = { name: '', contact_name: '', email: '', phone: '', address: '', website: '', notes: '' };
+const EMPTY_FORM: SupplierForm = { supplier_code: '', name: '', contact: '', email: '', phone: '', notes: '', is_active: true };
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type FormErrors = Partial<Record<keyof SupplierForm, string>>;
+
+function validate(form: SupplierForm): FormErrors {
+  const errors: FormErrors = {};
+  if (!form.supplier_code.trim()) errors.supplier_code = 'Supplier code is required';
+  if (!form.name.trim()) errors.name = 'Name is required';
+  if (form.email.trim() && !EMAIL_PATTERN.test(form.email.trim())) errors.email = 'Enter a valid email address';
+  return errors;
+}
 
 export default function SupplierManagement() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
-  const [page, setPage] = useState(0);
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 10 });
   const [search, setSearch] = useState('');
-  const [loading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [selected, setSelected] = useState<Supplier | null>(null);
-  const [form, setForm] = useState<any>(EMPTY_FORM);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [activeOnly, setActiveOnly] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Supplier | null>(null);
+  const [form, setForm] = useState<SupplierForm>(EMPTY_FORM);
+  const [submitted, setSubmitted] = useState(false);
+  const [deleting, setDeleting] = useState<Supplier | null>(null);
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ message: msg, type }); setTimeout(() => setToast(null), 3000); };
-  const handleCreate = () => { setSelected(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
-  const handleEdit = (s: Supplier) => { setSelected(s); setForm({ name: s.name, contact_name: s.contact_name || '', email: s.email || '', phone: s.phone || '', address: s.address || '', website: s.website || '', notes: s.notes || '' }); setShowForm(true); };
-
-  const handleSubmit = () => {
-    setSaving(true);
-    if (selected) {
-      setSuppliers(prev => prev.map(s => s.id === selected.id ? { ...s, ...form, updated_at: new Date().toISOString() } : s));
-      showToast(`Supplier "${form.name}" updated`);
-    } else {
-      setSuppliers(prev => [...prev, { ...form, id: Math.max(...prev.map(s => s.id)) + 1, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
-      showToast(`Supplier "${form.name}" created`);
-    }
-    setShowForm(false); setSaving(false);
+  const params = {
+    skip: paginationModel.page * paginationModel.pageSize,
+    limit: paginationModel.pageSize,
+    search: search || undefined,
+    is_active: activeOnly || undefined,
   };
 
-  const confirmDelete = () => {
-    if (!selected) return;
-    setSuppliers(prev => prev.filter(s => s.id !== selected.id));
-    showToast(`Supplier "${selected.name}" deleted`);
-    setShowDelete(false); setSelected(null);
-  };
-
-  const columns: Column<Supplier>[] = [
-    { key: 'name', label: 'Company Name', sortable: true },
-    { key: 'contact_name', label: 'Contact', sortable: true, render: v => v || '—' },
-    { key: 'email', label: 'Email', render: v => v || '—' },
-    { key: 'phone', label: 'Phone', render: v => v || '—' },
-    { key: 'is_active', label: 'Status', width: '90px', render: v => <StatusBadge active={v} /> },
-  ];
-
-  const filtered = suppliers.filter(s => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return s.name.toLowerCase().includes(q) || (s.contact_name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q);
+  const query = useQuery({
+    queryKey: ['admin', 'suppliers', params],
+    queryFn: () => suppliersApi.list(params),
+    placeholderData: keepPreviousData,
   });
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' };
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'suppliers'] });
+
+  const saveMutation = useMutation({
+    mutationFn: (): Promise<Supplier> => {
+      const body: SupplierCreate = {
+        supplier_code: form.supplier_code.trim(),
+        name: form.name.trim(),
+        contact: form.contact.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        notes: form.notes.trim(),
+        is_active: form.is_active,
+      };
+      return editing ? suppliersApi.update(editing.id, body) : suppliersApi.create(body);
+    },
+    onSuccess: (saved) => {
+      toast.success(editing ? `Supplier "${saved.name}" updated` : `Supplier "${saved.name}" created`);
+      setFormOpen(false);
+      void invalidate();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (s: Supplier) => suppliersApi.delete(s.id),
+    onSuccess: (_data, s) => {
+      toast.success(`Supplier "${s.name}" deleted`);
+      setDeleting(null);
+      void invalidate();
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setSubmitted(false);
+    setFormOpen(true);
+  };
+  const openEdit = (s: Supplier) => {
+    setEditing(s);
+    setForm({ supplier_code: s.supplier_code, name: s.name, contact: s.contact ?? '', email: s.email ?? '', phone: s.phone ?? '', notes: s.notes ?? '', is_active: s.is_active });
+    setSubmitted(false);
+    setFormOpen(true);
+  };
+
+  const errors = submitted ? validate(form) : {};
+  const submit = () => {
+    setSubmitted(true);
+    if (Object.keys(validate(form)).length === 0) saveMutation.mutate();
+  };
+
+  const columns: GridColDef<Supplier>[] = [
+    { field: 'name', headerName: 'Name', flex: 1.3, minWidth: 200, sortable: false },
+    { field: 'contact', headerName: 'Contact', flex: 1, minWidth: 150, sortable: false, valueGetter: (_v, row) => row.contact ?? '' },
+    { field: 'email', headerName: 'Email', flex: 1.2, minWidth: 200, sortable: false, valueGetter: (_v, row) => row.email ?? '' },
+    { field: 'phone', headerName: 'Phone', width: 150, sortable: false, valueGetter: (_v, row) => row.phone ?? '' },
+    {
+      field: 'is_active',
+      headerName: 'Status',
+      width: 110,
+      sortable: false,
+      renderCell: ({ row }) => <StatusChip kind="active" value={row.is_active} />,
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 110,
+      sortable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <RowActionButton label={`Edit ${row.name}`} icon={<EditOutlinedIcon fontSize="small" />} onClick={() => openEdit(row)} />
+          <RowActionButton label={`Delete ${row.name}`} icon={<DeleteOutlineIcon fontSize="small" />} color="error" onClick={() => setDeleting(row)} />
+        </Box>
+      ),
+    },
+  ];
+
+  const toolbar = (
+    <>
+      <SearchField
+        label="Search suppliers"
+        placeholder="Search suppliers"
+        onChange={(value) => {
+          setSearch(value);
+          setPaginationModel((m) => ({ ...m, page: 0 }));
+        }}
+      />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={activeOnly}
+            onChange={(e) => {
+              setActiveOnly(e.target.checked);
+              setPaginationModel((m) => ({ ...m, page: 0 }));
+            }}
+          />
+        }
+        label="Active only"
+      />
+    </>
+  );
+
+  const filtered = Boolean(search || activeOnly);
+  const failedFirstLoad = query.isError && !query.data;
 
   return (
-    <div style={{ maxWidth: '1400px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Supplier Management</h1>
-          <p style={{ fontSize: '15px', color: '#64748b' }}>Manage supplier contacts and company information</p>
-        </div>
-        <button onClick={handleCreate} style={{ padding: '10px 20px', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>+ Add Supplier</button>
-      </div>
+    <Box>
+      <PageHeader
+        title="Supplier management"
+        subtitle="Manage the suppliers behind your resources"
+        actions={
+          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>
+            Add supplier
+          </Button>
+        }
+      />
 
-      <div style={{ marginBottom: '20px' }}><SearchBar value={search} onChange={setSearch} placeholder="Search suppliers..." /></div>
+      <Card sx={{ p: 2 }}>
+        {failedFirstLoad ? (
+          <ErrorState
+            title="Could not load suppliers"
+            description="Something went wrong while loading suppliers. Check your connection and try again."
+            action={
+              <Button variant="outlined" onClick={() => query.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        ) : (
+          <DataTable<Supplier>
+            ariaLabel="Suppliers"
+            rows={query.data?.items ?? []}
+            columns={columns}
+            loading={query.isLoading || (query.isFetching && query.isPlaceholderData)}
+            rowCount={query.data?.total ?? 0}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            toolbar={toolbar}
+            emptyTitle={filtered ? 'No suppliers match your filters' : 'No suppliers yet'}
+            emptyDescription={filtered ? 'Try a different search or turn off Active only.' : 'Add the first supplier to get started.'}
+            emptyAction={
+              filtered ? (
+                <Button variant="outlined" onClick={() => setActiveOnly(false)}>
+                  Show all suppliers
+                </Button>
+              ) : (
+                <Button variant="contained" color="secondary" onClick={openCreate}>
+                  Add supplier
+                </Button>
+              )
+            }
+          />
+        )}
+      </Card>
 
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <DataGrid columns={columns} data={filtered} total={filtered.length} page={page} pageSize={20} onPageChange={setPage} loading={loading}
-          actions={(row: Supplier) => (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleEdit(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
-              <button onClick={() => { setSelected(row); setShowDelete(true); }} style={{ padding: '4px 12px', border: '1px solid #fee2e2', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>Delete</button>
-            </div>
-          )} />
-      </div>
-
-      <FormDialog open={showForm} title={selected ? 'Edit Supplier' : 'Add Supplier'} onClose={() => setShowForm(false)} onSubmit={handleSubmit} loading={saving}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Company Name</label><input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-          <div><label style={labelStyle}>Contact Name</label><input style={inputStyle} value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} /></div>
-          <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label style={labelStyle}>Phone</label><input style={inputStyle} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-          <div><label style={labelStyle}>Website</label><input style={inputStyle} value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} /></div>
-          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Address</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
-          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
-        </div>
+      <FormDialog
+        open={formOpen}
+        title={editing ? 'Edit supplier' : 'Add supplier'}
+        submitLabel={editing ? 'Save changes' : 'Create supplier'}
+        onClose={() => setFormOpen(false)}
+        onSubmit={submit}
+        loading={saveMutation.isPending}
+      >
+        <TextField label="Supplier code" required value={form.supplier_code} onChange={(e) => setForm({ ...form, supplier_code: e.target.value })} error={Boolean(errors.supplier_code)} helperText={errors.supplier_code ?? 'Saved in upper case'} autoComplete="off" />
+        <TextField label="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} error={Boolean(errors.name)} helperText={errors.name} />
+        <TextField label="Contact" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+        <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={Boolean(errors.email)} helperText={errors.email} autoComplete="off" />
+        <TextField label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <TextField label="Notes" multiline minRows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        <TextField select label="Status" value={form.is_active ? 'active' : 'inactive'} onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}>
+          <MenuItem value="active">Active</MenuItem>
+          <MenuItem value="inactive">Inactive</MenuItem>
+        </TextField>
       </FormDialog>
 
-      <ConfirmDialog open={showDelete} title="Delete Supplier" message={`Delete supplier "${selected?.name}"? This cannot be undone.`} onClose={() => setShowDelete(false)} onConfirm={confirmDelete} confirmLabel="Delete" danger />
-      {toast && <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 2000, backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444' }}>{toast.message}</div>}
-    </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete supplier"
+        message={`Delete supplier "${deleting?.name ?? ''}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
+      />
+    </Box>
   );
 }
