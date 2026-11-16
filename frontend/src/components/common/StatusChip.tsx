@@ -81,7 +81,14 @@ function toneSx(tone: Tone) {
       return { bgcolor: 'transparent', color: p.text.secondary, border: 1, borderColor: p.divider };
     }
     const color = tone === 'default' ? p.text.secondary : p[tone].main;
-    return { bgcolor: tint(color), color, border: 0 };
+    // On a light surface the palette colour over its own 12% tint falls just short of
+    // WCAG AA (4.5:1), so the label is darkened there. The dark scheme's colours already pass.
+    return {
+      bgcolor: tint(color),
+      color: `color-mix(in srgb, ${color} 75%, black)`,
+      border: 0,
+      ...theme.applyStyles('dark', { color }),
+    };
   };
 }
 
