@@ -1,56 +1,89 @@
 /**
- * ExportOptions - Export format buttons for downloading reports.
+ * ExportOptions - split button (PDF default, menu for XLSX, DOCX, CSV) that downloads the generated report.
  */
-import React, { useState } from 'react';
-import { ExportFormat, ReportRequest, reportsApi } from '../../api/reports';
+import React, { useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import Button from '@mui/material/Button';
+import ButtonGroup from '@mui/material/ButtonGroup';
+import CircularProgress from '@mui/material/CircularProgress';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
+import ArrowDropDown from '@mui/icons-material/ArrowDropDown';
+import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
+import { reportsApi, saveBlob, type ExportFormat, type ReportRequest } from '../../api/reports';
+import { useToast } from '../feedback/ToastProvider';
 
 interface ExportOptionsProps {
+  /** The request that produced the previewed result. */
   request: ReportRequest | null;
   disabled?: boolean;
 }
 
-const FORMATS: { format: ExportFormat; label: string; icon: string; color: string }[] = [
-  { format: 'pdf', label: 'PDF', icon: '📄', color: '#ef4444' },
-  { format: 'xlsx', label: 'Excel', icon: '📊', color: '#16a34a' },
-  { format: 'docx', label: 'Word', icon: '📝', color: '#2563eb' },
-  { format: 'csv', label: 'CSV', icon: '📋', color: '#8b5cf6' },
+const FORMATS: { format: ExportFormat; label: string; hint: string }[] = [
+  { format: 'pdf', label: 'PDF', hint: 'Formatted document' },
+  { format: 'xlsx', label: 'XLSX', hint: 'Excel workbook' },
+  { format: 'docx', label: 'DOCX', hint: 'Word document' },
+  { format: 'csv', label: 'CSV', hint: 'Plain data' },
 ];
 
 export default function ExportOptions({ request, disabled }: ExportOptionsProps) {
-  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const toast = useToast();
+  const groupRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const open = anchor !== null;
+  const [pending, setPending] = useState<ExportFormat | null>(null);
 
-  const handleExport = async (fmt: ExportFormat) => {
-    if (!request || disabled) return;
-    setExporting(fmt);
-    try {
-      await reportsApi.export({ ...request, export_format: fmt });
-    } catch (err) {
-      console.error('Export failed:', err);
-    }
-    setExporting(null);
-  };
-
-  const btnStyle = (color: string, isExporting: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '8px 16px', border: `1px solid ${color}20`, borderRadius: '8px',
-    backgroundColor: isExporting ? `${color}10` : '#fff',
-    color, cursor: disabled ? 'not-allowed' : 'pointer',
-    fontSize: '13px', fontWeight: 600, opacity: disabled ? 0.5 : 1,
-    transition: 'all 0.15s',
+  const exportMutation = useMutation({
+    mutationFn: (format: ExportFormat) => {
+      if (!request) throw new Error('No report to export');
+      return reportsApi.export({ ...request, export_format: format });
+    },
+    onMutate: (format) => setPending(format),
+    onSuccess: ({ blob, filename }, format) => {
+      saveBlob(blob, filename);
+      toast.success(`Exported ${filename} (${format.toUpperCase()})`);
+    },
+    onSettled: () => setPending(null),
   });
 
+  const busy = exportMutation.isPending;
+  const blocked = disabled || !request || busy;
+  const run = (format: ExportFormat) => {
+    setAnchor(null);
+    exportMutation.mutate(format);
+  };
+
   return (
-    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-      <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center' }}>Export:</span>
-      {FORMATS.map(({ format, label, icon, color }) => (
-        <button key={format} style={btnStyle(color, exporting === format)}
-          onClick={() => handleExport(format)} disabled={disabled || exporting !== null}
-          onMouseEnter={e => { if (!disabled) e.currentTarget.style.backgroundColor = `${color}10`; }}
-          onMouseLeave={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#fff'; }}>
-          <span>{icon}</span>
-          {exporting === format ? 'Exporting...' : label}
-        </button>
-      ))}
-    </div>
+    <>
+      <ButtonGroup ref={groupRef} variant="outlined" aria-label="Export report" disabled={blocked}>
+        <Button
+          onClick={() => run('pdf')}
+          aria-busy={busy}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" aria-hidden="true" /> : <FileDownloadOutlined />}
+        >
+          {busy ? `Exporting ${pending?.toUpperCase() ?? ''}` : 'Export PDF'}
+        </Button>
+        <Tooltip title={blocked ? '' : 'Choose export format'}>
+          <Button
+            size="small"
+            aria-label="Choose export format"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={() => setAnchor(groupRef.current)}
+          >
+            <ArrowDropDown />
+          </Button>
+        </Tooltip>
+      </ButtonGroup>
+      <Menu anchorEl={anchor} open={open} onClose={() => setAnchor(null)}>
+        {FORMATS.map((f) => (
+          <MenuItem key={f.format} onClick={() => run(f.format)}>
+            <ListItemText primary={f.label} secondary={f.hint} />
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
   );
 }
