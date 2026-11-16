@@ -1,111 +1,168 @@
 /**
- * AdminDashboard - Overview page with stats and recent activity.
+ * AdminDashboard - admin overview: headline counts, recent activity and links to each admin page.
+ * Data: GET /dashboard/stats (`admin` block and `recent_activity`).
  */
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuditLog } from '../../api/admin';
+import React from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
+import HistoryIcon from '@mui/icons-material/History';
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
+import TuneIcon from '@mui/icons-material/Tune';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardActionArea from '@mui/material/CardActionArea';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
+import { getDashboardStats } from '../../api/dashboard';
+import CardSkeleton from '../../components/common/CardSkeleton';
+import EmptyState from '../../components/common/EmptyState';
+import ErrorState from '../../components/common/ErrorState';
+import PageHeader from '../../components/common/PageHeader';
+import StatCard from '../../components/common/StatCard';
+import { formatDateTime, formatNumber } from '../../utils/format';
+import { formatActionLabel } from './auditFormat';
 
-// Mock data for development
-const MOCK_STATS = { total_resources: 128, total_suppliers: 24, recent_activity_count: 342 };
-const MOCK_ACTIVITY: AuditLog[] = [
-  { id: 1, user_id: 1, username: 'admin', action: 'create', entity_type: 'resource', entity_id: 45, details: 'Created resource RES045', created_at: new Date().toISOString() } as AuditLog,
-  { id: 2, user_id: 2, username: 'jsmith', action: 'update', entity_type: 'supplier', entity_id: 12, details: 'Updated supplier info', created_at: new Date(Date.now() - 3600000).toISOString() } as AuditLog,
-  { id: 3, user_id: 1, username: 'admin', action: 'delete', entity_type: 'cost_types', entity_id: 3, details: 'Removed cost type', created_at: new Date(Date.now() - 7200000).toISOString() } as AuditLog,
+const quickLinks = [
+  { label: 'Users', description: 'Accounts, roles and passwords', path: '/admin/users', icon: <PeopleOutlineIcon /> },
+  { label: 'Resources', description: 'Resource library and rates', path: '/admin/resources', icon: <Inventory2OutlinedIcon /> },
+  { label: 'Suppliers', description: 'Supplier contacts', path: '/admin/suppliers', icon: <BusinessOutlinedIcon /> },
+  { label: 'Config Tables', description: 'Lookup values for forms', path: '/admin/config', icon: <TuneIcon /> },
+  { label: 'Audit Logs', description: 'Who changed what, and when', path: '/admin/audit-logs', icon: <HistoryIcon /> },
 ];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [stats] = useState(MOCK_STATS);
-  const [activity] = useState<AuditLog[]>(MOCK_ACTIVITY);
+  const query = useQuery({ queryKey: ['dashboard', 'stats'], queryFn: getDashboardStats });
+  const admin = query.data?.admin;
+  const activity = query.data?.recent_activity ?? [];
+  const loading = query.isPending;
 
-  const statCards = [
-    { label: 'Resources', value: stats.total_resources, icon: '📦', color: '#3b82f6', path: '/admin/resources' },
-    { label: 'Suppliers', value: stats.total_suppliers, icon: '🏢', color: '#8b5cf6', path: '/admin/suppliers' },
-    { label: 'Activity', value: stats.recent_activity_count, icon: '📋', color: '#10b981', path: '/admin/audit-logs' },
+  const stats = [
+    { label: 'Users', value: admin?.users, icon: <PeopleOutlineIcon />, path: '/admin/users' },
+    { label: 'Active users', value: admin?.active_users, icon: <HowToRegOutlinedIcon />, path: '/admin/users' },
+    { label: 'Resources', value: admin?.resources, icon: <Inventory2OutlinedIcon />, path: '/admin/resources', hint: 'Active only' },
+    { label: 'Suppliers', value: admin?.suppliers, icon: <BusinessOutlinedIcon />, path: '/admin/suppliers', hint: 'Active only' },
   ];
-
-  const quickActions = [
-    { label: 'Add Resource', icon: '➕', path: '/admin/resources' },
-    { label: 'Add Supplier', icon: '🏢', path: '/admin/suppliers' },
-    { label: 'Manage Users', icon: '👥', path: '/admin/users' },
-    { label: 'Config Tables', icon: '⚙️', path: '/admin/config' },
-  ];
-
-  const s: Record<string, React.CSSProperties> = {
-    title: { fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '24px' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' },
-    card: { backgroundColor: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', border: '1px solid #e2e8f0' },
-    cardIcon: { fontSize: '32px', marginBottom: '8px' },
-    cardValue: { fontSize: '32px', fontWeight: 700, color: '#0f172a' },
-    cardLabel: { fontSize: '14px', color: '#64748b', marginTop: '4px' },
-    section: { backgroundColor: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', marginBottom: '24px' },
-    sectionTitle: { fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' },
-    actionsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' },
-    actionBtn: { display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, transition: 'all 0.15s' },
-    activityItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' },
-    activityText: { fontSize: '14px', color: '#1e293b' },
-    activityTime: { fontSize: '12px', color: '#94a3b8' },
-    badge: { display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 600 },
-  };
-
-  const actionColors: Record<string, { bg: string; fg: string }> = {
-    create: { bg: '#dcfce7', fg: '#166534' }, update: { bg: '#dbeafe', fg: '#1e40af' }, delete: { bg: '#fee2e2', fg: '#991b1b' },
-  };
-
-  const [now] = useState(() => Date.now());
-  const timeAgo = (dt: string) => {
-    const mins = Math.floor((now - new Date(dt).getTime()) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
-    return `${Math.floor(mins / 1440)}d ago`;
-  };
 
   return (
-    <div>
-      <h1 style={s.title}>Admin Dashboard</h1>
+    <Box>
+      <PageHeader title="Administration" subtitle="Overview of users, libraries and recent changes." />
 
-      <div style={s.grid}>
-        {statCards.map(c => (
-          <div key={c.label} style={s.card} onClick={() => navigate(c.path)}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
-            <div style={s.cardIcon}>{c.icon}</div>
-            <div style={{ ...s.cardValue, color: c.color }}>{c.value}</div>
-            <div style={s.cardLabel}>{c.label}</div>
-          </div>
-        ))}
-      </div>
+      {query.isError ? (
+        <Card>
+          <ErrorState
+            title="Could not load the overview"
+            description="Something went wrong while loading. Check your connection and try again."
+            action={
+              <Button variant="outlined" onClick={() => void query.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <Box
+            sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 2, mb: 3 }}
+          >
+            {stats.map((s) => (
+              <StatCard
+                key={s.label}
+                label={s.label}
+                value={formatNumber(s.value)}
+                icon={s.icon}
+                hint={s.hint}
+                loading={loading}
+                onClick={() => navigate(s.path)}
+              />
+            ))}
+          </Box>
 
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Quick Actions</div>
-        <div style={s.actionsGrid}>
-          {quickActions.map(a => (
-            <button key={a.label} style={s.actionBtn} onClick={() => navigate(a.path)}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#f8fafc')}>
-              <span>{a.icon}</span> {a.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          <Typography variant="h5" component="h2" sx={{ mb: 1.5 }}>
+            Recent activity
+          </Typography>
+          {loading ? (
+            <CardSkeleton lines={4} />
+          ) : activity.length === 0 ? (
+            <EmptyState
+              icon={<HistoryIcon />}
+              title="No recent activity"
+              description="Changes made in the admin area will appear here."
+            />
+          ) : (
+            <Card>
+              <List disablePadding>
+                {activity.map((a, i) => (
+                  <ListItem
+                    key={a.id}
+                    divider={i < activity.length - 1}
+                    secondaryAction={
+                      <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                        {formatDateTime(a.created_at)}
+                      </Typography>
+                    }
+                  >
+                    <ListItemText
+                      disableTypography
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                          <Chip size="small" variant="outlined" label={formatActionLabel(a.action)} />
+                          <Typography variant="body2">
+                            {a.entity_type}
+                            {a.entity_id != null ? ` #${a.entity_id}` : ''}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          by {a.username || 'System'}
+                          <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                            {' · '}
+                            {formatDateTime(a.created_at)}
+                          </Box>
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Card>
+          )}
 
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Recent Activity</div>
-        {activity.map(log => {
-          const ac = actionColors[log.action] || actionColors.update;
-          return (
-            <div key={log.id} style={s.activityItem}>
-              <div>
-                <span style={{ ...s.badge, backgroundColor: ac.bg, color: ac.fg, marginRight: '8px' }}>{log.action}</span>
-                <span style={s.activityText}>{log.details || `${log.action} ${log.entity_type} #${log.entity_id}`}</span>
-                <span style={{ ...s.activityTime, marginLeft: '8px' }}>by {log.username}</span>
-              </div>
-              <span style={s.activityTime}>{timeAgo(log.created_at)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+          <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 1.5 }}>
+            Manage
+          </Typography>
+          <Box
+            sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}
+          >
+            {quickLinks.map((l) => (
+              <Card key={l.path}>
+                <CardActionArea component={RouterLink} to={l.path}>
+                  <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box aria-hidden sx={{ color: 'text.secondary', display: 'flex' }}>
+                      {l.icon}
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle1">{l.label}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {l.description}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            ))}
+          </Box>
+        </>
+      )}
+    </Box>
   );
 }

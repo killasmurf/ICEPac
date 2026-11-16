@@ -1,0 +1,7 @@
+{
+  "tables": [
+    { "name": "Cost Types", "description": "Cost type classifications for resource assignments", "weighted": false },
+    { "name": "Regions", "description": "Geographic regions for projects and resources", "weighted": false },
+    { "name": "Probability Levels", "description": "Risk probability levels with weights", "weighted": true }
+  ]
+}
