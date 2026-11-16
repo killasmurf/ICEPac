@@ -1,24 +1,13 @@
-import React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  IconButton,
-  Typography,
-  Box,
-  Button,
-  Tooltip,
-  Chip,
-} from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@mui/material';
+import type { GridColDef } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Risk } from '../../api/estimation';
 import { formatCurrency } from '../../utils/format';
+import { DataTable } from '../common/DataTable';
+import TotalsStrip from './TotalsStrip';
 
 interface RiskListProps {
   risks: Risk[];
@@ -57,107 +46,139 @@ const RiskList: React.FC<RiskListProps> = ({
   // Calculate total exposure
   const totalExposure = risks.reduce((sum, r) => sum + r.risk_exposure, 0);
 
+  const columns = useMemo<GridColDef<Risk>[]>(() => {
+    const cols: GridColDef<Risk>[] = [
+      { field: 'risk_category_code', headerName: 'Category', minWidth: 120, flex: 1 },
+      {
+        field: 'risk_cost',
+        headerName: 'Cost',
+        type: 'number',
+        align: 'right',
+        headerAlign: 'right',
+        minWidth: 120,
+        flex: 0.8,
+        cellClassName: 'tabular-nums',
+        valueFormatter: (value: number) => formatCurrency(value),
+      },
+      {
+        field: 'probability_code',
+        headerName: 'Probability',
+        align: 'center',
+        headerAlign: 'center',
+        minWidth: 110,
+        renderCell: ({ row }) =>
+          row.probability_code ? <Chip label={row.probability_code} size="small" variant="outlined" /> : '-',
+      },
+      {
+        field: 'severity_code',
+        headerName: 'Severity',
+        align: 'center',
+        headerAlign: 'center',
+        minWidth: 110,
+        renderCell: ({ row }) =>
+          row.severity_code ? (
+            <Chip label={row.severity_code} size="small" color={getSeverityColor(row.severity_code)} />
+          ) : (
+            '-'
+          ),
+      },
+      {
+        field: 'risk_exposure',
+        headerName: 'Exposure',
+        type: 'number',
+        align: 'right',
+        headerAlign: 'right',
+        minWidth: 120,
+        flex: 0.8,
+        renderCell: ({ row }) => (
+          <Typography component="span" variant="body2" className="tabular-nums" sx={{ fontWeight: 700 }}>
+            {formatCurrency(row.risk_exposure)}
+          </Typography>
+        ),
+      },
+      {
+        field: 'mitigation_plan',
+        headerName: 'Mitigation',
+        minWidth: 180,
+        flex: 1.5,
+        renderCell: ({ row }) => (
+          <Tooltip title={row.mitigation_plan || 'No mitigation plan'}>
+            <Typography variant="body2" noWrap>
+              {row.mitigation_plan || '-'}
+            </Typography>
+          </Tooltip>
+        ),
+      },
+    ];
+
+    if (!readonly) {
+      cols.push({
+        field: 'actions',
+        headerName: 'Actions',
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        align: 'center',
+        headerAlign: 'center',
+        minWidth: 110,
+        renderCell: ({ row }) => (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Edit">
+              <IconButton size="small" aria-label={`Edit risk ${row.risk_category_code}`} onClick={() => onEdit(row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton
+                size="small"
+                color="error"
+                aria-label={`Delete risk ${row.risk_category_code}`}
+                onClick={() => onDelete(row)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      });
+    }
+    return cols;
+  }, [readonly, onEdit, onDelete]);
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Risk Register</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Typography variant="h6" component="h3">
+          Risk Register
+        </Typography>
         {!readonly && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={onAdd} size="small" color="warning">
+          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={onAdd} size="small">
             Add Risk
           </Button>
         )}
       </Box>
 
-      {risks.length === 0 ? (
-        <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-          No risks registered yet. Click "Add Risk" to create one.
-        </Typography>
-      ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell>Category</TableCell>
-                <TableCell align="right">Cost</TableCell>
-                <TableCell align="center">Probability</TableCell>
-                <TableCell align="center">Severity</TableCell>
-                <TableCell align="right">Exposure</TableCell>
-                <TableCell>Mitigation</TableCell>
-                {!readonly && <TableCell align="center">Actions</TableCell>}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {risks.map((risk) => (
-                <TableRow key={risk.id} hover>
-                  <TableCell>{risk.risk_category_code}</TableCell>
-                  <TableCell align="right">{formatCurrency(risk.risk_cost)}</TableCell>
-                  <TableCell align="center">
-                    {risk.probability_code ? (
-                      <Chip label={risk.probability_code} size="small" />
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
-                    {risk.severity_code ? (
-                      <Chip
-                        label={risk.severity_code}
-                        size="small"
-                        color={getSeverityColor(risk.severity_code)}
-                      />
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    <strong>{formatCurrency(risk.risk_exposure)}</strong>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={risk.mitigation_plan || 'No mitigation plan'}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          maxWidth: 200,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {risk.mitigation_plan || '-'}
-                      </Typography>
-                    </Tooltip>
-                  </TableCell>
-                  {!readonly && (
-                    <TableCell align="center">
-                      <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => onEdit(risk)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => onDelete(risk)}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
+      <DataTable<Risk>
+        rows={risks}
+        columns={columns}
+        ariaLabel="Risk register"
+        emptyTitle="No risks registered yet"
+        emptyDescription={readonly ? 'No risks have been recorded for this item.' : 'Record what could add cost to this item and how you plan to mitigate it.'}
+        emptyAction={
+          readonly ? undefined : (
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={onAdd}>
+              Add Risk
+            </Button>
+          )
+        }
+      />
 
-              {/* Totals Row */}
-              <TableRow sx={{ bgcolor: 'warning.50' }}>
-                <TableCell colSpan={4}>
-                  <strong>Total Risk Exposure ({risks.length} risks)</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(totalExposure)}</strong>
-                </TableCell>
-                <TableCell />
-                {!readonly && <TableCell />}
-              </TableRow>
-            </TableBody>
-          </Table>
-        </TableContainer>
+      {risks.length > 0 && (
+        <TotalsStrip
+          label={`Total Risk Exposure (${risks.length} risks)`}
+          ariaLabel="Risk totals"
+          items={[{ label: 'Exposure', value: formatCurrency(totalExposure), emphasis: true }]}
+        />
       )}
     </Box>
   );

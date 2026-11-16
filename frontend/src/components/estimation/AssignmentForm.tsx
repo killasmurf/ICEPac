@@ -1,17 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  MenuItem,
-  Typography,
-  Box,
-  Divider,
-} from '@mui/material';
+import { Box, Divider, Grid, InputAdornment, MenuItem, TextField, Typography } from '@mui/material';
 import {
   Assignment,
   AssignmentCreate,
@@ -19,6 +7,10 @@ import {
   calculatePERT,
   calculateStdDeviation,
 } from '../../api/estimation';
+import { PertRangeBar } from '../common/PertRangeBar';
+import { formatCurrency } from '../../utils/format';
+import ValidatedFormDialog from './ValidatedFormDialog';
+import { currencySymbol, parseAmount, validatePercent, validateThreePoint } from './estimationUtils';
 
 interface AssignmentFormProps {
   open: boolean;
@@ -33,33 +25,56 @@ interface AssignmentFormProps {
   estimatingTechniques: { code: string; description: string }[];
 }
 
-const toFormData = (assignment?: Assignment | null) => (assignment ? {
-    resource_code: assignment.resource_code,
-    supplier_code: assignment.supplier_code || '',
-    cost_type_code: assignment.cost_type_code || '',
-    region_code: assignment.region_code || '',
-    bus_area_code: assignment.bus_area_code || '',
-    estimating_technique_code: assignment.estimating_technique_code || '',
-    best_estimate: assignment.best_estimate,
-    likely_estimate: assignment.likely_estimate,
-    worst_estimate: assignment.worst_estimate,
-    duty_pct: assignment.duty_pct,
-    import_content_pct: assignment.import_content_pct,
-    aii_pct: assignment.aii_pct,
-  } : {
-    resource_code: '',
-    supplier_code: '',
-    cost_type_code: '',
-    region_code: '',
-    bus_area_code: '',
-    estimating_technique_code: '',
-    best_estimate: 0,
-    likely_estimate: 0,
-    worst_estimate: 0,
-    duty_pct: 0,
-    import_content_pct: 0,
-    aii_pct: 0,
-  });
+interface FormState {
+  resource_code: string;
+  supplier_code: string;
+  cost_type_code: string;
+  region_code: string;
+  bus_area_code: string;
+  estimating_technique_code: string;
+  best_estimate: string;
+  likely_estimate: string;
+  worst_estimate: string;
+  duty_pct: string;
+  import_content_pct: string;
+  aii_pct: string;
+}
+
+const toFormData = (assignment?: Assignment | null): FormState =>
+  assignment
+    ? {
+        resource_code: assignment.resource_code,
+        supplier_code: assignment.supplier_code || '',
+        cost_type_code: assignment.cost_type_code || '',
+        region_code: assignment.region_code || '',
+        bus_area_code: assignment.bus_area_code || '',
+        estimating_technique_code: assignment.estimating_technique_code || '',
+        best_estimate: String(assignment.best_estimate),
+        likely_estimate: String(assignment.likely_estimate),
+        worst_estimate: String(assignment.worst_estimate),
+        duty_pct: String(assignment.duty_pct),
+        import_content_pct: String(assignment.import_content_pct),
+        aii_pct: String(assignment.aii_pct),
+      }
+    : {
+        resource_code: '',
+        supplier_code: '',
+        cost_type_code: '',
+        region_code: '',
+        bus_area_code: '',
+        estimating_technique_code: '',
+        best_estimate: '0',
+        likely_estimate: '0',
+        worst_estimate: '0',
+        duty_pct: '0',
+        import_content_pct: '0',
+        aii_pct: '0',
+      };
+
+/** Keep an edited record's current code selectable even when the lookup list has not loaded it. */
+function withCurrent<T extends { code: string }>(options: T[], current: string, label: (code: string) => T): T[] {
+  return !current || options.some((o) => o.code === current) ? options : [label(current), ...options];
+}
 
 const AssignmentForm: React.FC<AssignmentFormProps> = ({
   open,
@@ -73,7 +88,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
   businessAreas,
   estimatingTechniques,
 }) => {
-  const [formData, setFormData] = useState(() => toFormData(assignment));
+  const [formData, setFormData] = useState<FormState>(() => toFormData(assignment));
   const [loading, setLoading] = useState(false);
   // Reset the form when the dialog opens or the edited item changes
   // (adjusting state during render rather than in an effect).
@@ -83,245 +98,260 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
     setFormData(toFormData(assignment));
   }
 
-  const handleChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.type === 'number' ? parseFloat(event.target.value) || 0 : event.target.value;
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
+  const threePointErrors = validateThreePoint({
+    best: formData.best_estimate,
+    likely: formData.likely_estimate,
+    worst: formData.worst_estimate,
+  });
+  const percentErrors = {
+    duty_pct: validatePercent(formData.duty_pct),
+    import_content_pct: validatePercent(formData.import_content_pct),
+    aii_pct: validatePercent(formData.aii_pct),
+  };
+  const resourceMissing = !formData.resource_code;
+  const invalid =
+    resourceMissing || Object.keys(threePointErrors).length > 0 || Object.values(percentErrors).some(Boolean);
+
   const handleSubmit = async () => {
+    if (invalid) return;
     setLoading(true);
     try {
-      await onSubmit(formData);
+      await onSubmit({
+        resource_code: formData.resource_code,
+        supplier_code: formData.supplier_code,
+        cost_type_code: formData.cost_type_code,
+        region_code: formData.region_code,
+        bus_area_code: formData.bus_area_code,
+        estimating_technique_code: formData.estimating_technique_code,
+        best_estimate: parseAmount(formData.best_estimate) ?? 0,
+        likely_estimate: parseAmount(formData.likely_estimate) ?? 0,
+        worst_estimate: parseAmount(formData.worst_estimate) ?? 0,
+        duty_pct: parseAmount(formData.duty_pct) ?? 0,
+        import_content_pct: parseAmount(formData.import_content_pct) ?? 0,
+        aii_pct: parseAmount(formData.aii_pct) ?? 0,
+      });
       onClose();
+    } catch {
+      // The failure is already reported by the global error toast; keep the dialog open so nothing is lost.
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate live preview
-  const pert = calculatePERT(formData.best_estimate, formData.likely_estimate, formData.worst_estimate);
-  const stdDev = calculateStdDeviation(formData.best_estimate, formData.worst_estimate);
+  // Live preview, only while the three points are valid
+  const previewReady = Object.keys(threePointErrors).length === 0;
+  const best = parseAmount(formData.best_estimate) ?? 0;
+  const likely = parseAmount(formData.likely_estimate) ?? 0;
+  const worst = parseAmount(formData.worst_estimate) ?? 0;
+  const pert = previewReady ? calculatePERT(best, likely, worst) : null;
+  const stdDev = previewReady ? calculateStdDeviation(best, worst) : null;
 
   const isEdit = !!assignment;
+  const symbol = currencySymbol();
+  const moneyAdornment = { startAdornment: <InputAdornment position="start">{symbol}</InputAdornment> };
+
+  const resourceOptions = withCurrent(resources, formData.resource_code, (code) => ({ code, description: '' }));
+  const supplierOptions = withCurrent(suppliers, formData.supplier_code, (code) => ({ code, name: '' }));
+  const costTypeOptions = withCurrent(costTypes, formData.cost_type_code, (code) => ({ code, description: '' }));
+  const regionOptions = withCurrent(regions, formData.region_code, (code) => ({ code, description: '' }));
+  const businessAreaOptions = withCurrent(businessAreas, formData.bus_area_code, (code) => ({ code, description: '' }));
+  const techniqueOptions = withCurrent(estimatingTechniques, formData.estimating_technique_code, (code) => ({
+    code,
+    description: '',
+  }));
+
+  const optionLabel = (code: string, text: string) => (text ? `${code} - ${text}` : code);
+
+  const threePointField = (
+    field: 'best_estimate' | 'likely_estimate' | 'worst_estimate',
+    key: 'best' | 'likely' | 'worst',
+    label: string,
+    hint: string,
+  ) => (
+    <Grid size={{ xs: 12, sm: 4 }}>
+      <TextField
+        fullWidth
+        type="number"
+        label={label}
+        value={formData[field]}
+        onChange={handleChange(field)}
+        error={!!threePointErrors[key]}
+        helperText={threePointErrors[key] ?? hint}
+        slotProps={{ input: moneyAdornment, htmlInput: { min: 0, step: 0.01 } }}
+      />
+    </Grid>
+  );
+
+  const percentField = (field: 'duty_pct' | 'import_content_pct' | 'aii_pct', label: string) => (
+    <Grid size={{ xs: 12, sm: 4 }}>
+      <TextField
+        fullWidth
+        type="number"
+        label={label}
+        value={formData[field]}
+        onChange={handleChange(field)}
+        error={!!percentErrors[field]}
+        helperText={percentErrors[field] ?? '0 to 100'}
+        slotProps={{
+          input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
+          htmlInput: { min: 0, max: 100, step: 0.1 },
+        }}
+      />
+    </Grid>
+  );
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{isEdit ? 'Edit Assignment' : 'New Assignment'}</DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {/* Resource Selection */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Resource"
-              value={formData.resource_code}
-              onChange={handleChange('resource_code')}
-              required
-            >
-              {resources.map((r) => (
-                <MenuItem key={r.code} value={r.code}>
-                  {r.code} - {r.description}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Supplier Selection */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Supplier"
-              value={formData.supplier_code}
-              onChange={handleChange('supplier_code')}
-            >
-              <MenuItem value="">None</MenuItem>
-              {suppliers.map((s) => (
-                <MenuItem key={s.code} value={s.code}>
-                  {s.code} - {s.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Cost Type */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Cost Type"
-              value={formData.cost_type_code}
-              onChange={handleChange('cost_type_code')}
-            >
-              <MenuItem value="">None</MenuItem>
-              {costTypes.map((ct) => (
-                <MenuItem key={ct.code} value={ct.code}>
-                  {ct.code} - {ct.description}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Region */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Region"
-              value={formData.region_code}
-              onChange={handleChange('region_code')}
-            >
-              <MenuItem value="">None</MenuItem>
-              {regions.map((r) => (
-                <MenuItem key={r.code} value={r.code}>
-                  {r.code} - {r.description}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Business Area */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Business Area"
-              value={formData.bus_area_code}
-              onChange={handleChange('bus_area_code')}
-            >
-              <MenuItem value="">None</MenuItem>
-              {businessAreas.map((ba) => (
-                <MenuItem key={ba.code} value={ba.code}>
-                  {ba.code} - {ba.description}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Estimating Technique */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Estimating Technique"
-              value={formData.estimating_technique_code}
-              onChange={handleChange('estimating_technique_code')}
-            >
-              <MenuItem value="">None</MenuItem>
-              {estimatingTechniques.map((et) => (
-                <MenuItem key={et.code} value={et.code}>
-                  {et.code} - {et.description}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ my: 1 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              Three-Point Estimation
-            </Typography>
-          </Grid>
-
-          {/* Three-Point Estimates */}
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Best Estimate"
-              value={formData.best_estimate}
-              onChange={handleChange('best_estimate')}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Likely Estimate"
-              value={formData.likely_estimate}
-              onChange={handleChange('likely_estimate')}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Worst Estimate"
-              value={formData.worst_estimate}
-              onChange={handleChange('worst_estimate')}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-          </Grid>
-
-          {/* Live Preview */}
-          <Grid size={{ xs: 12 }}>
-            <Box sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                PERT Estimate: <strong>${pert.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
-                {' | '}
-                Std Deviation: <strong>${stdDev.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
-              </Typography>
-            </Box>
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ my: 1 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              Additional Factors
-            </Typography>
-          </Grid>
-
-          {/* Percentages */}
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Duty %"
-              value={formData.duty_pct}
-              onChange={handleChange('duty_pct')}
-              inputProps={{ min: 0, max: 100, step: 0.1 }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="Import Content %"
-              value={formData.import_content_pct}
-              onChange={handleChange('import_content_pct')}
-              inputProps={{ min: 0, max: 100, step: 0.1 }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField
-              fullWidth
-              type="number"
-              label="AII %"
-              value={formData.aii_pct}
-              onChange={handleChange('aii_pct')}
-              inputProps={{ min: 0, max: 100, step: 0.1 }}
-            />
-          </Grid>
+    <ValidatedFormDialog
+      open={open}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      title={isEdit ? 'Edit Assignment' : 'New Assignment'}
+      submitLabel={isEdit ? 'Update' : 'Create'}
+      loading={loading}
+      submitDisabled={invalid}
+      maxWidth="md"
+    >
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label="Resource"
+            value={formData.resource_code}
+            onChange={handleChange('resource_code')}
+            required
+            helperText={resourceMissing ? 'Select a resource' : undefined}
+          >
+            {resourceOptions.map((r) => (
+              <MenuItem key={r.code} value={r.code}>
+                {optionLabel(r.code, r.description)}
+              </MenuItem>
+            ))}
+          </TextField>
         </Grid>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={loading || !formData.resource_code}
-        >
-          {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label="Supplier"
+            value={formData.supplier_code}
+            onChange={handleChange('supplier_code')}
+          >
+            <MenuItem value="">None</MenuItem>
+            {supplierOptions.map((s) => (
+              <MenuItem key={s.code} value={s.code}>
+                {optionLabel(s.code, s.name)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label="Cost Type"
+            value={formData.cost_type_code}
+            onChange={handleChange('cost_type_code')}
+          >
+            <MenuItem value="">None</MenuItem>
+            {costTypeOptions.map((ct) => (
+              <MenuItem key={ct.code} value={ct.code}>
+                {optionLabel(ct.code, ct.description)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField select fullWidth label="Region" value={formData.region_code} onChange={handleChange('region_code')}>
+            <MenuItem value="">None</MenuItem>
+            {regionOptions.map((r) => (
+              <MenuItem key={r.code} value={r.code}>
+                {optionLabel(r.code, r.description)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label="Business Area"
+            value={formData.bus_area_code}
+            onChange={handleChange('bus_area_code')}
+          >
+            <MenuItem value="">None</MenuItem>
+            {businessAreaOptions.map((ba) => (
+              <MenuItem key={ba.code} value={ba.code}>
+                {optionLabel(ba.code, ba.description)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label="Estimating Technique"
+            value={formData.estimating_technique_code}
+            onChange={handleChange('estimating_technique_code')}
+          >
+            <MenuItem value="">None</MenuItem>
+            {techniqueOptions.map((et) => (
+              <MenuItem key={et.code} value={et.code}>
+                {optionLabel(et.code, et.description)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle1" component="h3" gutterBottom>
+            Three-Point Estimation
+          </Typography>
+        </Grid>
+
+        {threePointField('best_estimate', 'best', 'Best Estimate', 'Optimistic cost')}
+        {threePointField('likely_estimate', 'likely', 'Likely Estimate', 'Most probable cost')}
+        {threePointField('worst_estimate', 'worst', 'Worst Estimate', 'Pessimistic cost')}
+
+        <Grid size={{ xs: 12 }}>
+          <Box
+            data-testid="pert-preview"
+            sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 1, display: 'flex', flexDirection: 'column', gap: 1 }}
+          >
+            <Typography variant="body2" color="text.secondary" aria-live="polite">
+              PERT Estimate: <strong className="tabular-nums">{formatCurrency(pert)}</strong>
+              {' | '}
+              Std Deviation: <strong className="tabular-nums">{formatCurrency(stdDev)}</strong>
+            </Typography>
+            {previewReady && pert !== null && worst > best && (
+              <PertRangeBar best={best} likely={likely} worst={worst} pert={pert} />
+            )}
+          </Box>
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle1" component="h3" gutterBottom>
+            Additional Factors
+          </Typography>
+        </Grid>
+
+        {percentField('duty_pct', 'Duty %')}
+        {percentField('import_content_pct', 'Import Content %')}
+        {percentField('aii_pct', 'AII %')}
+      </Grid>
+    </ValidatedFormDialog>
   );
 };
 

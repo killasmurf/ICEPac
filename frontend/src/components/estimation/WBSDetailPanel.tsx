@@ -1,16 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Drawer,
-  Box,
-  Typography,
-  IconButton,
-  Tabs,
-  Tab,
-  Divider,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Button, Divider, Drawer, Grid, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AssignmentList from './AssignmentList';
 import AssignmentForm from './AssignmentForm';
 import RiskList from './RiskList';
@@ -24,7 +15,6 @@ import {
   RiskCreate,
   RiskUpdate,
   WBSApprovalResponse,
-  WBSCostSummary,
   getAssignments,
   createAssignment,
   updateAssignment,
@@ -38,13 +28,25 @@ import {
 } from '../../api/estimation';
 import { WBSItem } from '../../api/projects';
 import { formatCurrency } from '../../utils/format';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { StatCard } from '../common/StatCard';
+import { StatusChip } from '../common/StatusChip';
+import { PertRangeBar } from '../common/PertRangeBar';
+import { TableSkeleton } from '../common/TableSkeleton';
+import ErrorState from '../common/ErrorState';
+import { useToast } from '../feedback/ToastProvider';
+import { invalidateEstimation, wbsDetailsKey } from './queryKeys';
+import { summaryRangeBar } from './estimationUtils';
 
 interface WBSDetailPanelProps {
   open: boolean;
   onClose: () => void;
   projectId: number;
   wbs: WBSItem | null;
+  /** Overrides the role check inside the approval tab. When omitted, admins and managers can approve. */
   canApprove?: boolean;
+  /** 'drawer' (default) slides in from the right; 'inline' renders the panel in place for split layouts. */
+  variant?: 'drawer' | 'inline';
   // Lookup data for forms
   resources?: { code: string; description: string }[];
   suppliers?: { code: string; name: string }[];
@@ -64,9 +66,9 @@ interface TabPanelProps {
 }
 
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
-  <div role="tabpanel" hidden={value !== index} style={{ height: '100%' }}>
+  <Box role="tabpanel" id={`wbs-panel-${index}`} aria-labelledby={`wbs-tab-${index}`} hidden={value !== index} sx={{ height: '100%' }}>
     {value === index && <Box sx={{ py: 2, height: '100%' }}>{children}</Box>}
-  </div>
+  </Box>
 );
 
 const fetchDetails = async (projectId: number, wbsId: number) => {
@@ -79,14 +81,15 @@ const fetchDetails = async (projectId: number, wbsId: number) => {
   return { assignments, risks, approval, estimation };
 };
 
-type WBSDetails = Awaited<ReturnType<typeof fetchDetails>>;
+type DeleteTarget = { kind: 'assignment'; item: Assignment } | { kind: 'risk'; item: Risk } | null;
 
 const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   open,
   onClose,
   projectId,
   wbs,
-  canApprove = false,
+  canApprove,
+  variant = 'drawer',
   resources = [],
   suppliers = [],
   costTypes = [],
@@ -97,73 +100,75 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   probabilityLevels = [],
   severityLevels = [],
 }) => {
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Data states
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [risks, setRisks] = useState<Risk[]>([]);
-  const [approvalStatus, setApprovalStatus] = useState<WBSApprovalResponse | null>(null);
-  const [estimation, setEstimation] = useState<WBSCostSummary | null>(null);
-
-  // Form states
+  // Form / dialog states
   const [assignmentFormOpen, setAssignmentFormOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [riskFormOpen, setRiskFormOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const wbsId = wbs?.id;
 
-  const applyDetails = useCallback((details: WBSDetails) => {
-    setAssignments(details.assignments.items);
-    setRisks(details.risks.items);
-    setApprovalStatus(details.approval);
-    setEstimation(details.estimation);
-  }, []);
+  const {
+    data: details,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: wbsDetailsKey(projectId, wbsId),
+    queryFn: () => fetchDetails(projectId, wbsId as number),
+    enabled: open && wbsId !== undefined,
+  });
 
-  // Show the spinner when the panel opens or the WBS item changes (adjusting state during render).
-  const [loadedFor, setLoadedFor] = useState({ open, wbsId });
-  if (loadedFor.open !== open || loadedFor.wbsId !== wbsId) {
-    setLoadedFor({ open, wbsId });
-    if (open && wbsId !== undefined) {
-      setLoading(true);
-      setError(null);
-    }
-  }
-
-  useEffect(() => {
-    if (!open || wbsId === undefined) return;
-    let cancelled = false;
-    fetchDetails(projectId, wbsId)
-      .then((details) => {
-        if (!cancelled) applyDetails(details);
-      })
-      .catch((err: any) => {
-        if (!cancelled) setError(err.response?.data?.detail || 'Failed to load WBS details');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, wbsId, projectId, applyDetails]);
-
-  const loadData = async () => {
-    if (!wbs) return;
-    setLoading(true);
-    setError(null);
-    try {
-      applyDetails(await fetchDetails(projectId, wbs.id));
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load WBS details');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const assignments = details?.assignments.items ?? [];
+  const risks = details?.risks.items ?? [];
+  const approvalStatus = details?.approval ?? null;
+  const estimation = details?.estimation ?? null;
 
   const isReadonly = approvalStatus?.approval_status === 'submitted' || approvalStatus?.approval_status === 'approved';
+
+  const refresh = () => (wbsId === undefined ? Promise.resolve([]) : invalidateEstimation(queryClient, projectId, wbsId));
+
+  const assignmentSave = useMutation({
+    mutationFn: (vars: { data: AssignmentCreate | AssignmentUpdate; editing: Assignment | null }) =>
+      vars.editing
+        ? updateAssignment(projectId, wbsId as number, vars.editing.id, vars.data)
+        : createAssignment(projectId, wbsId as number, vars.data as AssignmentCreate),
+    onSuccess: (_result, vars) => {
+      toast.success(vars.editing ? 'Assignment updated' : 'Assignment created');
+      setAssignmentFormOpen(false);
+      void refresh();
+    },
+  });
+
+  const riskSave = useMutation({
+    mutationFn: (vars: { data: RiskCreate | RiskUpdate; editing: Risk | null }) =>
+      vars.editing
+        ? updateRisk(projectId, wbsId as number, vars.editing.id, vars.data)
+        : createRisk(projectId, wbsId as number, vars.data as RiskCreate),
+    onSuccess: (_result, vars) => {
+      toast.success(vars.editing ? 'Risk updated' : 'Risk created');
+      setRiskFormOpen(false);
+      void refresh();
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (target: NonNullable<DeleteTarget>) =>
+      target.kind === 'assignment'
+        ? deleteAssignment(projectId, wbsId as number, target.item.id)
+        : deleteRisk(projectId, wbsId as number, target.item.id),
+    onSuccess: (_result, target) => {
+      toast.success(target.kind === 'assignment' ? 'Assignment deleted' : 'Risk deleted');
+      setDeleteTarget(null);
+      void refresh();
+    },
+    onError: () => setDeleteTarget(null),
+  });
 
   // Assignment handlers
   const handleAddAssignment = () => {
@@ -176,25 +181,9 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
     setAssignmentFormOpen(true);
   };
 
-  const handleDeleteAssignment = async (assignment: Assignment) => {
-    if (!wbs || !confirm('Are you sure you want to delete this assignment?')) return;
-    try {
-      await deleteAssignment(projectId, wbs.id, assignment.id);
-      await loadData();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete assignment');
-    }
-  };
-
   const handleAssignmentSubmit = async (data: AssignmentCreate | AssignmentUpdate) => {
     if (!wbs) return;
-    if (editingAssignment) {
-      await updateAssignment(projectId, wbs.id, editingAssignment.id, data);
-    } else {
-      await createAssignment(projectId, wbs.id, data as AssignmentCreate);
-    }
-    setAssignmentFormOpen(false);
-    await loadData();
+    await assignmentSave.mutateAsync({ data, editing: editingAssignment });
   };
 
   // Risk handlers
@@ -208,137 +197,128 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
     setRiskFormOpen(true);
   };
 
-  const handleDeleteRisk = async (risk: Risk) => {
-    if (!wbs || !confirm('Are you sure you want to delete this risk?')) return;
-    try {
-      await deleteRisk(projectId, wbs.id, risk.id);
-      await loadData();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete risk');
-    }
-  };
-
   const handleRiskSubmit = async (data: RiskCreate | RiskUpdate) => {
     if (!wbs) return;
-    if (editingRisk) {
-      await updateRisk(projectId, wbs.id, editingRisk.id, data);
-    } else {
-      await createRisk(projectId, wbs.id, data as RiskCreate);
-    }
-    setRiskFormOpen(false);
-    await loadData();
+    await riskSave.mutateAsync({ data, editing: editingRisk });
   };
 
-  // Approval handler
+  // The approval workflow invalidates the queries itself; this keeps the cached copy fresh immediately.
   const handleApprovalChange = (newStatus: WBSApprovalResponse) => {
-    setApprovalStatus(newStatus);
-    loadData();
+    if (wbsId === undefined) return;
+    queryClient.setQueryData(wbsDetailsKey(projectId, wbsId), (old: Awaited<ReturnType<typeof fetchDetails>> | undefined) =>
+      old ? { ...old, approval: newStatus } : old,
+    );
   };
 
   if (!wbs) return null;
 
-  return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      sx={{
-        '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 600, md: 800 },
-        },
-      }}
-    >
+  const content = (
+    <>
       {/* Header */}
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box>
-          <Typography variant="h6">{wbs.wbs_title}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {wbs.wbs_code || `WBS #${wbs.id}`}
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" component="h2">
+            {wbs.wbs_title}
           </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">
+              {wbs.wbs_code || `WBS #${wbs.id}`}
+            </Typography>
+            {approvalStatus && <StatusChip kind="approval" value={approvalStatus.approval_status} />}
+          </Box>
         </Box>
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
+        <Tooltip title="Close">
+          <IconButton onClick={onClose} aria-label="Close details">
+            <CloseIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
       <Divider />
 
       {/* Tabs */}
-      <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ px: 2 }}>
-        <Tab label="Assignments" />
-        <Tab label="Risks" />
-        <Tab label="Summary" />
-        <Tab label="Approval" />
+      <Tabs
+        value={tabValue}
+        onChange={(_, v: number) => setTabValue(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        aria-label="WBS details"
+        sx={{ px: 2 }}
+      >
+        {['Assignments', 'Risks', 'Summary', 'Approval'].map((label, i) => (
+          <Tab key={label} label={label} id={`wbs-tab-${i}`} aria-controls={`wbs-panel-${i}`} />
+        ))}
       </Tabs>
       <Divider />
 
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Alert severity="error">{error}</Alert>
+        {isLoading ? (
+          <TableSkeleton rows={4} columns={5} />
+        ) : isError || !details ? (
+          <ErrorState
+            title="Could not load WBS details"
+            description="Something went wrong while loading. Check your connection and try again."
+            action={
+              <Button variant="outlined" onClick={() => void refetch()}>
+                Retry
+              </Button>
+            }
+          />
         ) : (
           <>
-            {/* Assignments Tab */}
             <TabPanel value={tabValue} index={0}>
               <AssignmentList
                 assignments={assignments}
                 onAdd={handleAddAssignment}
                 onEdit={handleEditAssignment}
-                onDelete={handleDeleteAssignment}
+                onDelete={(assignment) => setDeleteTarget({ kind: 'assignment', item: assignment })}
                 readonly={isReadonly}
               />
             </TabPanel>
 
-            {/* Risks Tab */}
             <TabPanel value={tabValue} index={1}>
               <RiskList
                 risks={risks}
                 onAdd={handleAddRisk}
                 onEdit={handleEditRisk}
-                onDelete={handleDeleteRisk}
+                onDelete={(risk) => setDeleteTarget({ kind: 'risk', item: risk })}
                 readonly={isReadonly}
               />
             </TabPanel>
 
-            {/* Summary Tab */}
             <TabPanel value={tabValue} index={2}>
               {estimation && (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
+                  <Typography variant="h6" component="h3" gutterBottom>
                     Cost Summary
                   </Typography>
-                  <Box sx={{ display: 'grid', gap: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                      <Typography>PERT Estimate</Typography>
-                      <Typography fontWeight="bold">{formatCurrency(estimation.total_pert_estimate)}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                      <Typography>Standard Deviation</Typography>
-                      <Typography fontWeight="bold">{formatCurrency(estimation.total_std_deviation)}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
-                      <Typography>80% Confidence Range</Typography>
-                      <Typography fontWeight="bold">
-                        {formatCurrency(estimation.confidence_80_low)} - {formatCurrency(estimation.confidence_80_high)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'warning.50', borderRadius: 1 }}>
-                      <Typography>Risk Exposure</Typography>
-                      <Typography fontWeight="bold">{formatCurrency(estimation.total_risk_exposure)}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
-                      <Typography>Risk-Adjusted Estimate</Typography>
-                      <Typography fontWeight="bold">{formatCurrency(estimation.risk_adjusted_estimate)}</Typography>
-                    </Box>
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <StatCard label="PERT Estimate" value={formatCurrency(estimation.total_pert_estimate)} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <StatCard label="Standard Deviation" value={formatCurrency(estimation.total_std_deviation)} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <StatCard label="Risk Exposure" value={formatCurrency(estimation.total_risk_exposure)} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <StatCard label="Risk-Adjusted Estimate" value={formatCurrency(estimation.risk_adjusted_estimate)} />
+                    </Grid>
+                  </Grid>
+                  <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      80% Confidence Range
+                    </Typography>
+                    <Typography variant="body1" className="tabular-nums" sx={{ mb: 1, fontWeight: 600 }}>
+                      {formatCurrency(estimation.confidence_80_low)} - {formatCurrency(estimation.confidence_80_high)}
+                    </Typography>
+                    <PertRangeBar {...summaryRangeBar(estimation)} />
                   </Box>
                 </Box>
               )}
             </TabPanel>
 
-            {/* Approval Tab */}
             <TabPanel value={tabValue} index={3}>
               {approvalStatus && (
                 <ApprovalWorkflow
@@ -354,7 +334,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
         )}
       </Box>
 
-      {/* Forms */}
+      {/* Forms and confirmations */}
       <AssignmentForm
         open={assignmentFormOpen}
         onClose={() => setAssignmentFormOpen(false)}
@@ -377,6 +357,44 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
         probabilityLevels={probabilityLevels}
         severityLevels={severityLevels}
       />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget?.kind === 'risk' ? 'Delete risk?' : 'Delete assignment?'}
+        message={
+          deleteTarget?.kind === 'risk'
+            ? `Delete the ${deleteTarget.item.risk_category_code} risk? This cannot be undone.`
+            : deleteTarget
+              ? `Delete the ${deleteTarget.item.resource_code} assignment? This cannot be undone.`
+              : ''
+        }
+        confirmLabel="Delete"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </>
+  );
+
+  if (variant === 'inline') {
+    return open ? (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>{content}</Box>
+    ) : null;
+  }
+
+  return (
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          width: { xs: '100%', sm: 600, md: 800 },
+        },
+      }}
+    >
+      {content}
     </Drawer>
   );
 };

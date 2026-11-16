@@ -1,0 +1,37 @@
+import type { Assignment, Risk } from '../../api/estimation';
+
+export const makeAssignment = (over: Partial<Assignment> = {}): Assignment => ({
+  id: 1,
+  wbs_id: 10,
+  resource_code: 'ENG',
+  supplier_code: 'ACME',
+  cost_type_code: null,
+  region_code: null,
+  bus_area_code: null,
+  estimating_technique_code: null,
+  best_estimate: 100,
+  likely_estimate: 200,
+  worst_estimate: 400,
+  duty_pct: 0,
+  import_content_pct: 0,
+  aii_pct: 0,
+  pert_estimate: 216.67,
+  std_deviation: 50,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  ...over,
+});
+
+export const makeRisk = (over: Partial<Risk> = {}): Risk => ({
+  id: 5,
+  wbs_id: 10,
+  risk_category_code: 'TECH',
+  risk_cost: 10000,
+  probability_code: 'M',
+  severity_code: 'H',
+  mitigation_plan: 'Add a spike',
+  risk_exposure: 2500,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  ...over,
+});
