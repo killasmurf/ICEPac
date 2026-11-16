@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { estimationRoutes } from './fixtures/estimationRoutes';
@@ -19,6 +19,13 @@ test.afterEach(() => {
 const noHorizontalScroll = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
+/** Narrow screens virtualise off-screen grid columns, so scroll the grid to the right to reach the last ones. */
+async function scrollGridRight(grid: Locator) {
+  await grid.locator('.MuiDataGrid-virtualScroller').evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+  });
+}
+
 async function openTab(page: Page, name: string | RegExp) {
   await page.goto('/projects/1');
   await page.getByRole('tab', { name }).click();
@@ -38,6 +45,7 @@ test.describe('estimation summary', () => {
     await expect(page.getByText('$1,186,000.00 to $1,314,000.00')).toBeVisible();
     const wbs = page.getByRole('grid', { name: 'WBS cost summary' });
     await expect(wbs.getByText('Foundations')).toBeVisible();
+    await scrollGridRight(wbs);
     await expect(wbs.getByText('Approved')).toBeVisible();
     await expect(wbs.getByText('Rejected')).toBeVisible();
     expect(await noHorizontalScroll(page)).toBe(true);
@@ -69,7 +77,8 @@ test.describe('project risk register', () => {
   test('renders rows from the API', async ({ page }, testInfo) => {
     await openTab(page, 'Risk Register');
     await expect(page.getByText('Steel price escalation')).toBeVisible();
-    await expect(page.getByText('$125,001')).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: '$125,001' })).toBeVisible();
+    await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
     await expect(page.getByText('Open', { exact: true })).toBeVisible();
     expect(await noHorizontalScroll(page)).toBe(true);
     await saveScreenshot(page, testInfo, 'phase-4', 'risk-register-light');
@@ -104,6 +113,7 @@ test.describe('project risk register', () => {
 
   test('edit sends a PUT and toasts', async ({ page }) => {
     await openTab(page, 'Risk Register');
+    await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
     await page.getByRole('button', { name: 'Edit risk Steel price escalation' }).click();
     const dialog = page.getByRole('dialog', { name: 'Edit Project Risk' });
     await dialog.getByLabel('Risk Cost').fill('99000');
@@ -115,6 +125,7 @@ test.describe('project risk register', () => {
 
   test('delete asks for confirmation, sends a DELETE and toasts', async ({ page }) => {
     await openTab(page, 'Risk Register');
+    await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
     await page.getByRole('button', { name: 'Delete risk Steel price escalation' }).click();
     const request = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/projects/1/risks/7'));
     await page.getByRole('dialog', { name: 'Delete project risk?' }).getByRole('button', { name: 'Delete' }).click();
@@ -127,7 +138,8 @@ test.describe('WBS detail panel', () => {
   async function openPanel(page: Page) {
     await page.goto('/projects/1');
     await page.getByRole('tab', { name: /^WBS/ }).click();
-    await page.getByText('Foundations').first().click();
+    // click the row via its code cell: the title column is collapsed to nothing on narrow screens in the current tree
+    await page.getByText('1.1', { exact: true }).first().click();
     await expect(page.getByRole('grid', { name: 'Resource assignments' })).toBeVisible();
   }
 
@@ -135,6 +147,7 @@ test.describe('WBS detail panel', () => {
     await openPanel(page);
     const grid = page.getByRole('grid', { name: 'Resource assignments' });
     await expect(grid.getByText('ENG')).toBeVisible();
+    await scrollGridRight(grid);
     await expect(grid.getByRole('img', { name: /Best case \$100\.00/ })).toBeVisible();
     await saveScreenshot(page, testInfo, 'phase-4', 'wbs-panel-light');
   });
@@ -167,6 +180,7 @@ test.describe('WBS detail panel', () => {
 
   test('deleting an assignment confirms, sends a DELETE and toasts', async ({ page }) => {
     await openPanel(page);
+    await scrollGridRight(page.getByRole('grid', { name: 'Resource assignments' }));
     await page.getByRole('button', { name: 'Delete assignment ENG' }).click();
     const request = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/projects/1/wbs/11/assignments/1'));
     await page.getByRole('dialog', { name: 'Delete assignment?' }).getByRole('button', { name: 'Delete' }).click();
