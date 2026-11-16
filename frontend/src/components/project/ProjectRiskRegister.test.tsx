@@ -1,3 +1,4 @@
+import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -24,7 +25,8 @@ vi.mock('../../api/project-risks', () => ({
 vi.mock('../../api/admin', () => ({ configApi: { listItems: h.listItems } }));
 vi.mock('../common/DataTable', async () => {
   const actual = await vi.importActual<typeof import('../common/DataTable')>('../common/DataTable');
-  const DataTable = ((props: object) => <actual.DataTable {...(props as never)} disableVirtualization />) as typeof actual.DataTable;
+  const Real = actual.DataTable as unknown as React.ComponentType<{ disableVirtualization?: boolean }>;
+  const DataTable = ((props: object) => <Real {...props} disableVirtualization />) as unknown as typeof actual.DataTable;
   return { ...actual, DataTable, default: DataTable };
 });
 
@@ -108,7 +110,7 @@ describe('ProjectRiskRegister', () => {
     expect(create).toBeDisabled();
     expect(within(dialog).getByText('Title is required')).toBeInTheDocument();
 
-    setValue(/^Title/, 'Regulatory slip');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), { target: { value: 'Regulatory slip' } });
     setValue('Risk Cost', '25000');
     expect(create).toBeEnabled();
     await userEvent.click(create);
@@ -132,7 +134,7 @@ describe('ProjectRiskRegister', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Edit risk Steel price escalation' }));
     await screen.findByRole('dialog', { name: 'Edit Project Risk' });
     expect(screen.getByLabelText('Risk Cost')).toHaveValue(125000.5);
-    setValue(/^Title/, 'Steel price spike');
+    fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), { target: { value: 'Steel price spike' } });
     setValue('Risk Cost', '-1');
     expect(screen.getByText('Must be 0 or more')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();

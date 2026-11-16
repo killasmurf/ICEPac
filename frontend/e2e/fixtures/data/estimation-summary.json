@@ -1,0 +1,29 @@
+{
+  "project_id": 1,
+  "project_name": "Harbour Bridge Refurbishment",
+  "total_wbs_items": 2,
+  "total_assignments": 3,
+  "total_pert_estimate": 1250000,
+  "total_std_deviation": 50000,
+  "confidence_80_low": 1186000,
+  "confidence_80_high": 1314000,
+  "total_risks": 2,
+  "total_risk_exposure": 75000,
+  "risk_adjusted_estimate": 1325000,
+  "by_cost_type": [{ "code": "LAB", "description": "Labour", "total_pert": 800000, "assignment_count": 2 }],
+  "by_region": [],
+  "by_resource": [],
+  "by_supplier": [{ "code": "ACME", "name": "Acme Pty Ltd", "total_pert": 450000, "assignment_count": 1 }],
+  "wbs_summaries": [
+    {
+      "wbs_id": 11, "wbs_code": "1.1", "wbs_title": "Foundations", "assignment_count": 2,
+      "total_pert_estimate": 700000, "total_std_deviation": 10000, "confidence_80_low": 687200, "confidence_80_high": 712800,
+      "risk_count": 1, "total_risk_exposure": 25000, "risk_adjusted_estimate": 725000, "approval_status": "approved"
+    },
+    {
+      "wbs_id": 12, "wbs_code": "1.2", "wbs_title": "Deck", "assignment_count": 1,
+      "total_pert_estimate": 550000, "total_std_deviation": 20000, "confidence_80_low": 524400, "confidence_80_high": 575600,
+      "risk_count": 1, "total_risk_exposure": 50000, "risk_adjusted_estimate": 600000, "approval_status": "rejected"
+    }
+  ]
+}

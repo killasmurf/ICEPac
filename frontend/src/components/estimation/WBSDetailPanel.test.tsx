@@ -1,3 +1,4 @@
+import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -30,7 +31,8 @@ vi.mock('../../api/estimation', async () => {
 });
 vi.mock('../common/DataTable', async () => {
   const actual = await vi.importActual<typeof import('../common/DataTable')>('../common/DataTable');
-  const DataTable = ((props: object) => <actual.DataTable {...(props as never)} disableVirtualization />) as typeof actual.DataTable;
+  const Real = actual.DataTable as unknown as React.ComponentType<{ disableVirtualization?: boolean }>;
+  const DataTable = ((props: object) => <Real {...props} disableVirtualization />) as unknown as typeof actual.DataTable;
   return { ...actual, DataTable, default: DataTable };
 });
 
