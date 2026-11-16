@@ -16,7 +16,9 @@ const theme = createTheme({
     } },
     dark: { palette: {
       primary:   { main: brand.gold, dark: brand.goldDark, light: brand.goldLight, contrastText: brand.navyDeep },
-      secondary: { main: status.dark.info, contrastText: brand.navyDeep },
+      // Gold stays the key-action colour in dark mode (same as primary), so a
+      // `color="secondary"` button is gold in both schemes.
+      secondary: { main: brand.gold, dark: brand.goldDark, light: brand.goldLight, contrastText: brand.navyDeep },
       success: { main: status.dark.success }, warning: { main: status.dark.warning },
       error: { main: status.dark.error }, info: { main: status.dark.info },
       background: { default: dark.bg, paper: dark.paper },

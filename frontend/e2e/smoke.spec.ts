@@ -15,9 +15,9 @@ test.afterEach(() => {
 
 test('login page renders', async ({ page }, testInfo) => {
   await page.goto('/login');
-  await expect(page.getByRole('heading', { name: 'ICEPac Login' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Username')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
   await saveScreenshot(page, testInfo, PHASE, 'login');
 });
 
