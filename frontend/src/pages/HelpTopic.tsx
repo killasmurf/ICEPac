@@ -1,96 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, CircularProgress, Button, Divider } from '@mui/material';
+import React from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Skeleton from '@mui/material/Skeleton';
+import Typography from '@mui/material/Typography';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getTopic, HelpTopic as HelpTopicType } from '../api/help';
+import SearchOffIcon from '@mui/icons-material/SearchOff';
+import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink, useParams } from 'react-router-dom';
+import { getTopic } from '../api/help';
+import ErrorState from '../components/common/ErrorState';
+
+const BackLink: React.FC = () => (
+  <Button component={RouterLink} to="/help" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
+    Back to Help
+  </Button>
+);
+
+function statusOf(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } } | null)?.response?.status;
+}
 
 const HelpTopic: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [topic, setTopic] = useState<HelpTopicType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const topicId = Number(id);
+  const valid = Number.isInteger(topicId) && topicId > 0;
 
-  // Reset to the loading state when the topic id changes (adjusting state during render).
-  const [loadedId, setLoadedId] = useState(id);
-  if (loadedId !== id) {
-    setLoadedId(id);
-    if (id) {
-      setLoading(true);
-      setError('');
-    }
-  }
+  // Not ['help','topics',id]: the shell's breadcrumb hook caches only the title under that key.
+  const { data: topic, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['help', 'topics', topicId, 'detail'],
+    queryFn: () => getTopic(topicId),
+    enabled: valid,
+    retry: (count, err) => statusOf(err) !== 404 && count < 1,
+    meta: { silent: true }, // shown inline below
+  });
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    getTopic(Number(id))
-      .then((data) => {
-        if (!cancelled) setTopic(data);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load help topic.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  if (loading) {
+  if (valid && isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-        <CircularProgress />
+      <Box sx={{ maxWidth: '72ch' }} aria-busy="true" aria-label="Loading">
+        <BackLink />
+        <Skeleton variant="text" width="60%" height={48} />
+        <Skeleton variant="text" />
+        <Skeleton variant="text" />
+        <Skeleton variant="text" width="70%" />
       </Box>
     );
   }
 
-  if (error || !topic) {
+  if (!valid || (isError && statusOf(error) === 404)) {
     return (
       <Box>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/help')} sx={{ mb: 2 }}>
-          Back to Help
-        </Button>
-        <Typography color="error">{error || 'Topic not found.'}</Typography>
+        <BackLink />
+        <ErrorState
+          icon={<SearchOffIcon />}
+          title="Topic not found"
+          description="This help topic does not exist or is no longer available."
+        />
       </Box>
     );
   }
+
+  if (isError || !topic) {
+    return (
+      <Box>
+        <BackLink />
+        <ErrorState
+          title="Could not load this topic"
+          description="Something went wrong while loading the topic. Try again."
+          action={
+            <Button variant="outlined" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      </Box>
+    );
+  }
+
+  const sections = [...topic.descriptions].sort((a, b) => a.section_number - b.section_number);
 
   return (
     <Box>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/help')} sx={{ mb: 2 }}>
-        Back to Help
-      </Button>
+      <BackLink />
+      <Card sx={{ maxWidth: '72ch' }}>
+        <CardContent sx={{ p: { xs: 2, sm: 4 } }}>
+          <Typography variant="h3" component="h1" gutterBottom>
+            {topic.title}
+          </Typography>
+          <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{topic.content}</Typography>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          {topic.title}
-        </Typography>
-
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 3 }}>
-          {topic.content}
-        </Typography>
-
-        {topic.descriptions.length > 0 && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            {topic.descriptions
-              .sort((a, b) => a.section_number - b.section_number)
-              .map((desc) => (
-                <Box key={desc.id} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Section {desc.section_number}
-                  </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {desc.detailed_text}
-                  </Typography>
-                </Box>
-              ))}
-          </>
-        )}
-      </Paper>
+          {sections.map((desc) => (
+            <Box key={desc.id} component="section" sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+              <Typography variant="h6" component="h2" gutterBottom>
+                Section {desc.section_number}
+              </Typography>
+              <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{desc.detailed_text}</Typography>
+            </Box>
+          ))}
+        </CardContent>
+      </Card>
     </Box>
   );
 };
