@@ -101,14 +101,22 @@ Added because an application needs states the marketing site does not. All pass 
 - **Shape:** 8px radius on cards, inputs and buttons; 999px on chips.
 - **Product naming:** the app is "ICEPac"; the brand line is "by Adalex Consulting".
 
-### 3.4 Logo (open item for Adam)
+### 3.4 Logo assets (supplied by Adam, committed)
 
-The Adalex logo could not be downloaded into the build environment. Adam to add two files:
+All four files are transparent PNGs in `frontend/public/brand/`. The white and mark-only files were generated from the supplied logo by recolouring and cropping; the artwork itself is unchanged.
 
-- `frontend/public/brand/adalex-logo.svg` — standard (blue on transparent), for light surfaces
-- `frontend/public/brand/adalex-logo-white.svg` — white version, for the dark sidebar and login panel
+| File | Size | Use |
+|---|---|---|
+| `adalex-logo.png` | 1316×362 | Full logo (blue `#004773` mark, `#3B4B59` wordmark). Light surfaces only: login form panel, light-mode footer. |
+| `adalex-logo-white.png` | 1316×362 | Full logo in white. Dark surfaces: sidebar footer, login brand panel. |
+| `adalex-mark.png` | 404×404 | Diamond mark only, blue. Favicon source; light surfaces. |
+| `adalex-mark-white.png` | 404×404 | Diamond mark only, white. Sidebar header and collapsed rail. |
 
-Until they exist, the `BrandMark` component (P1-T5) renders a text wordmark, so nothing is blocked.
+Rules:
+- Never place the blue logo on a navy surface (the blue mark is nearly invisible on `navyDeep`); use the white files there. In dark colour mode always use the white files.
+- Do not recolour, stretch, crop or add effects to the logo. Keep clear space of at least half the mark's height on every side. Minimum rendered height of the full logo is 24px.
+- Always set `alt="Adalex Consulting"` (or `alt=""` when the name is printed next to it).
+- For reference, the brand's own solid backdrop for the white logo is `#224A6E`. It is not used as a UI surface.
 
 ---
 
@@ -359,9 +367,12 @@ Create `src/theme/components.ts` exporting a `Components<Theme>` object. Require
 
 ### P1-T5 Brand mark
 `components/brand/BrandMark.tsx`, props `{ variant: 'light' | 'dark'; collapsed?: boolean }`.
-- If `/brand/adalex-logo.svg` (or `-white.svg` for `variant="dark"`) loads, show it at 28px height next to the word "ICEPac"; on `onError` fall back to the text wordmark: "ICEPac" (700 weight) with "by Adalex Consulting" beneath (overline style, gold on dark, `goldText` on light).
-- When `collapsed`, show only a 32px rounded square in gold with "IC" in `navyDeep`.
-- **Accept:** unit test renders the text fallback when the image errors.
+- `variant` names the **surface**: `dark` = on a navy surface (use the `-white` files), `light` = on a light surface (use the blue files). In dark colour mode callers always pass `dark`.
+- Expanded: the mark (`/brand/adalex-mark-white.png` or `/brand/adalex-mark.png`) at 32px, then "ICEPac" (700 weight, 1.125rem) with "by Adalex Consulting" beneath (overline style; gold on dark, `goldText` on light).
+- `collapsed`: the 32px mark only, with `alt="ICEPac by Adalex Consulting"`.
+- Also export `AdalexLogo` (`variant: 'light' | 'dark'`, `height` default 28) which renders the full logo file. Use it in the sidebar footer above the collapse toggle (hidden in rail mode) and on the login page.
+- If an image fails to load (`onError`), render the text only; never show a broken image.
+- **Accept:** unit tests: `variant="dark"` requests a `-white` file; `collapsed` renders one image and no text; the text fallback renders when the image errors.
 
 ### P1-T6 Formatters
 `src/utils/format.ts`:
@@ -575,7 +586,7 @@ In `EstimationSummary`: above the tabs add a "Cost breakdown" card with a segmen
 | P6-T4 | Loading polish: `placeholderData: keepPreviousData` on paginated lists so tables do not blank between pages; a 2px `LinearProgress` under the header whenever `useIsFetching() > 0`. | e2e: paging a table never shows the skeleton after first load. |
 | P6-T5 | Focus and keyboard pass: visible `:focus-visible` ring (2px, gold on dark surfaces, navy on light) on every interactive element; dialogs return focus to their trigger; a "Skip to content" link as the first tab stop. | e2e: first Tab on `/` focuses "Skip to content"; axe clean on all routes in both modes. |
 | P6-T6 | Performance budget: keep the entry chunk small via the lazy routes from P2-T7; charts and the data grid must not be in the entry chunk. | After `npm run build`, the largest entry `*.js` in `build/assets` is under 350 kB gzipped (script `scripts/bundle-budget.mjs`, added to `verify`). |
-| P6-T7 | Favicon and metadata: replace `public/favicon.ico` with an "IC" mark in navy and gold (SVG `favicon.svg` plus `.ico` fallback); `manifest.json` `theme_color: #153351`, `background_color: #F5F7F9`. | `build/index.html` references the new icon. |
+| P6-T7 | Favicon and metadata: replace `public/favicon.ico` with icons generated from `public/brand/adalex-mark.png` (the blue diamond on a transparent background: `favicon.ico` at 16/32/48px, `icon-192.png`, `icon-512.png`, referenced from `index.html` and `manifest.json`); `manifest.json` `theme_color: #153351`, `background_color: #F5F7F9`. | `build/index.html` references the new icon. |
 | P6-T8 | Documentation: rewrite `frontend/README.md` (run, test, env vars, theme tokens, how to add a screen using the recipe in 9.1). Add a "UI" section to the root `README.md`. Tick the branding items in `IMPLEMENTATION_CHECKLIST.md` and `MODERNIZATION_PLAN.md`. | Files updated; commands in the README were run and work. |
 | P6-T9 | Final review pack: run the full e2e suite and attach the `__screenshots__` artefact (every route × desktop/mobile × light/dark) to the PR for Adam's sign-off. | Artefact present on the PR. |
 
@@ -601,7 +612,7 @@ In `EstimationSummary`: above the tabs add a "Cost breakdown" card with a segmen
 
 ## 13. Inputs needed from Adam
 
-1. Logo files (section 3.4). Not blocking.
+1. ~~Logo files~~ — received and committed (section 3.4).
 2. Confirmation of the decisions in section 12.
 3. A seeded admin login for the manual check at the end of each phase.
 
