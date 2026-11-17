@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password
-from app.models.database.user import User
+from app.models.database.user import User, UserRole
 from app.models.schemas.user import UserCreate, UserPasswordUpdate, UserUpdate
 from app.repositories.user_repository import UserRepository
 
@@ -73,13 +73,31 @@ class UserService:
         return self.repository.update(user, update_data)
 
     def update_password(
-        self, user_id: int, password_update: UserPasswordUpdate
+        self, user_id: int, password_update: UserPasswordUpdate, acting_user: User
     ) -> User:
+        """Change a user's password.
+
+        Changing your own password requires the current password. An admin may
+        reset another user's password without it; anyone else may not.
+        """
         user = self.get_or_404(user_id)
-        if not verify_password(password_update.current_password, user.hashed_password):
+        if acting_user.id == user.id:
+            if not password_update.current_password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is required",
+                )
+            if not verify_password(
+                password_update.current_password, user.hashed_password
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Incorrect current password",
+                )
+        elif acting_user.role != UserRole.ADMIN:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Incorrect current password",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset another user's password",
             )
         return self.repository.update(
             user, {"hashed_password": get_password_hash(password_update.new_password)}

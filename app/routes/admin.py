@@ -125,12 +125,12 @@ async def update_password(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Change user password."""
+    """Change a user's password (self: needs current password; admin: reset)."""
     service = UserService(db)
-    service.update_password(user_id, password_in)
+    service.update_password(user_id, password_in, current_user)
 
     audit = AuditService(db)
-    audit.log_password_change(user_id, request)
+    audit.log_password_change(user_id, request, acting_user_id=current_user.id)
     return {"detail": "Password updated"}
 
 
