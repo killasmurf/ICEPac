@@ -17,8 +17,7 @@ test.afterEach(() => {
 const pages: { name: string; path: string; auth: boolean; ready: string; exclude?: string[] }[] = [
   { name: 'login', path: '/login', auth: false, ready: 'Welcome back' },
   { name: 'dashboard', path: '/', auth: true, ready: 'Dashboard' },
-  // TODO(phase-4): the per-row archive icon buttons in the Projects table have no label (button-name); DataTable row actions fix this.
-  { name: 'projects', path: '/projects', auth: true, ready: 'Harbour Bridge Refurbishment', exclude: ['main tbody button'] },
+  { name: 'projects', path: '/projects', auth: true, ready: 'Harbour Bridge Refurbishment' },
 ];
 
 for (const scheme of ['light', 'dark'] as const) {

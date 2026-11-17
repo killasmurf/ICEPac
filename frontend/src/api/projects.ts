@@ -39,8 +39,8 @@ export interface ProjectCreateInput {
 
 export interface ProjectUpdateInput {
   project_name?: string;
-  project_manager?: string;
-  description?: string;
+  project_manager?: string | null;
+  description?: string | null;
   archived?: boolean;
 }
 
@@ -142,7 +142,7 @@ export interface WBSTreeResponse {
 // ============================================================
 
 export async function getProjects(skip = 0, limit = 100, search?: string): Promise<ProjectListResponse> {
-  const params: Record<string, any> = { skip, limit };
+  const params: Record<string, string | number> = { skip, limit };
   if (search) params.search = search;
   const response = await client.get('/projects', { params });
   return response.data;
@@ -171,11 +171,20 @@ export async function deleteProject(id: number): Promise<void> {
 // Import API functions
 // ============================================================
 
-export async function uploadProjectFile(projectId: number, file: File): Promise<ImportStartResponse> {
+export async function uploadProjectFile(
+  projectId: number,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<ImportStartResponse> {
   const formData = new FormData();
   formData.append('file', file);
   const response = await client.post(`/projects/${projectId}/import`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress
+      ? (event) => {
+          if (event.total) onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      : undefined,
   });
   return response.data;
 }
