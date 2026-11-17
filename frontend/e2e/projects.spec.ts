@@ -212,7 +212,7 @@ test.describe('project import (ProjectUpload on the project page)', () => {
     await setup(page);
     await openImport(page);
     await expect(page.getByText(/Accepted types: \.mpp, \.mpx, \.xml/)).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'harbour-bridge.mpp' })).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: 'harbour-bridge.mpp' })).toBeVisible();
     await expect(page.getByText('Completed')).toBeVisible();
     await expect(page.getByText('Could not parse file')).toBeVisible();
     await noHorizontalScroll(page);

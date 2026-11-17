@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { GridColDef } from '@mui/x-data-grid';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { DataTable } from './DataTable';
+import { DataTable, useResponsiveColumns } from './DataTable';
 
 interface Row { id: number; name: string }
 const columns: GridColDef<Row>[] = [{ field: 'name', headerName: 'Name', flex: 1 }];
@@ -74,5 +74,40 @@ describe('DataTable', () => {
   it('renders the toolbar slot', () => {
     renderWithProviders(<DataTable<Row> rows={[]} columns={columns} toolbar={<span>My toolbar</span>} disableVirtualization />);
     expect(screen.getByText('My toolbar')).toBeInTheDocument();
+  });
+
+  it('renders the footer under the grid', () => {
+    renderWithProviders(<DataTable<Row> rows={makeRows(2)} columns={columns} footer={<div>Totals here</div>} disableVirtualization />);
+    expect(screen.getByText('Totals here')).toBeInTheDocument();
+  });
+
+  it('hides columns named in columnVisibilityModel', async () => {
+    const two: GridColDef<Row>[] = [...columns, { field: 'id', headerName: 'Identifier', width: 100 }];
+    renderWithProviders(<DataTable<Row> rows={makeRows(1)} columns={two} columnVisibilityModel={{ id: false }} disableVirtualization />);
+    expect(await screen.findByText('Project 1')).toBeInTheDocument();
+    expect(screen.queryByText('Identifier')).toBeNull();
+  });
+});
+
+describe('useResponsiveColumns', () => {
+  const fields = ['email'];
+  function Probe() {
+    return <span data-testid="model">{JSON.stringify(useResponsiveColumns(fields))}</span>;
+  }
+  const mockMatch = (matches: boolean) =>
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+
+  it('hides the named columns on small screens only', () => {
+    mockMatch(true);
+    const { unmount } = renderWithProviders(<Probe />);
+    expect(screen.getByTestId('model').textContent).toBe('{"email":false}');
+    unmount();
+    mockMatch(false);
+    renderWithProviders(<Probe />);
+    expect(screen.getByTestId('model').textContent).toBe('{}');
+    vi.unstubAllGlobals();
   });
 });

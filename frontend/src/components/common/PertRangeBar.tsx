@@ -11,11 +11,15 @@ export interface PertRangeBarProps {
   pert: number;
   low80?: number;
   high80?: number;
+  /** Name of the left end of the bar. Defaults to "Best". */
+  minLabel?: string;
+  /** Name of the right end of the bar. Defaults to "Worst". */
+  maxLabel?: string;
 }
 
 const clamp = (n: number) => Math.min(100, Math.max(0, n));
 
-export function PertRangeBar({ best, likely, worst, pert, low80, high80 }: PertRangeBarProps) {
+export function PertRangeBar({ best, likely, worst, pert, low80, high80, minLabel = 'Best', maxLabel = 'Worst' }: PertRangeBarProps) {
   const span = worst - best;
   const degenerate = span === 0;
   const pos = (v: number) => (degenerate ? 50 : clamp(((v - best) / span) * 100));
@@ -24,14 +28,14 @@ export function PertRangeBar({ best, likely, worst, pert, low80, high80 }: PertR
   const fc = (v: number) => formatCurrency(v);
 
   const summary =
-    `Best case ${fc(best)}, most likely ${fc(likely)}, worst case ${fc(worst)}, PERT estimate ${fc(pert)}` +
+    `${minLabel === 'Best' ? 'Best case' : minLabel} ${fc(best)}, most likely ${fc(likely)}, ${maxLabel === 'Worst' ? 'worst case' : maxLabel} ${fc(worst)}, PERT estimate ${fc(pert)}` +
     (low80 != null && high80 != null ? `, 80% range ${fc(low80)} to ${fc(high80)}` : '');
 
   const tip = (
     <Box>
-      <div>Best: {fc(best)}</div>
+      <div>{minLabel}: {fc(best)}</div>
       <div>Most likely: {fc(likely)}</div>
-      <div>Worst: {fc(worst)}</div>
+      <div>{maxLabel}: {fc(worst)}</div>
       <div>PERT: {fc(pert)}</div>
       {low80 != null && high80 != null && (
         <div>

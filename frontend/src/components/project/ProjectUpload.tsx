@@ -11,12 +11,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +20,8 @@ import {
   uploadProjectFile,
   type ImportJob,
 } from '../../api/projects';
+import type { GridColDef } from '@mui/x-data-grid';
+import DataTable from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import ErrorState from '../common/ErrorState';
 import { StatusChip } from '../common/StatusChip';
@@ -49,6 +45,64 @@ interface ProjectUploadProps {
 }
 
 const POLL_INTERVAL_MS = 2000;
+const HISTORY_COLUMNS: GridColDef<ImportJob>[] = [
+  {
+    field: 'filename',
+    headerName: 'File',
+    flex: 1.5,
+    minWidth: 200,
+    sortable: false,
+    renderCell: ({ row }) => (
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', minWidth: 0, lineHeight: 1.3 }}>
+        <Typography variant="body2" noWrap title={row.filename}>
+          {row.filename}
+        </Typography>
+        {row.status === 'failed' && row.error_message && (
+          <Typography variant="caption" color="error" noWrap title={row.error_message}>
+            {row.error_message}
+          </Typography>
+        )}
+      </Box>
+    ),
+  },
+  { field: 'status', headerName: 'Status', width: 140, sortable: false, renderCell: ({ row }) => <StatusChip kind="job" value={row.status} /> },
+  {
+    field: 'task_count',
+    headerName: 'Tasks',
+    type: 'number',
+    width: 100,
+    sortable: false,
+    cellClassName: 'tabular-nums',
+    valueFormatter: (v: number) => formatNumber(v),
+  },
+  {
+    field: 'resource_count',
+    headerName: 'Resources',
+    type: 'number',
+    width: 120,
+    sortable: false,
+    cellClassName: 'tabular-nums',
+    valueFormatter: (v: number) => formatNumber(v),
+  },
+  {
+    field: 'file_size',
+    headerName: 'Size',
+    type: 'number',
+    width: 110,
+    sortable: false,
+    cellClassName: 'tabular-nums',
+    valueFormatter: (v: number | null) => formatFileSize(v),
+  },
+  {
+    field: 'started_at',
+    headerName: 'Started',
+    width: 170,
+    sortable: false,
+    valueGetter: (_v, row) => row.started_at ?? row.created_at,
+    valueFormatter: (v: string) => formatDateTime(v),
+  },
+];
+
 const tint = (color: string) => `color-mix(in srgb, ${color} 14%, transparent)`;
 
 const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComplete }) => {
@@ -293,47 +347,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
         ) : history.data.items.length === 0 ? (
           <EmptyState title="No imports yet" description="Imports of MS Project files for this project will be listed here." />
         ) : (
-          <TableContainer tabIndex={0} role="region" aria-label="Import history, scrollable" sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
-            <Table size="small" aria-label="Import history">
-              <TableHead>
-                <TableRow>
-                  <TableCell>File</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Tasks</TableCell>
-                  <TableCell align="right">Resources</TableCell>
-                  <TableCell align="right">Size</TableCell>
-                  <TableCell>Started</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {history.data.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell sx={{ minWidth: 200 }}>
-                      {item.filename}
-                      {item.status === 'failed' && item.error_message && (
-                        <Typography variant="caption" color="error" component="div">
-                          {item.error_message}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <StatusChip kind="job" value={item.status} />
-                    </TableCell>
-                    <TableCell align="right" className="tabular-nums">
-                      {formatNumber(item.task_count)}
-                    </TableCell>
-                    <TableCell align="right" className="tabular-nums">
-                      {formatNumber(item.resource_count)}
-                    </TableCell>
-                    <TableCell align="right" className="tabular-nums">
-                      {formatFileSize(item.file_size)}
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDateTime(item.started_at ?? item.created_at)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DataTable<ImportJob> rows={history.data.items} columns={HISTORY_COLUMNS} ariaLabel="Import history" />
         )}
       </Box>
     </Box>

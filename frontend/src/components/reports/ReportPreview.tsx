@@ -67,35 +67,38 @@ export default function ReportPreview({ result }: ReportPreviewProps) {
         />
       ) : (
         <>
-          <DataTable<PreviewRow> rows={rows} columns={columns} ariaLabel={`${result.title} report data`} />
-          {totalEntries.length > 0 && (
-            <Box
-              component="dl"
-              aria-label="Report totals"
-              sx={{
-                m: 0,
-                p: 2,
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                gap: 2,
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 1,
-                bgcolor: 'action.hover',
-              }}
-            >
-              {totalEntries.map((c) => (
-                <Box key={c.key} sx={{ minWidth: 0 }}>
-                  <Typography component="dt" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    Total {c.label}
-                  </Typography>
-                  <Typography component="dd" variant="subtitle1" className="tabular-nums" sx={{ m: 0 }}>
-                    {formatCell(kinds.get(c.key) ?? 'text', result.totals?.[c.key])}
-                  </Typography>
+          <DataTable<PreviewRow>
+            rows={rows}
+            columns={columns}
+            ariaLabel={`${result.title} report data`}
+            footer={
+              totalEntries.length > 0 ? (
+                <Box
+                  component="dl"
+                  aria-label="Report totals"
+                  sx={{
+                    m: 0,
+                    p: 2,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: 2,
+                    bgcolor: 'action.hover',
+                  }}
+                >
+                  {totalEntries.map((c) => (
+                    <Box key={c.key} sx={{ minWidth: 0 }}>
+                      <Typography component="dt" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Total {c.label}
+                      </Typography>
+                      <Typography component="dd" variant="subtitle1" className="tabular-nums" sx={{ m: 0 }}>
+                        {formatCell(kinds.get(c.key) ?? 'text', result.totals?.[c.key])}
+                      </Typography>
+                    </Box>
+                  ))}
                 </Box>
-              ))}
-            </Box>
-          )}
+              ) : undefined
+            }
+          />
         </>
       )}
     </Box>

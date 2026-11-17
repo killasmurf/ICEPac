@@ -17,7 +17,7 @@ import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { usersApi, type User, type UserCreate, type UserRole, type UserUpdate } from '../../api/admin';
 import { useAuth } from '../../auth/AuthContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import DataTable from '../../components/common/DataTable';
+import DataTable, { useResponsiveColumns } from '../../components/common/DataTable';
 import ErrorState from '../../components/common/ErrorState';
 import FormDialog from '../../components/common/FormDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -63,7 +63,11 @@ interface PasswordForm {
 }
 const EMPTY_PASSWORD: PasswordForm = { current: '', next: '', confirm: '' };
 
+/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
+const USER_LOW_PRIORITY = ['email', 'last_login'];
+
 export default function UserManagement() {
+  const columnVisibilityModel = useResponsiveColumns(USER_LOW_PRIORITY);
   const { user: me } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -307,6 +311,7 @@ export default function UserManagement() {
           />
         ) : (
           <DataTable<User>
+            columnVisibilityModel={columnVisibilityModel}
             ariaLabel="Users"
             rows={rows}
             columns={columns}

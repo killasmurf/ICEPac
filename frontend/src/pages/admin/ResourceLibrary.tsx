@@ -16,7 +16,7 @@ import TextField from '@mui/material/TextField';
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { resourcesApi, type Resource, type ResourceCreate } from '../../api/admin';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import DataTable from '../../components/common/DataTable';
+import DataTable, { useResponsiveColumns } from '../../components/common/DataTable';
 import ErrorState from '../../components/common/ErrorState';
 import FormDialog from '../../components/common/FormDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -48,7 +48,11 @@ function validate(form: ResourceForm): FormErrors {
   return errors;
 }
 
+/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
+const RESOURCE_LOW_PRIORITY = ['eoc', 'units'];
+
 export default function ResourceLibrary() {
+  const columnVisibilityModel = useResponsiveColumns(RESOURCE_LOW_PRIORITY);
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -222,7 +226,7 @@ export default function ResourceLibrary() {
         }
       />
 
-      <Card sx={{ p: 2, '& .tabular-nums': { fontVariantNumeric: 'tabular-nums' } }}>
+      <Card sx={{ p: 2 }}>
         {failedFirstLoad ? (
           <ErrorState
             title="Could not load resources"
@@ -235,6 +239,7 @@ export default function ResourceLibrary() {
           />
         ) : (
           <DataTable<Resource>
+            columnVisibilityModel={columnVisibilityModel}
             ariaLabel="Resources"
             rows={rows}
             columns={columns}

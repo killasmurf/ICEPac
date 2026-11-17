@@ -2,6 +2,8 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import InboxOutlined from '@mui/icons-material/InboxOutlined';
 import {
   DataGrid,
@@ -9,6 +11,7 @@ import {
   useGridApiContext,
   useGridSelector,
   type GridColDef,
+  type GridColumnVisibilityModel,
   type GridPaginationModel,
   type GridRowId,
   type GridRowsProp,
@@ -42,6 +45,10 @@ export interface DataTableProps<R extends { id?: GridRowId } = Record<string, un
   emptyAction?: React.ReactNode;
   /** Rendered above the grid (search field, filters, buttons). */
   toolbar?: React.ReactNode;
+  /** Rendered directly under the grid inside the same outlined container, for example a totals block. */
+  footer?: React.ReactNode;
+  /** Hides columns by field name. See useResponsiveColumns for hiding low-priority columns on phones. */
+  columnVisibilityModel?: GridColumnVisibilityModel;
   /** Accessible name for the grid. */
   ariaLabel?: string;
   /** Error from the data source. Shows an inline alert with a retry button. */
@@ -74,6 +81,19 @@ function LoadingOverlay() {
   );
 }
 
+/**
+ * Column visibility model that hides the named low-priority columns below the `sm` breakpoint,
+ * so the table does not force sideways scrolling on phones for columns of little value.
+ */
+export function useResponsiveColumns(hiddenBelowSm: readonly string[]): GridColumnVisibilityModel {
+  const theme = useTheme();
+  const small = useMediaQuery(theme.breakpoints.down('sm'));
+  return React.useMemo(
+    () => (small ? Object.fromEntries(hiddenBelowSm.map((field) => [field, false])) : {}),
+    [small, hiddenBelowSm],
+  );
+}
+
 export function DataTable<R extends { id?: GridRowId } = Record<string, unknown> & { id?: GridRowId }>({
   rows,
   columns,
@@ -88,6 +108,8 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
   emptyDescription,
   emptyAction,
   toolbar,
+  footer,
+  columnVisibilityModel,
   ariaLabel,
   error,
   onRetry,
@@ -105,7 +127,9 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
           action={onRetry && <Button variant="outlined" onClick={onRetry}>Retry</Button>}
         />
       )}
-      <Box sx={{ width: '100%', minHeight: 240 }}>
+      <Box
+        sx={{ width: '100%', minHeight: 240, minWidth: 0, border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden', bgcolor: 'background.paper' }}
+      >
         <DataGrid<R>
           rows={rows}
           columns={columns}
@@ -123,6 +147,7 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
           onPaginationModelChange={onPaginationModelChange}
           sortModel={sortModel}
           onSortModelChange={onSortModelChange}
+          columnVisibilityModel={columnVisibilityModel}
           onRowClick={onRowClick ? (params) => onRowClick(params.row) : undefined}
           disableVirtualization={disableVirtualization}
           slots={{ noRowsOverlay: NoRowsOverlay, loadingOverlay: LoadingOverlay }}
@@ -133,8 +158,8 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
               '--DataGrid-t-color-background-base': p.background.paper,
               '--DataGrid-t-header-background-base': p.background.paper,
               backgroundColor: p.background.paper,
-              borderColor: p.divider,
-              borderRadius: 1,
+              border: 0,
+              borderRadius: 0,
               '& .MuiDataGrid-columnHeaders': { borderBottomColor: p.divider },
               '& .MuiDataGrid-columnHeaderTitle': {
                 fontWeight: 600,
@@ -152,6 +177,7 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
             };
           }}
         />
+        {footer && <Box sx={{ borderTop: 1, borderColor: 'divider' }}>{footer}</Box>}
       </Box>
     </Box>
   );

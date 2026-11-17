@@ -13,18 +13,14 @@ interface TotalsStripProps {
   items: TotalsItem[];
 }
 
-/** Totals shown under a DataTable (the grid has no footer row in this edition). */
+/** Totals block, passed as the `footer` of a DataTable so it sits inside the table's outlined container. */
 const TotalsStrip: React.FC<TotalsStripProps> = ({ label, ariaLabel, items }) => (
   <Box
     role="group"
     aria-label={ariaLabel}
     sx={{
-      mt: 1.5,
       px: 2,
       py: 1.5,
-      borderRadius: 1,
-      border: 1,
-      borderColor: 'divider',
       bgcolor: 'action.hover',
       display: 'flex',
       flexWrap: 'wrap',

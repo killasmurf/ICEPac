@@ -54,4 +54,11 @@ describe('PertRangeBar', () => {
     await userEvent.tab();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('PERT: $15.83');
   });
+
+  it('names the ends Best and Worst by default and accepts custom labels', () => {
+    const { rerender } = renderWithProviders(<PertRangeBar best={10} likely={15} worst={25} pert={15} />);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/^Best case \$10\.00.*worst case \$25\.00/);
+    rerender(<PertRangeBar best={10} likely={15} worst={25} pert={15} minLabel="Low (-3σ)" maxLabel="High (+3σ)" />);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/^Low \(-3σ\) \$10\.00.*High \(\+3σ\) \$25\.00/);
+  });
 });

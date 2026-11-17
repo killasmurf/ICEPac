@@ -260,7 +260,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
           <Typography variant="h5" component="p" className="tabular-nums" sx={{ mb: 1 }}>
             {formatCurrency(summary.confidence_80_low)} to {formatCurrency(summary.confidence_80_high)}
           </Typography>
-          <PertRangeBar {...range} />
+          <PertRangeBar {...range} minLabel="Low (−3σ)" maxLabel="High (+3σ)" />
           <Typography variant="caption" color="text.secondary">
             The gold marker is the PERT estimate and the shaded band is the 80% range. The bar spans three standard
             deviations either side of the estimate.
