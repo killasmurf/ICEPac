@@ -49,7 +49,7 @@ function validate(form: SupplierForm): FormErrors {
 }
 
 /** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
-const SUPPLIER_LOW_PRIORITY = ['email', 'phone'];
+const SUPPLIER_LOW_PRIORITY = ['contact', 'email', 'phone'];
 
 export default function SupplierManagement() {
   const columnVisibilityModel = useResponsiveColumns(SUPPLIER_LOW_PRIORITY);
@@ -186,7 +186,7 @@ export default function SupplierManagement() {
   return (
     <Box>
       <PageHeader
-        title="Supplier management"
+        title="Supplier Management"
         subtitle="Manage the suppliers behind your resources"
         actions={
           <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>

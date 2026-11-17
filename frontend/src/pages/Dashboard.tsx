@@ -1,5 +1,6 @@
 import React from 'react';
 import { Typography, Grid, Paper, Box, Chip } from '@mui/material';
+import PageHeader from '../components/common/PageHeader';
 import { useQuery } from '@tanstack/react-query';
 import FolderIcon from '@mui/icons-material/Folder';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -32,7 +33,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      <Typography variant="h4" gutterBottom>Dashboard</Typography>
+      <PageHeader title="Dashboard" subtitle="Your projects, reports and help at a glance." />
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard label="Active Projects" value={projects.data ?? 0} loading={projects.isLoading}

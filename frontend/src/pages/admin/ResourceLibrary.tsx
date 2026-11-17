@@ -49,7 +49,7 @@ function validate(form: ResourceForm): FormErrors {
 }
 
 /** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
-const RESOURCE_LOW_PRIORITY = ['eoc', 'units'];
+const RESOURCE_LOW_PRIORITY = ['eoc', 'units', 'is_active'];
 
 export default function ResourceLibrary() {
   const columnVisibilityModel = useResponsiveColumns(RESOURCE_LOW_PRIORITY);
@@ -139,8 +139,8 @@ export default function ResourceLibrary() {
   };
 
   const columns: GridColDef<Resource>[] = [
-    { field: 'resource_code', headerName: 'Code', width: 130, sortable: false },
-    { field: 'description', headerName: 'Description', flex: 1.5, minWidth: 220, sortable: false },
+    { field: 'resource_code', headerName: 'Code', width: 110, sortable: false },
+    { field: 'description', headerName: 'Description', flex: 1.5, minWidth: 150, sortable: false },
     { field: 'eoc', headerName: 'EOC', width: 130, sortable: false, valueGetter: (_v, row) => row.eoc ?? '' },
     {
       field: 'cost',
@@ -217,7 +217,7 @@ export default function ResourceLibrary() {
   return (
     <Box>
       <PageHeader
-        title="Resource library"
+        title="Resource Library"
         subtitle="Manage the resources and unit costs used in estimates"
         actions={
           <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>

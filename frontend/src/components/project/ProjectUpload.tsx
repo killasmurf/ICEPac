@@ -96,7 +96,7 @@ const HISTORY_COLUMNS: GridColDef<ImportJob>[] = [
   {
     field: 'started_at',
     headerName: 'Started',
-    width: 170,
+    width: 200,
     sortable: false,
     valueGetter: (_v, row) => row.started_at ?? row.created_at,
     valueFormatter: (v: string) => formatDateTime(v),

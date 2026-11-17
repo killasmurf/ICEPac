@@ -64,7 +64,7 @@ interface PasswordForm {
 const EMPTY_PASSWORD: PasswordForm = { current: '', next: '', confirm: '' };
 
 /** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
-const USER_LOW_PRIORITY = ['email', 'last_login'];
+const USER_LOW_PRIORITY = ['username', 'email', 'is_active', 'last_login'];
 
 export default function UserManagement() {
   const columnVisibilityModel = useResponsiveColumns(USER_LOW_PRIORITY);
@@ -192,7 +192,7 @@ export default function UserManagement() {
       field: 'full_name',
       headerName: 'Name',
       flex: 1,
-      minWidth: 160,
+      minWidth: 120,
       sortable: false,
       valueGetter: (_v, row) => row.full_name ?? '',
       renderCell: ({ row }) => row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>,
@@ -202,7 +202,7 @@ export default function UserManagement() {
     {
       field: 'role',
       headerName: 'Role',
-      width: 120,
+      width: 110,
       sortable: false,
       renderCell: ({ row }) => <StatusChip kind="role" value={row.role} />,
     },
@@ -289,7 +289,7 @@ export default function UserManagement() {
   return (
     <Box>
       <PageHeader
-        title="User management"
+        title="User Management"
         subtitle="Manage user accounts, roles and access"
         actions={
           <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>

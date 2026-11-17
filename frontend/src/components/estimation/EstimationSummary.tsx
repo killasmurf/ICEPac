@@ -10,7 +10,7 @@ import {
   WBSCostSummary,
 } from '../../api/estimation';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { DataTable } from '../common/DataTable';
+import { DataTable, useResponsiveColumns } from '../common/DataTable';
 import { StatCard } from '../common/StatCard';
 import { StatusChip } from '../common/StatusChip';
 import { PertRangeBar } from '../common/PertRangeBar';
@@ -100,8 +100,12 @@ const BreakdownTable: React.FC<{
 
 type WBSRow = WBSCostSummary & { id: number };
 
+/** Low-priority WBS summary columns, hidden below sm so the table keeps title, PERT and status on phones. */
+const WBS_LOW_PRIORITY = ['wbs_code', 'assignment_count', 'risk_count', 'total_risk_exposure'];
+
 const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHeadline = false }) => {
   const [tabValue, setTabValue] = useState(0);
+  const wbsColumnVisibility = useResponsiveColumns(WBS_LOW_PRIORITY);
   const { data: summary, isLoading, isError, refetch } = useQuery({
     queryKey: estimationKey(projectId),
     queryFn: () => getProjectEstimation(projectId),
@@ -283,6 +287,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
           <DataTable<WBSRow>
             rows={wbsRows}
             columns={wbsColumns}
+            columnVisibilityModel={wbsColumnVisibility}
             ariaLabel="WBS cost summary"
             emptyTitle="No WBS items"
           />

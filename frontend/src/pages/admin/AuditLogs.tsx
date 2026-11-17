@@ -152,7 +152,7 @@ export default function AuditLogs() {
       </FormControl>
       <SearchField
         label="Entity type"
-        placeholder="Entity type, e.g. Resource"
+        placeholder="e.g. Resource"
         onChange={(v) => {
           setEntityType(v.trim());
           resetPage();

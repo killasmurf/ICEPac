@@ -57,9 +57,9 @@ const noHorizontalScroll = async (page: Page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
 const screens = [
-  { name: 'users', path: '/admin/users', heading: 'User management', ready: 'Test User 2' },
-  { name: 'resources', path: '/admin/resources', heading: 'Resource library', ready: 'Resource 2 description' },
-  { name: 'suppliers', path: '/admin/suppliers', heading: 'Supplier management', ready: 'Supplier 2 Pty Ltd' },
+  { name: 'users', path: '/admin/users', heading: 'User Management', ready: 'Test User 2' },
+  { name: 'resources', path: '/admin/resources', heading: 'Resource Library', ready: 'Resource 2 description' },
+  { name: 'suppliers', path: '/admin/suppliers', heading: 'Supplier Management', ready: 'Supplier 2 Pty Ltd' },
 ] as const;
 
 for (const s of screens) {

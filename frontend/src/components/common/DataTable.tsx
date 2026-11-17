@@ -164,7 +164,7 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
           width: '100%',
           minHeight: 240,
           minWidth: 0,
-          border: 1,
+          border: isEmpty ? 0 : 1,
           borderColor: 'divider',
           borderRadius: 1,
           overflow: 'hidden',

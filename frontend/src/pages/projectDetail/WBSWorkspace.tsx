@@ -17,14 +17,17 @@ import { invalidateEstimation } from '../../components/estimation/queryKeys';
 import type { ReferenceData } from './useProjectData';
 
 const SplitGroup = styled(Group)({ height: '100%', width: '100%' });
-const Handle = styled(Separator)(({ theme }) => ({
-  width: 6,
-  flexShrink: 0,
-  backgroundColor: theme.palette.divider,
-  transition: 'background-color 120ms',
-  '&[data-separator="hover"], &[data-separator="active"]': { backgroundColor: theme.palette.primary.main },
-  '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: -2 },
-}));
+const Handle = styled(Separator)(({ theme }) => {
+  const p = (theme.vars ?? theme).palette;
+  return {
+    width: 6,
+    flexShrink: 0,
+    backgroundColor: p.divider,
+    transition: 'background-color 120ms',
+    '&[data-separator="hover"], &[data-separator="active"]': { backgroundColor: p.secondary.main },
+    '&:focus-visible': { outline: `2px solid ${p.secondary.main}`, outlineOffset: -2 },
+  };
+});
 
 export interface WBSWorkspaceProps {
   projectId: number;
