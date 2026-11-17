@@ -8,6 +8,7 @@ import {
   validateMoney,
   validatePercent,
   validateThreePoint,
+  withNodeApprovalStatus,
 } from './estimationUtils';
 
 describe('currencySymbol', () => {
@@ -149,5 +150,22 @@ describe('topWbsByEstimate', () => {
   it('returns the n largest', () => {
     const items = [{ total_pert_estimate: 1 }, { total_pert_estimate: 9 }, { total_pert_estimate: 5 }];
     expect(topWbsByEstimate(items, 2).map((i) => i.total_pert_estimate)).toEqual([9, 5]);
+  });
+});
+
+describe('withNodeApprovalStatus', () => {
+  interface N {
+    id: number;
+    approval_status: string;
+    children: N[];
+  }
+  const node = (id: number, approval_status: string, children: N[] = []): N => ({ id, approval_status, children });
+  it('replaces the status of one nested node and leaves the original untouched', () => {
+    const tree = { items: [node(1, 'draft', [node(2, 'draft'), node(3, 'approved', [node(4, 'draft')])])], total: 4 };
+    const next = withNodeApprovalStatus(tree, 4, 'submitted');
+    expect(next.total).toBe(4);
+    expect(next.items[0].children[1].children[0].approval_status).toBe('submitted');
+    expect(next.items[0].children[0].approval_status).toBe('draft');
+    expect(tree.items[0].children[1].children[0].approval_status).toBe('draft');
   });
 });

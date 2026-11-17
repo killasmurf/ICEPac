@@ -154,6 +154,19 @@ export function rankBreakdown(items: BreakdownInput[], maxRows = 7): RankedBreak
   return { rows: rows.map((r, i) => ({ ...r, share: tenths[i] / 10 })), total, empty: false };
 }
 
+interface StatusNode {
+  id: number;
+  approval_status: string;
+  children: StatusNode[];
+}
+
+/** Copy of a WBS tree response with one node's approval status replaced (used for optimistic updates). */
+export function withNodeApprovalStatus<N extends StatusNode, R extends { items: N[] }>(response: R, wbsId: number, status: string): R {
+  const walk = (nodes: N[]): N[] =>
+    nodes.map((n) => ({ ...n, approval_status: n.id === wbsId ? status : n.approval_status, children: walk(n.children as N[]) }));
+  return { ...response, items: walk(response.items) };
+}
+
 /** The `n` WBS items with the largest PERT estimate. */
 export function topWbsByEstimate<T extends { total_pert_estimate: number }>(items: T[], n = 10): T[] {
   return [...items].sort((a, b) => b.total_pert_estimate - a.total_pert_estimate).slice(0, n);

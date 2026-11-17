@@ -30,8 +30,9 @@
     "e2e": "playwright test",
     "lint": "eslint src e2e --max-warnings 0",
     "style-budget": "node scripts/style-budget.mjs",
+    "bundle-budget": "node scripts/bundle-budget.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
-    "verify": "npm run typecheck && npm run lint && npm run style-budget && npm test && npm run build && npm run e2e"
+    "verify": "npm run typecheck && npm run lint && npm run style-budget && npm test && npm run build && npm run bundle-budget && npm run e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
