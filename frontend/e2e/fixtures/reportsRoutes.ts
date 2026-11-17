@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 /** Mock routes for the Reports screen. Pass as the second argument of mockApi(page, reportsRoutes). */
 export const reportsRoutes = {

@@ -34,4 +34,21 @@ describe('FormDialog', () => {
     renderWithProviders(<FormDialog open title="t" onClose={vi.fn()} onSubmit={vi.fn()} loading>{field}</FormDialog>);
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
+
+  it('disables submit and ignores Enter when submitDisabled', async () => {
+    const onSubmit = vi.fn();
+    renderWithProviders(<FormDialog open title="t" onClose={vi.fn()} onSubmit={onSubmit} submitDisabled>{field}</FormDialog>);
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Name'), 'abc{Enter}');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('turns native validation off by default and on when asked', () => {
+    const { rerender } = renderWithProviders(
+      <FormDialog open title="t" onClose={vi.fn()} onSubmit={vi.fn()}>{field}</FormDialog>,
+    );
+    expect(screen.getByRole('dialog')).toHaveProperty('noValidate', true);
+    rerender(<FormDialog open title="t" onClose={vi.fn()} onSubmit={vi.fn()} noValidate={false}>{field}</FormDialog>);
+    expect(screen.getByRole('dialog')).toHaveProperty('noValidate', false);
+  });
 });

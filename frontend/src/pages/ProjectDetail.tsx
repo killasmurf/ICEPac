@@ -147,7 +147,7 @@ const ProjectDetail: React.FC = () => {
         {tab === 'summary' && (
           <Card>
             <CardContent>
-              <EstimationSummary projectId={projectId} />
+              <EstimationSummary projectId={projectId} hideHeadline />
             </CardContent>
           </Card>
         )}

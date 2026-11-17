@@ -9,7 +9,7 @@ import {
 } from '../../api/estimation';
 import { PertRangeBar } from '../common/PertRangeBar';
 import { formatCurrency } from '../../utils/format';
-import ValidatedFormDialog from './ValidatedFormDialog';
+import { FormDialog } from '../common/FormDialog';
 import { currencySymbol, parseAmount, validatePercent, validateThreePoint } from './estimationUtils';
 
 interface AssignmentFormProps {
@@ -205,7 +205,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
   );
 
   return (
-    <ValidatedFormDialog
+    <FormDialog
       open={open}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -351,7 +351,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
         {percentField('import_content_pct', 'Import Content %')}
         {percentField('aii_pct', 'AII %')}
       </Grid>
-    </ValidatedFormDialog>
+    </FormDialog>
   );
 };
 

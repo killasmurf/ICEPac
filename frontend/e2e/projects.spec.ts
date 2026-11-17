@@ -2,7 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { projectsRoutes } from './fixtures/projectsRoutes';
-import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 const PHASE = 'phase-4';
@@ -13,7 +12,7 @@ test.afterEach(() => {
 });
 
 async function setup(page: Page, opts: { many?: boolean; scheme?: 'light' | 'dark'; view?: 'cards' | 'table' } = {}) {
-  api = await mockApi(page, { ...projectDetailRoutes, ...projectsRoutes({ many: opts.many }) });
+  api = await mockApi(page, opts.many ? projectsRoutes({ many: true }) : {});
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(
     ([scheme, view]) => {
@@ -213,7 +212,7 @@ test.describe('project import (ProjectUpload on the project page)', () => {
     await setup(page);
     await openImport(page);
     await expect(page.getByText(/Accepted types: \.mpp, \.mpx, \.xml/)).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'harbour-bridge.mpp' })).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: 'harbour-bridge.mpp' })).toBeVisible();
     await expect(page.getByText('Completed')).toBeVisible();
     await expect(page.getByText('Could not parse file')).toBeVisible();
     await noHorizontalScroll(page);

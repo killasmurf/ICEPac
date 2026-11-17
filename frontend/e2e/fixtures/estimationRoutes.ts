@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 const now = '2026-03-01T00:00:00Z';
 

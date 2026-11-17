@@ -16,7 +16,7 @@ import TextField from '@mui/material/TextField';
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { suppliersApi, type Supplier, type SupplierCreate } from '../../api/admin';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import DataTable from '../../components/common/DataTable';
+import DataTable, { useResponsiveColumns } from '../../components/common/DataTable';
 import ErrorState from '../../components/common/ErrorState';
 import FormDialog from '../../components/common/FormDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -48,7 +48,11 @@ function validate(form: SupplierForm): FormErrors {
   return errors;
 }
 
+/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
+const SUPPLIER_LOW_PRIORITY = ['contact', 'email', 'phone'];
+
 export default function SupplierManagement() {
+  const columnVisibilityModel = useResponsiveColumns(SUPPLIER_LOW_PRIORITY);
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -182,7 +186,7 @@ export default function SupplierManagement() {
   return (
     <Box>
       <PageHeader
-        title="Supplier management"
+        title="Supplier Management"
         subtitle="Manage the suppliers behind your resources"
         actions={
           <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>
@@ -204,6 +208,7 @@ export default function SupplierManagement() {
           />
         ) : (
           <DataTable<Supplier>
+            columnVisibilityModel={columnVisibilityModel}
             ariaLabel="Suppliers"
             rows={query.data?.items ?? []}
             columns={columns}

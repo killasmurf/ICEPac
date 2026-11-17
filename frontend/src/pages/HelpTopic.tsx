@@ -9,7 +9,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useParams } from 'react-router-dom';
-import { getTopic } from '../api/help';
+import { helpTopicQuery } from '../api/queries';
 import ErrorState from '../components/common/ErrorState';
 
 const BackLink: React.FC = () => (
@@ -27,10 +27,9 @@ const HelpTopic: React.FC = () => {
   const topicId = Number(id);
   const valid = Number.isInteger(topicId) && topicId > 0;
 
-  // Not ['help','topics',id]: the shell's breadcrumb hook caches only the title under that key.
+  // Same key and fetch as the shell's breadcrumb title lookup (api/queries.ts).
   const { data: topic, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['help', 'topics', topicId, 'detail'],
-    queryFn: () => getTopic(topicId),
+    ...helpTopicQuery(topicId),
     enabled: valid,
     retry: (count, err) => statusOf(err) !== 404 && count < 1,
     meta: { silent: true }, // shown inline below

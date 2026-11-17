@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Grid, InputAdornment, MenuItem, TextField, Typography } from '@mui/material';
 import { Risk, RiskCreate, RiskUpdate } from '../../api/estimation';
 import { formatCurrency } from '../../utils/format';
-import ValidatedFormDialog from './ValidatedFormDialog';
+import { FormDialog } from '../common/FormDialog';
 import { currencySymbol, parseAmount, validateMoney } from './estimationUtils';
 
 interface RiskFormProps {
@@ -99,7 +99,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
       : riskCategories;
 
   return (
-    <ValidatedFormDialog
+    <FormDialog
       open={open}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -203,7 +203,7 @@ const RiskForm: React.FC<RiskFormProps> = ({
           />
         </Grid>
       </Grid>
-    </ValidatedFormDialog>
+    </FormDialog>
   );
 };
 

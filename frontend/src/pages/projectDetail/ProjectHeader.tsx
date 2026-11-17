@@ -10,6 +10,7 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Project, updateProject } from '../../api/projects';
+import { projectQuery } from '../../api/queries';
 import type { ProjectEstimationSummary } from '../../api/estimation';
 import FormDialog from '../../components/common/FormDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -61,7 +62,7 @@ const EditProjectDialog: React.FC<EditDialogProps> = ({ project, open, onClose }
         description,
       }),
     onSuccess: async (updated) => {
-      queryClient.setQueryData(['projects', project.id, 'detail'], updated);
+      queryClient.setQueryData(projectQuery(project.id).queryKey, updated);
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project updated.');
       onClose();

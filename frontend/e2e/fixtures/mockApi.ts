@@ -1,16 +1,16 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
+import { loadFixture } from './load';
+import { adminARoutes } from './adminARoutes';
+import { adminBRoutes } from './adminBRoutes';
+import { estimationRoutes } from './estimationRoutes';
+import { miscRoutes } from './miscRoutes';
+import { projectDetailRoutes } from './projectDetailRoutes';
+import { projectsRoutes } from './projectsRoutes';
+import { reportsRoutes } from './reportsRoutes';
+
+export { loadFixture };
 
 export type Role = 'admin' | 'manager' | 'user' | 'viewer';
-
-const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
-
-/** Load a JSON fixture from e2e/fixtures/data. */
-export function loadFixture<T = unknown>(name: string): T {
-  return JSON.parse(fs.readFileSync(path.join(DATA_DIR, `${name}.json`), 'utf8')) as T;
-}
 
 type Handler = unknown | ((url: URL, method: string) => unknown);
 
@@ -18,7 +18,7 @@ type Handler = unknown | ((url: URL, method: string) => unknown);
  * Routes the mock API answers, keyed by "METHOD /path" (path relative to /api/v1).
  * Add an entry here (and a JSON file under data/) when a screen needs a new endpoint.
  */
-const routes: Record<string, Handler> = {
+const baseRoutes: Record<string, Handler> = {
   'GET /projects': () => loadFixture('projects'),
   'GET /help/topics': () => loadFixture('help-topics'),
   'GET /auth/me': () => loadFixture('auth-me'),
@@ -26,6 +26,24 @@ const routes: Record<string, Handler> = {
   'GET /projects/1': () => loadFixture<{ items: unknown[] }>('projects').items[0],
   'GET /projects/2': () => loadFixture<{ items: unknown[] }>('projects').items[1],
 };
+
+/**
+ * Every area's default routes, so mockApi(page) answers every screen. Where two areas define the same
+ * key differently, the later one here wins; a spec that needs the other version passes it as `extra`
+ * (for example estimation.spec.ts passes estimationRoutes).
+ */
+function defaultRoutes(): Record<string, Handler> {
+  return {
+    ...baseRoutes,
+    ...estimationRoutes,
+    ...projectDetailRoutes,
+    ...projectsRoutes(),
+    ...adminBRoutes,
+    ...adminARoutes,
+    ...miscRoutes,
+    ...reportsRoutes,
+  };
+}
 
 const CORS_HEADERS = {
   'access-control-allow-origin': '*',
@@ -44,7 +62,7 @@ export interface MockApiHandle {
  */
 export async function mockApi(page: Page, extra: Record<string, Handler> = {}): Promise<MockApiHandle> {
   const handle: MockApiHandle = { unmatched: [] };
-  const table = { ...routes, ...extra };
+  const table = { ...defaultRoutes(), ...extra };
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();

@@ -92,6 +92,16 @@ describe('EstimationSummary', () => {
     expect(within(wbs).getByText('-')).toBeInTheDocument();
   });
 
+  it('hideHeadline leaves out the headline cards but keeps the 80% range and tables', async () => {
+    h.getProjectEstimation.mockResolvedValue(summary);
+    renderWithProviders(<EstimationSummary projectId={1} hideHeadline />);
+
+    expect(await screen.findByText('80% Confidence Range')).toBeInTheDocument();
+    expect(screen.queryByText('Total PERT Estimate')).toBeNull();
+    expect(screen.queryByText('Risk-Adjusted Estimate')).toBeNull();
+    expect(screen.getByRole('grid', { name: 'WBS cost summary' })).toBeInTheDocument();
+  });
+
   it('switches breakdown tabs', async () => {
     h.getProjectEstimation.mockResolvedValue(summary);
     renderWithProviders(<EstimationSummary projectId={1} />);

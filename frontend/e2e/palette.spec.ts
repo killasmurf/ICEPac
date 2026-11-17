@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, loginAs, MockApiHandle } from './fixtures/mockApi';
-import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, projectDetailRoutes);
+  api = await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'light'));
   await loginAs(page, 'admin');
@@ -52,4 +51,16 @@ test('actions: toggle colour mode and sign out', async ({ page }) => {
   await expect(page.getByRole('option', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('New project action opens the create dialog on the Projects page', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await page.keyboard.press('Control+k');
+  await page.getByRole('combobox').fill('New project');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/projects\?new=1$/);
+  const dialog = page.getByRole('dialog', { name: 'New project' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel(/Project name/)).toBeFocused();
 });

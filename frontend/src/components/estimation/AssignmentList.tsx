@@ -146,6 +146,21 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
         rows={assignments}
         columns={columns}
         ariaLabel="Resource assignments"
+        footer={
+          assignments.length > 0 ? (
+            <TotalsStrip
+              label={`Totals (${assignments.length} assignments)`}
+              ariaLabel="Assignment totals"
+              items={[
+                { label: 'Best', value: money(totals.best) },
+                { label: 'Likely', value: money(totals.likely) },
+                { label: 'Worst', value: money(totals.worst) },
+                { label: 'PERT', value: money(totals.pert), emphasis: true },
+                { label: 'Std Dev', value: money(combinedStdDev) },
+              ]}
+            />
+          ) : undefined
+        }
         emptyTitle="No assignments yet"
         emptyDescription={readonly ? 'Nothing has been assigned to this item.' : 'Add a resource with a three-point estimate to start costing this item.'}
         emptyAction={
@@ -156,20 +171,6 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
           )
         }
       />
-
-      {assignments.length > 0 && (
-        <TotalsStrip
-          label={`Totals (${assignments.length} assignments)`}
-          ariaLabel="Assignment totals"
-          items={[
-            { label: 'Best', value: money(totals.best) },
-            { label: 'Likely', value: money(totals.likely) },
-            { label: 'Worst', value: money(totals.worst) },
-            { label: 'PERT', value: money(totals.pert), emphasis: true },
-            { label: 'Std Dev', value: money(combinedStdDev) },
-          ]}
-        />
-      )}
     </Box>
   );
 };

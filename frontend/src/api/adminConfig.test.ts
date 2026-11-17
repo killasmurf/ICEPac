@@ -7,6 +7,18 @@ describe('config table helpers', () => {
     expect(configTableKey('PMB Weights')).toBe('pmb-weights');
   });
 
+  it('uses the key from the response and falls back to deriving it from the label', () => {
+    const [withKey, without] = normalizeConfigTables({
+      tables: [
+        { key: 'severity-levels', name: 'Severity (Impact) Levels', description: 'd', weighted: true },
+        { name: 'Cost Types', description: 'd', weighted: false },
+      ],
+    });
+    expect(withKey.key).toBe('severity-levels');
+    expect(withKey.label).toBe('Severity (Impact) Levels');
+    expect(without.key).toBe('cost-types');
+  });
+
   it('normalises the /admin/config response', () => {
     expect(
       normalizeConfigTables({ tables: [{ name: 'Probability Levels', description: 'd', weighted: true }] }),

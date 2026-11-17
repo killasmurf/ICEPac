@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { getProject, getProjects, type Project } from '../../api/projects';
-import { getTopic } from '../../api/help';
+import { getProjects, type Project } from '../../api/projects';
+import { helpTopicQuery, projectQuery } from '../../api/queries';
 
 /*
  * Small lookup hooks for the shell (breadcrumb names, command-palette projects).
- * They read through the shared query cache using the plan's key convention.
+ * They share one query per entity with the pages (see api/queries.ts) and `select` the name or title.
  * Failures are silent (meta.silent): the shell falls back to a generic label.
  */
 
@@ -18,8 +18,8 @@ export function resetLookupCache(): void {
 /** Name of project `id`; undefined while unknown. */
 export function useProjectName(id: number | undefined): string | undefined {
   const { data } = useQuery({
-    queryKey: ['projects', id],
-    queryFn: async () => (await getProject(id as number)).project_name,
+    ...projectQuery(id as number),
+    select: (project) => project.project_name,
     enabled: isId(id),
     meta: { silent: true },
   });
@@ -29,8 +29,8 @@ export function useProjectName(id: number | undefined): string | undefined {
 /** Title of help topic `id`; undefined while unknown. */
 export function useTopicTitle(id: number | undefined): string | undefined {
   const { data } = useQuery({
-    queryKey: ['help', 'topics', id],
-    queryFn: async () => (await getTopic(id as number)).title,
+    ...helpTopicQuery(id as number),
+    select: (topic) => topic.title,
     enabled: isId(id),
     meta: { silent: true },
   });

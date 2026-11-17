@@ -17,7 +17,7 @@ import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { usersApi, type User, type UserCreate, type UserRole, type UserUpdate } from '../../api/admin';
 import { useAuth } from '../../auth/AuthContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import DataTable from '../../components/common/DataTable';
+import DataTable, { useResponsiveColumns } from '../../components/common/DataTable';
 import ErrorState from '../../components/common/ErrorState';
 import FormDialog from '../../components/common/FormDialog';
 import PageHeader from '../../components/common/PageHeader';
@@ -63,7 +63,11 @@ interface PasswordForm {
 }
 const EMPTY_PASSWORD: PasswordForm = { current: '', next: '', confirm: '' };
 
+/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
+const USER_LOW_PRIORITY = ['username', 'email', 'is_active', 'last_login'];
+
 export default function UserManagement() {
+  const columnVisibilityModel = useResponsiveColumns(USER_LOW_PRIORITY);
   const { user: me } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -136,7 +140,7 @@ export default function UserManagement() {
 
   const passwordMutation = useMutation({
     mutationFn: ({ user, form: f }: { user: User; form: PasswordForm }) =>
-      usersApi.changePassword(user.id, f.next, f.current),
+      usersApi.changePassword(user.id, f.next, isSelf(user) ? f.current : undefined),
     onSuccess: (_data, { user }) => {
       toast.success(`Password updated for "${user.username}"`);
       setResetting(null);
@@ -171,14 +175,14 @@ export default function UserManagement() {
 
   const passwordErrors: Partial<Record<keyof PasswordForm, string>> = {};
   if (passwordSubmitted) {
-    if (!passwordForm.current) passwordErrors.current = 'Enter the current password';
+    if (isSelf(resetting) && !passwordForm.current) passwordErrors.current = 'Enter your current password';
     if (passwordForm.next.length < 8 || passwordForm.next.length > 128) passwordErrors.next = 'Password must be 8 to 128 characters';
     if (passwordForm.confirm !== passwordForm.next) passwordErrors.confirm = 'Passwords do not match';
   }
   const submitPassword = () => {
     setPasswordSubmitted(true);
     if (!resetting) return;
-    if (passwordForm.current && passwordForm.next.length >= 8 && passwordForm.next.length <= 128 && passwordForm.confirm === passwordForm.next) {
+    if ((!isSelf(resetting) || passwordForm.current) && passwordForm.next.length >= 8 && passwordForm.next.length <= 128 && passwordForm.confirm === passwordForm.next) {
       passwordMutation.mutate({ user: resetting, form: passwordForm });
     }
   };
@@ -188,7 +192,7 @@ export default function UserManagement() {
       field: 'full_name',
       headerName: 'Name',
       flex: 1,
-      minWidth: 160,
+      minWidth: 120,
       sortable: false,
       valueGetter: (_v, row) => row.full_name ?? '',
       renderCell: ({ row }) => row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>,
@@ -198,7 +202,7 @@ export default function UserManagement() {
     {
       field: 'role',
       headerName: 'Role',
-      width: 120,
+      width: 110,
       sortable: false,
       renderCell: ({ row }) => <StatusChip kind="role" value={row.role} />,
     },
@@ -285,7 +289,7 @@ export default function UserManagement() {
   return (
     <Box>
       <PageHeader
-        title="User management"
+        title="User Management"
         subtitle="Manage user accounts, roles and access"
         actions={
           <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>
@@ -307,6 +311,7 @@ export default function UserManagement() {
           />
         ) : (
           <DataTable<User>
+            columnVisibilityModel={columnVisibilityModel}
             ariaLabel="Users"
             rows={rows}
             columns={columns}
@@ -376,7 +381,9 @@ export default function UserManagement() {
         onSubmit={submitPassword}
         loading={passwordMutation.isPending}
       >
-        <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'The API verifies the existing password before changing it'} autoComplete="off" />
+        {isSelf(resetting) && (
+          <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'Required when changing your own password'} autoComplete="current-password" />
+        )}
         <TextField label="New password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} error={Boolean(passwordErrors.next)} helperText={passwordErrors.next ?? 'At least 8 characters'} autoComplete="new-password" />
         <TextField label="Confirm new password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} error={Boolean(passwordErrors.confirm)} helperText={passwordErrors.confirm} autoComplete="new-password" />
       </FormDialog>

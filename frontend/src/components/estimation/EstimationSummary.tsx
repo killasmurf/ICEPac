@@ -10,7 +10,7 @@ import {
   WBSCostSummary,
 } from '../../api/estimation';
 import { formatCurrency, formatNumber } from '../../utils/format';
-import { DataTable } from '../common/DataTable';
+import { DataTable, useResponsiveColumns } from '../common/DataTable';
 import { StatCard } from '../common/StatCard';
 import { StatusChip } from '../common/StatusChip';
 import { PertRangeBar } from '../common/PertRangeBar';
@@ -23,6 +23,8 @@ import { summaryRangeBar } from './estimationUtils';
 
 interface EstimationSummaryProps {
   projectId: number;
+  /** Leave out the four headline cards when the page already shows those totals (for example the project header band). */
+  hideHeadline?: boolean;
 }
 
 interface TabPanelProps {
@@ -98,8 +100,12 @@ const BreakdownTable: React.FC<{
 
 type WBSRow = WBSCostSummary & { id: number };
 
-const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
+/** Low-priority WBS summary columns, hidden below sm so the table keeps title, PERT and status on phones. */
+const WBS_LOW_PRIORITY = ['wbs_code', 'assignment_count', 'risk_count', 'total_risk_exposure'];
+
+const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHeadline = false }) => {
   const [tabValue, setTabValue] = useState(0);
+  const wbsColumnVisibility = useResponsiveColumns(WBS_LOW_PRIORITY);
   const { data: summary, isLoading, isError, refetch } = useQuery({
     queryKey: estimationKey(projectId),
     queryFn: () => getProjectEstimation(projectId),
@@ -178,13 +184,15 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
   if (isLoading) {
     return (
       <Box role="status" aria-busy="true" aria-label="Loading estimation summary">
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
-              <CardSkeleton lines={2} />
-            </Grid>
-          ))}
-        </Grid>
+        {!hideHeadline && (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
+                <CardSkeleton lines={2} />
+              </Grid>
+            ))}
+          </Grid>
+        )}
         <TableSkeleton rows={5} columns={5} />
       </Box>
     );
@@ -220,36 +228,38 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
   return (
     <Box>
       {/* Headline figures */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <StatCard
-            label="Total PERT Estimate"
-            value={compact(summary.total_pert_estimate)}
-            hint={`${formatCurrency(summary.total_pert_estimate)} across ${summary.total_assignments} assignments`}
-          />
+      {!hideHeadline && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+            <StatCard
+              label="Total PERT Estimate"
+              value={compact(summary.total_pert_estimate)}
+              hint={`${formatCurrency(summary.total_pert_estimate)} across ${summary.total_assignments} assignments`}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+            <StatCard
+              label="Std Deviation"
+              value={compact(summary.total_std_deviation)}
+              hint={formatCurrency(summary.total_std_deviation)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+            <StatCard
+              label="Risk Exposure"
+              value={compact(summary.total_risk_exposure)}
+              hint={`${formatCurrency(summary.total_risk_exposure)} from ${summary.total_risks} risks`}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+            <StatCard
+              label="Risk-Adjusted Estimate"
+              value={compact(summary.risk_adjusted_estimate)}
+              hint={`${formatCurrency(summary.risk_adjusted_estimate)} (PERT + risk exposure)`}
+            />
+          </Grid>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <StatCard
-            label="Std Deviation"
-            value={compact(summary.total_std_deviation)}
-            hint={formatCurrency(summary.total_std_deviation)}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <StatCard
-            label="Risk Exposure"
-            value={compact(summary.total_risk_exposure)}
-            hint={`${formatCurrency(summary.total_risk_exposure)} from ${summary.total_risks} risks`}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <StatCard
-            label="Risk-Adjusted Estimate"
-            value={compact(summary.risk_adjusted_estimate)}
-            hint={`${formatCurrency(summary.risk_adjusted_estimate)} (PERT + risk exposure)`}
-          />
-        </Grid>
-      </Grid>
+      )}
 
       {/* 80% interval */}
       <Card sx={{ mb: 3 }}>
@@ -260,7 +270,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
           <Typography variant="h5" component="p" className="tabular-nums" sx={{ mb: 1 }}>
             {formatCurrency(summary.confidence_80_low)} to {formatCurrency(summary.confidence_80_high)}
           </Typography>
-          <PertRangeBar {...range} />
+          <PertRangeBar {...range} minLabel="Low (−3σ)" maxLabel="High (+3σ)" />
           <Typography variant="caption" color="text.secondary">
             The gold marker is the PERT estimate and the shaded band is the 80% range. The bar spans three standard
             deviations either side of the estimate.
@@ -277,6 +287,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId }) => {
           <DataTable<WBSRow>
             rows={wbsRows}
             columns={wbsColumns}
+            columnVisibilityModel={wbsColumnVisibility}
             ariaLabel="WBS cost summary"
             emptyTitle="No WBS items"
           />

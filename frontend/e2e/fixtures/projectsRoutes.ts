@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 interface ProjectRow {
   id: number;

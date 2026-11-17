@@ -12,8 +12,7 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {
-      // TODO(ui-phase-4): re-enable once the admin API layer and pages are typed.
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
 );

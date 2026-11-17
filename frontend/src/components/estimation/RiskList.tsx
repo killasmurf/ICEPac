@@ -162,6 +162,15 @@ const RiskList: React.FC<RiskListProps> = ({
         rows={risks}
         columns={columns}
         ariaLabel="Risk register"
+        footer={
+          risks.length > 0 ? (
+            <TotalsStrip
+              label={`Total Risk Exposure (${risks.length} risks)`}
+              ariaLabel="Risk totals"
+              items={[{ label: 'Exposure', value: formatCurrency(totalExposure), emphasis: true }]}
+            />
+          ) : undefined
+        }
         emptyTitle="No risks registered yet"
         emptyDescription={readonly ? 'No risks have been recorded for this item.' : 'Record what could add cost to this item and how you plan to mitigate it.'}
         emptyAction={
@@ -172,14 +181,6 @@ const RiskList: React.FC<RiskListProps> = ({
           )
         }
       />
-
-      {risks.length > 0 && (
-        <TotalsStrip
-          label={`Total Risk Exposure (${risks.length} risks)`}
-          ariaLabel="Risk totals"
-          items={[{ label: 'Exposure', value: formatCurrency(totalExposure), emphasis: true }]}
-        />
-      )}
     </Box>
   );
 };

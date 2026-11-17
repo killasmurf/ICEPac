@@ -35,7 +35,7 @@ import { CardSkeleton } from '../common/CardSkeleton';
 import { TableSkeleton } from '../common/TableSkeleton';
 import ErrorState from '../common/ErrorState';
 import { useToast } from '../feedback/ToastProvider';
-import ValidatedFormDialog from '../estimation/ValidatedFormDialog';
+import { FormDialog } from '../common/FormDialog';
 import { currencySymbol, validateMoney } from '../estimation/estimationUtils';
 import { invalidateEstimation, projectRiskRegisterKey } from '../estimation/queryKeys';
 
@@ -357,7 +357,7 @@ export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
       />
 
       {/* Create / edit dialog */}
-      <ValidatedFormDialog
+      <FormDialog
         open={dialogOpen}
         title={editing ? 'Edit Project Risk' : 'Add Project Risk'}
         submitLabel={editing ? 'Save Changes' : 'Create Risk'}
@@ -442,7 +442,7 @@ export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
           fullWidth
           helperText="Concrete actions, not platitudes ('monitor closely' is not a plan)."
         />
-      </ValidatedFormDialog>
+      </FormDialog>
 
       <ConfirmDialog
         open={deleting !== null}

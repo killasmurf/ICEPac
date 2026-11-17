@@ -1,13 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
-import { adminBRoutes } from './fixtures/adminBRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, adminBRoutes);
+  api = await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'light'));
   await loginAs(page, 'admin');
@@ -229,7 +228,6 @@ test.describe('audit logs', () => {
   test('empty list shows the empty state', async ({ page }) => {
     await page.unroute('**/api/v1/**');
     api = await mockApi(page, {
-      ...adminBRoutes,
       'GET /admin/audit-logs': () => ({ items: [], total: 0, skip: 0, limit: 25 }),
     });
     await page.goto('/admin/audit-logs');
@@ -278,7 +276,6 @@ test.describe('admin overview', () => {
   test('empty activity shows the empty state', async ({ page }) => {
     await page.unroute('**/api/v1/**');
     api = await mockApi(page, {
-      ...adminBRoutes,
       'GET /dashboard/stats': () => ({
         ...(JSON.parse(JSON.stringify({ admin: { users: 1, active_users: 1, resources: 0, suppliers: 0 } }))),
         recent_activity: [],
