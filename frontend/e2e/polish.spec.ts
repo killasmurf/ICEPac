@@ -49,3 +49,42 @@ test.describe('route transition', () => {
     expect(opacity).toBe('1');
   });
 });
+
+test.describe('loading polish', () => {
+  test('paging a table keeps the rows, never shows the skeleton, and shows the progress bar', async ({ page }) => {
+    // Slow down page two so the in-between state is observable.
+    await page.route(/\/api\/v1\/admin\/resources\?.*skip=10/, async (route) => {
+      await new Promise((r) => setTimeout(r, 1200));
+      await route.fallback();
+    });
+    await page.goto('/admin/resources');
+    await expect(page.getByText('Resource 2 description')).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Loading data' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: /next page/i }).click();
+    await expect(page.getByRole('progressbar', { name: 'Loading data' })).toBeVisible();
+    await expect(page.locator('.MuiSkeleton-root')).toHaveCount(0);
+    await expect(page.getByText('Resource 2 description')).toBeVisible();
+
+    await expect(page.getByText(/11.*12 of 12/)).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Loading data' })).toHaveCount(0);
+    await expect(page.locator('.MuiSkeleton-root')).toHaveCount(0);
+  });
+
+  test('the progress bar is 2px tall and sits at the bottom of the header', async ({ page }) => {
+    await page.route(/\/api\/v1\/admin\/resources\?.*skip=10/, async (route) => {
+      await new Promise((r) => setTimeout(r, 1200));
+      await route.fallback();
+    });
+    await page.goto('/admin/resources');
+    await expect(page.getByText('Resource 2 description')).toBeVisible();
+    await page.getByRole('button', { name: /next page/i }).click();
+    const bar = page.getByRole('progressbar', { name: 'Loading data' });
+    await expect(bar).toBeVisible();
+    const [barBox, headerBox] = await Promise.all([bar.boundingBox(), page.locator('header').first().boundingBox()]);
+    expect(barBox?.height).toBe(2);
+    // The header has a 1px bottom border, so the bar sits just inside it.
+    const gap = (headerBox?.y ?? 0) + (headerBox?.height ?? 0) - ((barBox?.y ?? 0) + 2);
+    expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+  });
+});

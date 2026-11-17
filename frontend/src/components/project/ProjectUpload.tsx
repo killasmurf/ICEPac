@@ -127,6 +127,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
     queryKey: [...historyKey, jobId],
     queryFn: () => getImportStatus(projectId, jobId as number),
     enabled: jobId != null,
+    meta: { background: true },
     refetchInterval: (query) =>
       query.state.status === 'error' || isTerminalStatus(query.state.data?.status) ? false : POLL_INTERVAL_MS,
   });
