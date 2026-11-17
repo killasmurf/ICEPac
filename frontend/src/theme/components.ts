@@ -1,5 +1,8 @@
 import type { Components, Theme } from '@mui/material/styles';
-import { brand, radius } from './tokens';
+import { brand, motion, radius } from './tokens';
+
+/** Hover transitions: only properties that never cause layout. */
+const hoverTransition = `background-color ${motion.fast}ms ${motion.easing}, border-color ${motion.fast}ms ${motion.easing}, transform ${motion.fast}ms ${motion.easing}`;
 
 /** Scheme-safe tokens: CSS variables when available, plain palette otherwise (theme.vars is optional in the types). */
 const tk = (theme: Theme) => theme.vars ?? theme;
@@ -39,7 +42,7 @@ export const components: Components<Theme> = {
   },
   MuiCard: {
     defaultProps: { variant: 'outlined' },
-    styleOverrides: { root: { borderRadius: radius.lg } },
+    styleOverrides: { root: { borderRadius: radius.lg, transition: hoverTransition } },
   },
   MuiAppBar: {
     defaultProps: { elevation: 0, color: 'inherit' },
@@ -96,6 +99,9 @@ export const components: Components<Theme> = {
   },
   MuiLink: { defaultProps: { underline: 'hover' } },
   MuiListItemButton: {
-    styleOverrides: { root: { borderRadius: radius.md } },
+    styleOverrides: { root: { borderRadius: radius.md, transition: hoverTransition } },
+  },
+  MuiTableRow: {
+    styleOverrides: { root: { transition: hoverTransition } },
   },
 };

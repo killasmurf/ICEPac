@@ -1,8 +1,8 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
-import { Box, LinearProgress, useMediaQuery } from '@mui/material';
+import { Box, Fade, LinearProgress, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Outlet } from 'react-router-dom';
-import { layout } from '../../theme/tokens';
+import { Outlet, useLocation } from 'react-router-dom';
+import { layout, motion } from '../../theme/tokens';
 import CommandPalette from './CommandPalette';
 import Header from './Header';
 import Sidebar from './Sidebar';
@@ -10,6 +10,8 @@ import { useSidebarCollapsed } from './useSidebarCollapsed';
 
 const AppLayout: React.FC = () => {
   const theme = useTheme();
+  // Keyed on the pathname only, so query-string changes (project tabs, report filters) do not re-trigger the fade.
+  const { pathname } = useLocation();
   const desktop = useMediaQuery(theme.breakpoints.up('md'), { noSsr: true });
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -44,7 +46,11 @@ const AppLayout: React.FC = () => {
             <Suspense
               fallback={<LinearProgress aria-label="Loading page" sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
             >
-              <Outlet />
+              <Fade key={pathname} in appear timeout={motion.base}>
+                <Box>
+                  <Outlet />
+                </Box>
+              </Fade>
             </Suspense>
           </Box>
         </Box>
