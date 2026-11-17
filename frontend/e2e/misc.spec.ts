@@ -202,9 +202,8 @@ test.describe('dashboard', () => {
     await loginAs(page, 'admin');
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-    await expect(page.getByText('Active Projects')).toBeVisible();
-    await expect(page.getByText('Help Topics')).toBeVisible();
-    await expect(page.getByText('System Status')).toBeVisible();
+    await expect(page.getByText('Active projects')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'System health' })).toBeVisible();
     await expect(page.locator('main').getByText('Admin', { exact: true })).toHaveCount(0);
     await expect(page.locator('main .MuiCircularProgress-root')).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);

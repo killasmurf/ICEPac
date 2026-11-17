@@ -9,10 +9,14 @@ export interface ErrorStateProps {
   action?: React.ReactNode;
   /** Defaults to an error icon. */
   icon?: React.ReactNode;
+  /** Heading element. Defaults to `h1` (a whole-page error); use `h2`/`h3` for a panel inside a page. */
+  headingLevel?: 'h1' | 'h2' | 'h3';
+  /** Smaller padding, icon and title, for a panel inside a page. */
+  compact?: boolean;
 }
 
 /** Centered message for errors, not-found and not-authorised screens. */
-const ErrorState: React.FC<ErrorStateProps> = ({ title, description, action, icon }) => (
+const ErrorState: React.FC<ErrorStateProps> = ({ title, description, action, icon, headingLevel = 'h1', compact = false }) => (
   <Box
     sx={{
       display: 'flex',
@@ -20,14 +24,14 @@ const ErrorState: React.FC<ErrorStateProps> = ({ title, description, action, ico
       alignItems: 'center',
       textAlign: 'center',
       gap: 1.5,
-      py: { xs: 6, md: 10 },
+      py: compact ? 4 : { xs: 6, md: 10 },
       px: 2,
     }}
   >
-    <Box sx={{ color: 'text.secondary', display: 'flex', '& svg': { fontSize: 56 } }} aria-hidden="true">
+    <Box sx={{ color: 'text.secondary', display: 'flex', '& svg': { fontSize: compact ? 40 : 56 } }} aria-hidden="true">
       {icon ?? <ErrorOutlineIcon />}
     </Box>
-    <Typography variant="h4" component="h1">
+    <Typography variant={compact ? 'h6' : 'h4'} component={headingLevel}>
       {title}
     </Typography>
     {description && (

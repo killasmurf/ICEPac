@@ -10,5 +10,7 @@ export const miscRoutes = {
     const items = all.items.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
     return { items, total: items.length, skip: 0, limit: 100 };
   },
+  'GET /dashboard/portfolio': () => loadFixture('dashboard-portfolio'),
+  'GET /dashboard/health-detailed': () => loadFixture('dashboard-health'),
   'GET /help/topics/1': () => loadFixture('misc-help-topic-1'),
 };
