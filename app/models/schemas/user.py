@@ -28,7 +28,7 @@ class UserUpdate(BaseModel):
 
 
 class UserPasswordUpdate(BaseModel):
-    current_password: str
+    current_password: Optional[str] = None
     new_password: str = Field(min_length=8, max_length=128)
 
 

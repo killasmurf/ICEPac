@@ -155,14 +155,21 @@ class AuditService:
         )
 
     def log_password_change(
-        self, user_id: int, request: Optional[Request] = None
+        self,
+        user_id: int,
+        request: Optional[Request] = None,
+        acting_user_id: Optional[int] = None,
     ) -> AuditLog:
-        """Log a PASSWORD_CHANGE action."""
+        """Log a PASSWORD_CHANGE action.
+
+        ``user_id`` is the user whose password changed; ``acting_user_id`` is who
+        performed the change (defaults to the same user).
+        """
         return self.log_action(
             action=AuditAction.PASSWORD_CHANGE,
             entity_type="User",
             entity_id=user_id,
-            user_id=user_id,
+            user_id=acting_user_id if acting_user_id is not None else user_id,
             request=request,
         )
 
