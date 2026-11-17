@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, loginAs, MockApiHandle } from './fixtures/mockApi';
+import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { reportsRoutes } from './fixtures/reportsRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, reportsRoutes); // the Reports screen loads its catalog
+  // The shell tests visit Reports (loads its catalog) and a project detail page.
+  api = await mockApi(page, { ...reportsRoutes, ...projectDetailRoutes });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'light'));
 });
