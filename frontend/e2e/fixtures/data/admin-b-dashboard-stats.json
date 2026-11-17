@@ -1,0 +1,13 @@
+{
+  "projects": { "total": 4, "active": 2 },
+  "wbs": { "total": 40, "approved": 12, "pending": 3 },
+  "estimation": { "assignments": 80, "risks": 9, "total_pert": 123456.78 },
+  "admin": { "users": 14, "active_users": 11, "resources": 128, "suppliers": 24 },
+  "reports": { "generated": 5, "available_types": 16 },
+  "help": { "topics": 12 },
+  "recent_activity": [
+    { "id": 301, "action": "UPDATE", "entity_type": "Resource", "entity_id": 45, "username": "jordan", "created_at": "2026-11-15T09:30:00Z" },
+    { "id": 300, "action": "CREATE", "entity_type": "Supplier", "entity_id": 12, "username": "jordan", "created_at": "2026-11-15T09:10:00Z" },
+    { "id": 299, "action": "DELETE", "entity_type": "cost-types", "entity_id": 3, "username": "", "created_at": "2026-11-14T22:01:00Z" }
+  ]
+}

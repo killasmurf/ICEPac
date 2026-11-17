@@ -1,0 +1,8 @@
+{
+  "items": [
+    { "id": 1, "code": "LABOUR", "description": "Direct labour costs", "is_active": true, "created_at": "2026-01-05T00:00:00Z" },
+    { "id": 2, "code": "MATERIAL", "description": "Materials and supplies", "is_active": true, "created_at": "2026-01-05T00:00:00Z" },
+    { "id": 3, "code": "LEGACY", "description": "Retired cost type", "is_active": false, "created_at": "2026-01-05T00:00:00Z" }
+  ],
+  "total": 3
+}

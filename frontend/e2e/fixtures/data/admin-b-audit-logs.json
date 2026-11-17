@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": 301, "user_id": 1, "username": "jordan", "action": "UPDATE", "entity_type": "Resource", "entity_id": 45,
+      "old_values": { "cost": 120, "description": "Site engineer" },
+      "new_values": { "cost": 135, "description": "Site engineer" },
+      "ip_address": "10.0.0.5", "user_agent": "Mozilla/5.0", "created_at": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 300, "user_id": 1, "username": "jordan", "action": "CREATE", "entity_type": "Supplier", "entity_id": 12,
+      "old_values": null,
+      "new_values": { "name": "Southern Cranes" },
+      "ip_address": "10.0.0.5", "user_agent": "Mozilla/5.0", "created_at": "2026-11-15T09:10:00Z"
+    },
+    {
+      "id": 299, "user_id": null, "username": null, "action": "FAILED_LOGIN", "entity_type": "User", "entity_id": null,
+      "old_values": "not valid json {",
+      "new_values": null,
+      "ip_address": null, "user_agent": null, "created_at": "2026-11-14T22:01:00Z"
+    }
+  ],
+  "total": 3,
+  "skip": 0,
+  "limit": 25
+}

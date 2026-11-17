@@ -1,111 +1,217 @@
 /**
- * AuditLogs - Audit trail viewer with action/entity filters and detail modal.
+ * AuditLogs - read-only, server-paginated audit trail (GET /admin/audit-logs).
+ * Clicking a row opens a drawer with who, when, what and the old/new values.
  */
 import React, { useState } from 'react';
-import DataGrid, { Column } from '../../components/admin/DataGrid';
-import SearchBar from '../../components/admin/SearchBar';
-import { AuditLog } from '../../api/admin';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import CloseIcon from '@mui/icons-material/Close';
+import HistoryIcon from '@mui/icons-material/History';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Drawer from '@mui/material/Drawer';
+import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import { auditApi, type AuditLog } from '../../api/admin';
+import DataTable from '../../components/common/DataTable';
+import PageHeader from '../../components/common/PageHeader';
+import SearchField from '../../components/common/SearchField';
+import { formatDateTime } from '../../utils/format';
+import { AUDIT_ACTIONS, formatActionLabel, formatAuditValue } from './auditFormat';
 
-const MOCK_LOGS: AuditLog[] = [
-  { id: 1, user_id: 1, username: 'admin', action: 'create', entity_type: 'resource', entity_id: 45, details: 'Created resource RES045', old_values: undefined, new_values: '{"resource_code":"RES045","cost":175}', ip_address: '192.168.1.10', created_at: new Date().toISOString() },
-  { id: 2, user_id: 2, username: 'jsmith', action: 'update', entity_type: 'supplier', entity_id: 12, details: 'Updated supplier contact info', old_values: '{"contact_name":"Old Name"}', new_values: '{"contact_name":"New Name"}', ip_address: '192.168.1.15', created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: 3, user_id: 1, username: 'admin', action: 'delete', entity_type: 'cost_types', entity_id: 7, details: 'Removed cost type "Obsolete"', old_values: '{"name":"Obsolete","code":"OBS"}', ip_address: '192.168.1.10', created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: 4, user_id: 3, username: 'mjones', action: 'create', entity_type: 'user', entity_id: 5, details: 'Created user account', new_values: '{"username":"newuser","role":"viewer"}', ip_address: '10.0.0.5', created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 5, user_id: 1, username: 'admin', action: 'update', entity_type: 'resource', entity_id: 12, details: 'Updated resource cost', old_values: '{"cost":100}', new_values: '{"cost":125}', ip_address: '192.168.1.10', created_at: new Date(Date.now() - 172800000).toISOString() },
+const columns: GridColDef<AuditLog>[] = [
+  {
+    field: 'created_at',
+    headerName: 'When',
+    width: 180,
+    sortable: false,
+    valueFormatter: (value: string) => formatDateTime(value),
+  },
+  { field: 'username', headerName: 'User', width: 140, sortable: false, valueFormatter: (v: string | null) => v ?? 'System' },
+  {
+    field: 'action',
+    headerName: 'Action',
+    width: 160,
+    sortable: false,
+    renderCell: (p) => <Chip size="small" variant="outlined" label={formatActionLabel(p.row.action)} />,
+  },
+  { field: 'entity_type', headerName: 'Entity', flex: 1, minWidth: 140, sortable: false },
+  {
+    field: 'entity_id',
+    headerName: 'Entity ID',
+    width: 110,
+    type: 'number',
+    align: 'right',
+    headerAlign: 'right',
+    sortable: false,
+    cellClassName: 'tabular-nums',
+    valueFormatter: (v: number | null) => (v == null ? '—' : String(v)),
+  },
+  { field: 'ip_address', headerName: 'IP address', width: 140, sortable: false, valueFormatter: (v: string | null) => v ?? '—' },
 ];
 
-export default function AuditLogs() {
-  const [logs] = useState<AuditLog[]>(MOCK_LOGS);
-  const [page, setPage] = useState(0);
-  const [actionFilter, setActionFilter] = useState('');
-  const [entityFilter, setEntityFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [detailLog, setDetailLog] = useState<AuditLog | null>(null);
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 1, py: 0.75 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+        {children}
+      </Typography>
+    </Box>
+  );
+}
 
-  const actionColors: Record<string, { bg: string; fg: string }> = {
-    create: { bg: '#dcfce7', fg: '#166534' }, update: { bg: '#dbeafe', fg: '#1e40af' }, delete: { bg: '#fee2e2', fg: '#991b1b' },
+function JsonBlock({ title, value }: { title: string; value: unknown }) {
+  const text = formatAuditValue(value);
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="subtitle2" component="h3" sx={{ mb: 0.5 }}>
+        {title}
+      </Typography>
+      {text === null ? (
+        <Typography variant="body2" color="text.secondary">
+          No value recorded.
+        </Typography>
+      ) : (
+        <Box
+          component="pre"
+          tabIndex={0}
+          aria-label={`${title} (JSON)`}
+          sx={{
+            m: 0,
+            p: 1.5,
+            overflow: 'auto',
+            maxHeight: 280,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+            fontSize: '0.8125rem',
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+            bgcolor: 'action.hover',
+            color: 'text.primary',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+          }}
+        >
+          {text}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+export default function AuditLogs() {
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 25 });
+  const [action, setAction] = useState('');
+  const [entityType, setEntityType] = useState('');
+  const [selected, setSelected] = useState<AuditLog | null>(null);
+
+  const params = {
+    skip: paginationModel.page * paginationModel.pageSize,
+    limit: paginationModel.pageSize,
+    action: action || undefined,
+    entity_type: entityType || undefined,
   };
 
-  const columns: Column<AuditLog>[] = [
-    { key: 'created_at', label: 'Time', sortable: true, width: '160px', render: v => new Date(v).toLocaleString() },
-    { key: 'username', label: 'User', sortable: true, width: '100px' },
-    { key: 'action', label: 'Action', width: '90px', render: v => { const c = actionColors[v] || actionColors.update; return <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, backgroundColor: c.bg, color: c.fg, textTransform: 'capitalize' }}>{v}</span>; } },
-    { key: 'entity_type', label: 'Entity', sortable: true, width: '120px', render: v => v.replace(/_/g, ' ') },
-    { key: 'entity_id', label: 'ID', width: '60px', render: v => v ? `#${v}` : '—' },
-    { key: 'details', label: 'Details', render: v => v || '—' },
-    { key: 'ip_address', label: 'IP', width: '120px', render: v => v || '—' },
-  ];
-
-  const actions = Array.from(new Set(logs.map(l => l.action)));
-  const entities = Array.from(new Set(logs.map(l => l.entity_type)));
-
-  const filtered = logs.filter(l => {
-    if (actionFilter && l.action !== actionFilter) return false;
-    if (entityFilter && l.entity_type !== entityFilter) return false;
-    if (search && !l.username.toLowerCase().includes(search.toLowerCase()) && !(l.details || '').toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  const query = useQuery({
+    queryKey: ['admin', 'audit-logs', params],
+    queryFn: () => auditApi.list(params),
+    placeholderData: keepPreviousData,
   });
 
-  const selectStyle: React.CSSProperties = { padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', backgroundColor: '#fff' };
+  const resetPage = () => setPaginationModel((m) => ({ ...m, page: 0 }));
+  const filtered = Boolean(action || entityType);
 
-  const tryParse = (s?: string) => { try { return s ? JSON.stringify(JSON.parse(s), null, 2) : '—'; } catch { return s || '—'; } };
+  const toolbar = (
+    <>
+      <FormControl size="small" sx={{ minWidth: 180 }}>
+        <InputLabel id="audit-action-label">Action</InputLabel>
+        <Select
+          labelId="audit-action-label"
+          label="Action"
+          value={action}
+          onChange={(e) => {
+            setAction(e.target.value);
+            resetPage();
+          }}
+        >
+          <MenuItem value="">All actions</MenuItem>
+          {AUDIT_ACTIONS.map((a) => (
+            <MenuItem key={a} value={a}>
+              {formatActionLabel(a)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <SearchField
+        label="Entity type"
+        placeholder="Entity type, e.g. Resource"
+        onChange={(v) => {
+          setEntityType(v.trim());
+          resetPage();
+        }}
+      />
+    </>
+  );
 
   return (
-    <div style={{ maxWidth: '1400px' }}>
-      <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Audit Logs</h1>
-      <p style={{ fontSize: '15px', color: '#64748b', marginBottom: '24px' }}>Track all administrative actions and changes</p>
+    <Box>
+      <PageHeader title="Audit Logs" subtitle="Every change made through the admin area. Select a row to see what changed." />
 
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <SearchBar value={search} onChange={setSearch} placeholder="Search by user or details..." />
-        <select style={selectStyle} value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
-          <option value="">All Actions</option>
-          {actions.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <select style={selectStyle} value={entityFilter} onChange={e => setEntityFilter(e.target.value)}>
-          <option value="">All Entities</option>
-          {entities.map(e => <option key={e} value={e}>{e.replace(/_/g, ' ')}</option>)}
-        </select>
-      </div>
+      <DataTable<AuditLog>
+        rows={query.data?.items ?? []}
+        columns={columns}
+        loading={query.isPending || query.isFetching}
+        error={query.isError ? query.error : undefined}
+        onRetry={() => void query.refetch()}
+        rowCount={query.data?.total ?? 0}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        onRowClick={setSelected}
+        toolbar={toolbar}
+        ariaLabel="Audit log entries"
+        emptyTitle={filtered ? 'No matching entries' : 'No audit entries yet'}
+        emptyDescription={filtered ? 'Try a different action or entity type.' : 'Changes made in the admin area will appear here.'}
+      />
 
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <DataGrid columns={columns} data={filtered} total={filtered.length} page={page} pageSize={20} onPageChange={setPage}
-          onRowClick={(row) => setDetailLog(row)}
-          actions={(row: AuditLog) => (
-            <button onClick={() => setDetailLog(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>View</button>
-          )} />
-      </div>
-
-      {/* Detail Modal */}
-      {detailLog && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setDetailLog(null)}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', padding: '24px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Audit Log #{detailLog.id}</h2>
-              <button onClick={() => setDetailLog(null)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '12px', fontSize: '14px' }}>
-              <strong style={{ color: '#64748b' }}>Time:</strong><span>{new Date(detailLog.created_at).toLocaleString()}</span>
-              <strong style={{ color: '#64748b' }}>User:</strong><span>{detailLog.username} (ID: {detailLog.user_id})</span>
-              <strong style={{ color: '#64748b' }}>Action:</strong><span style={{ textTransform: 'capitalize' }}>{detailLog.action}</span>
-              <strong style={{ color: '#64748b' }}>Entity:</strong><span>{detailLog.entity_type} #{detailLog.entity_id}</span>
-              <strong style={{ color: '#64748b' }}>Details:</strong><span>{detailLog.details || '—'}</span>
-              <strong style={{ color: '#64748b' }}>IP Address:</strong><span>{detailLog.ip_address || '—'}</span>
-            </div>
-            {detailLog.old_values && (
-              <div style={{ marginTop: '16px' }}>
-                <strong style={{ fontSize: '13px', color: '#64748b' }}>Previous Values:</strong>
-                <pre style={{ backgroundColor: '#fef2f2', padding: '12px', borderRadius: '8px', fontSize: '12px', overflow: 'auto', marginTop: '4px' }}>{tryParse(detailLog.old_values)}</pre>
-              </div>
-            )}
-            {detailLog.new_values && (
-              <div style={{ marginTop: '12px' }}>
-                <strong style={{ fontSize: '13px', color: '#64748b' }}>New Values:</strong>
-                <pre style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '8px', fontSize: '12px', overflow: 'auto', marginTop: '4px' }}>{tryParse(detailLog.new_values)}</pre>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+      <Drawer
+        anchor="right"
+        open={selected !== null}
+        onClose={() => setSelected(null)}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 480 }, maxWidth: '100%' }, 'aria-label': 'Audit entry details' } }}
+      >
+        {selected && (
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
+              <Typography variant="h5" component="h2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <HistoryIcon aria-hidden /> Audit entry #{selected.id}
+              </Typography>
+              <Tooltip title="Close">
+                <IconButton aria-label="Close details" onClick={() => setSelected(null)}>
+                  <CloseIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <DetailRow label="Action">{formatActionLabel(selected.action)}</DetailRow>
+            <DetailRow label="Entity">
+              {selected.entity_type}
+              {selected.entity_id != null ? ` #${selected.entity_id}` : ''}
+            </DetailRow>
+            <DetailRow label="User">{selected.username ?? 'System'}</DetailRow>
+            <DetailRow label="When">{formatDateTime(selected.created_at)}</DetailRow>
+            <DetailRow label="IP address">{selected.ip_address ?? '—'}</DetailRow>
+            <JsonBlock title="Old values" value={selected.old_values} />
+            <JsonBlock title="New values" value={selected.new_values} />
+          </Box>
+        )}
+      </Drawer>
+    </Box>
   );
 }

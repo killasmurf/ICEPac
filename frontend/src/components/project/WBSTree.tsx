@@ -1,369 +1,313 @@
 /**
- * WBSTree Component
+ * WBSTree
  *
- * Displays a hierarchical WBS tree with expandable/collapsible nodes.
- * Shows WBS code, title, dates, percent complete bar, and badges
- * for milestone/critical tasks.
+ * Accessible, filterable WBS tree (WAI-ARIA tree pattern) built on MUI List.
+ * Rows show code, title, approval status, PERT total (when supplied), progress
+ * and milestone/critical flags. Keyboard: Up/Down move, Right expands or moves
+ * to the first child, Left collapses or moves to the parent, Home/End jump,
+ * Enter/Space select.
  */
 
-import React, { useState, useEffect } from 'react';
-import { getWBSTree, WBSTreeNode, WBSItem } from '../../api/projects';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import Typography from '@mui/material/Typography';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
+import { WBSItem, WBSTreeNode } from '../../api/projects';
+import { formatCurrency, formatNumber } from '../../utils/format';
+import CardSkeleton from '../common/CardSkeleton';
+import EmptyState from '../common/EmptyState';
+import ErrorState from '../common/ErrorState';
+import SearchField from '../common/SearchField';
+import StatusChip from '../common/StatusChip';
+import { useWbsTree } from './useWbsTree';
+import {
+  FlatRow,
+  NAV_KEYS,
+  NavKey,
+  expandableIds,
+  filterTree,
+  flattenVisible,
+  initialExpanded,
+  navigate as navigateRows,
+} from './wbsTreeLogic';
 
-// ============================================================
-// Types
-// ============================================================
-
-interface WBSTreeProps {
+export interface WBSTreeProps {
   projectId: number;
   onNodeClick?: (node: WBSItem) => void;
+  /** Id of the selected node; when omitted the tree tracks selection itself. */
+  selectedId?: number | null;
+  /** PERT estimate per WBS id (from the project estimation summary). */
+  pertTotals?: Readonly<Record<number, number>>;
+  /** Shown in the empty state, e.g. a button that opens the import tab. */
+  emptyAction?: React.ReactNode;
 }
 
-// ============================================================
-// Styles
-// ============================================================
+const INDENT_PX = 16;
 
-const styles = {
-  container: {
-    padding: '24px',
-  },
-  loading: {
-    textAlign: 'center' as const,
-    padding: '48px',
-    color: '#999',
-  },
-  empty: {
-    textAlign: 'center' as const,
-    padding: '48px',
-    color: '#999',
-  },
-  header: {
-    display: 'flex',
-    padding: '8px 12px',
-    backgroundColor: '#f5f5f5',
-    borderBottom: '2px solid #ddd',
-    fontWeight: 600 as const,
-    fontSize: '13px',
-    color: '#666',
-  },
-  nodeRow: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '6px 12px',
-    borderBottom: '1px solid #f0f0f0',
-    fontSize: '14px',
-    cursor: 'pointer',
-    transition: 'background-color 0.15s',
-  },
-  nodeRowHover: {
-    backgroundColor: '#f9f9f9',
-  },
-  expandIcon: {
-    width: '20px',
-    textAlign: 'center' as const,
-    fontSize: '12px',
-    color: '#999',
-    cursor: 'pointer',
-    userSelect: 'none' as const,
-    flexShrink: 0,
-  },
-  nameCell: {
-    flex: 1,
-    minWidth: 0,
-    overflow: 'hidden' as const,
-    textOverflow: 'ellipsis' as const,
-    whiteSpace: 'nowrap' as const,
-  },
-  codeCell: {
-    width: '100px',
-    flexShrink: 0,
-    fontSize: '12px',
-    color: '#999',
-  },
-  dateCell: {
-    width: '100px',
-    flexShrink: 0,
-    fontSize: '12px',
-    color: '#666',
-    textAlign: 'right' as const,
-  },
-  progressCell: {
-    width: '120px',
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    paddingLeft: '12px',
-  },
-  progressBar: {
-    flex: 1,
-    height: '6px',
-    backgroundColor: '#e0e0e0',
-    borderRadius: '3px',
-    overflow: 'hidden' as const,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4caf50',
-    borderRadius: '3px',
-  },
-  progressText: {
-    fontSize: '11px',
-    color: '#999',
-    width: '32px',
-    textAlign: 'right' as const,
-    flexShrink: 0,
-  },
-  badge: {
-    display: 'inline-block',
-    padding: '1px 6px',
-    borderRadius: '10px',
-    fontSize: '10px',
-    fontWeight: 600 as const,
-    marginLeft: '6px',
-    flexShrink: 0,
-  },
-  milestoneBadge: {
-    backgroundColor: '#e8eaf6',
-    color: '#3949ab',
-  },
-  criticalBadge: {
-    backgroundColor: '#fce4ec',
-    color: '#c62828',
-  },
-  summaryStyle: {
-    fontWeight: 600 as const,
-  },
-  statsBar: {
-    display: 'flex',
-    gap: '24px',
-    padding: '12px 16px',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '6px',
-    marginBottom: '16px',
-    fontSize: '14px',
-    color: '#555',
-  },
-};
-
-// ============================================================
-// Helper functions
-// ============================================================
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+interface TreeRowProps {
+  row: FlatRow;
+  selected: boolean;
+  focusable: boolean;
+  pert: number | undefined;
+  onSelect: (node: WBSTreeNode) => void;
+  onToggle: (id: number) => void;
+  onFocusRow: (id: number) => void;
+  register: (id: number, el: HTMLElement | null) => void;
 }
 
-// ============================================================
-// TreeNode sub-component
-// ============================================================
-
-interface TreeNodeProps {
-  node: WBSTreeNode;
-  depth: number;
-  expandedIds: Set<number>;
-  toggleExpand: (id: number) => void;
-  onNodeClick?: (node: WBSItem) => void;
-}
-
-const TreeNodeRow: React.FC<TreeNodeProps> = ({ node, depth, expandedIds, toggleExpand, onNodeClick }) => {
-  const hasChildren = node.children && node.children.length > 0;
-  const isExpanded = expandedIds.has(node.id);
-  const indent = depth * 20;
-
-  const handleClick = () => {
-    if (hasChildren) {
-      toggleExpand(node.id);
-    }
-    if (onNodeClick) {
-      onNodeClick(node);
-    }
-  };
-
+const TreeRow = React.memo(function TreeRow({
+  row,
+  selected,
+  focusable,
+  pert,
+  onSelect,
+  onToggle,
+  onFocusRow,
+  register,
+}: TreeRowProps) {
+  const { node, depth, hasChildren, expanded } = row;
+  const percent = Math.round(node.percent_complete ?? 0);
   return (
-    <>
-      <div
-        style={{
-          ...styles.nodeRow,
-          ...(node.is_summary ? styles.summaryStyle : {}),
+    <ListItemButton
+      component="div"
+      role="treeitem"
+      ref={(el: HTMLElement | null) => register(node.id, el)}
+      tabIndex={focusable ? 0 : -1}
+      aria-level={depth + 1}
+      aria-setsize={row.setSize}
+      aria-posinset={row.posInSet}
+      aria-selected={selected}
+      aria-expanded={hasChildren ? expanded : undefined}
+      selected={selected}
+      onClick={() => onSelect(node)}
+      onFocus={() => onFocusRow(node.id)}
+      data-wbs-id={node.id}
+      sx={{
+        alignItems: 'flex-start',
+        gap: 0.5,
+        py: 0.75,
+        pr: 1.5,
+        pl: `${8 + depth * INDENT_PX}px`,
+        borderBottom: 1,
+        borderColor: 'divider',
+        '&:focus-visible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main', outlineOffset: -2 },
+      }}
+    >
+      <Box
+        component="span"
+        aria-hidden
+        onClick={(e: React.MouseEvent) => {
+          if (!hasChildren) return;
+          e.stopPropagation();
+          onToggle(node.id);
         }}
-        onClick={handleClick}
+        sx={{
+          display: 'inline-flex',
+          width: 24,
+          height: 24,
+          flexShrink: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 1,
+          color: 'text.secondary',
+          cursor: hasChildren ? 'pointer' : 'default',
+          '&:hover': hasChildren ? { bgcolor: 'action.hover' } : undefined,
+        }}
       >
-        {/* Expand/collapse icon */}
-        <span style={{ ...styles.expandIcon, marginLeft: `${indent}px` }}>
-          {hasChildren ? (isExpanded ? '▼' : '▶') : ''}
-        </span>
+        {hasChildren && (expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />)}
+      </Box>
 
-        {/* WBS Code */}
-        <span style={styles.codeCell}>{node.wbs_code || ''}</span>
-
-        {/* Title */}
-        <span style={styles.nameCell}>
-          {node.wbs_title}
-          {node.is_milestone && (
-            <span style={{ ...styles.badge, ...styles.milestoneBadge }}>Milestone</span>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
+          {node.wbs_code && (
+            <Typography variant="caption" color="text.secondary" className="tabular-nums" sx={{ flexShrink: 0 }}>
+              {node.wbs_code}
+            </Typography>
           )}
-          {node.is_critical && (
-            <span style={{ ...styles.badge, ...styles.criticalBadge }}>Critical</span>
+          <Typography variant="body2" noWrap sx={{ fontWeight: node.is_summary ? 700 : 400, minWidth: 0 }}>
+            {node.wbs_title}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+          <StatusChip kind="approval" value={node.approval_status} />
+          {pert !== undefined && pert > 0 && (
+            <Typography variant="caption" className="tabular-nums" sx={{ fontWeight: 600 }}>
+              {formatCurrency(pert, { maximumFractionDigits: 0 })}
+            </Typography>
           )}
-        </span>
-
-        {/* Start Date */}
-        <span style={styles.dateCell}>{formatDate(node.schedule_start)}</span>
-
-        {/* Finish Date */}
-        <span style={styles.dateCell}>{formatDate(node.schedule_finish)}</span>
-
-        {/* Progress */}
-        <div style={styles.progressCell}>
-          <div style={styles.progressBar}>
-            <div style={{ ...styles.progressFill, width: `${node.percent_complete || 0}%` }} />
-          </div>
-          <span style={styles.progressText}>{Math.round(node.percent_complete || 0)}%</span>
-        </div>
-      </div>
-
-      {/* Render children if expanded */}
-      {hasChildren && isExpanded && node.children.map((child) => (
-        <TreeNodeRow
-          key={child.id}
-          node={child}
-          depth={depth + 1}
-          expandedIds={expandedIds}
-          toggleExpand={toggleExpand}
-          onNodeClick={onNodeClick}
-        />
-      ))}
-    </>
+          <Typography variant="caption" color="text.secondary" className="tabular-nums">
+            {percent}% complete
+          </Typography>
+          {node.is_milestone && <Chip label="Milestone" size="small" variant="outlined" />}
+          {node.is_critical && <Chip label="Critical" size="small" variant="outlined" color="error" />}
+        </Box>
+      </Box>
+    </ListItemButton>
   );
-};
+});
 
-// ============================================================
-// Main Component
-// ============================================================
+const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick, selectedId, pertTotals, emptyAction }) => {
+  const { data, isPending, isError, refetch } = useWbsTree(projectId);
+  const tree = useMemo(() => data?.items ?? [], [data]);
 
-const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick }) => {
-  const [tree, setTree] = useState<WBSTreeNode[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [query, setQuery] = useState('');
+  // Expansion is stored as "user choice since the tree last loaded"; null means the default (first level open).
+  const [expandedOverride, setExpandedOverride] = useState<Set<number> | null>(null);
+  const [localSelected, setLocalSelected] = useState<number | null>(null);
+  const [focusedId, setFocusedId] = useState<number | null>(null);
+  const rowEls = useRef(new Map<number, HTMLElement>());
 
-  // Show the spinner again when the project changes (adjusting state during render).
-  const [loadedFor, setLoadedFor] = useState(projectId);
-  if (loadedFor !== projectId) {
-    setLoadedFor(projectId);
-    setLoading(true);
-  }
+  const expanded = useMemo(() => expandedOverride ?? initialExpanded(tree), [expandedOverride, tree]);
+  const filter = useMemo(() => filterTree(tree, query), [tree, query]);
+  const rows = useMemo(() => flattenVisible(tree, expanded, filter), [tree, expanded, filter]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getWBSTree(projectId)
-      .then((res) => {
-        if (cancelled) return;
-        setTree(res.items);
-        setTotal(res.total);
-        // Auto-expand first level
-        const firstLevelIds = new Set(res.items.map((n) => n.id));
-        setExpandedIds(firstLevelIds);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Failed to load WBS');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+  const effectiveSelected = selectedId !== undefined ? selectedId : localSelected;
+
+  // Roving tabindex: one row is in the tab order.
+  const tabStopId = useMemo(() => {
+    const has = (id: number | null) => id !== null && rows.some((r) => r.node.id === id);
+    if (has(focusedId)) return focusedId;
+    if (has(effectiveSelected)) return effectiveSelected;
+    return rows[0]?.node.id ?? null;
+  }, [rows, focusedId, effectiveSelected]);
+
+  const register = useCallback((id: number, el: HTMLElement | null) => {
+    if (el) rowEls.current.set(id, el);
+    else rowEls.current.delete(id);
+  }, []);
+
+  const toggle = useCallback(
+    (id: number) => {
+      setExpandedOverride((prev) => {
+        const next = new Set(prev ?? initialExpanded(tree));
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+    },
+    [tree],
+  );
 
-  const toggleExpand = (id: number) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const select = useCallback(
+    (node: WBSTreeNode) => {
+      setLocalSelected(node.id);
+      setFocusedId(node.id);
+      onNodeClick?.(node);
+    },
+    [onNodeClick],
+  );
 
-  const expandAll = () => {
-    const allIds = new Set<number>();
-    const collect = (nodes: WBSTreeNode[]) => {
-      for (const n of nodes) {
-        if (n.children?.length) {
-          allIds.add(n.id);
-          collect(n.children);
-        }
+  const focusRow = useCallback((id: number) => {
+    setFocusedId(id);
+    rowEls.current.get(id)?.focus();
+  }, []);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const current = (e.target as HTMLElement).closest<HTMLElement>('[data-wbs-id]');
+    if (!current) return;
+    const id = Number(current.dataset.wbsId);
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      const row = rows.find((r) => r.node.id === id);
+      if (row) {
+        e.preventDefault();
+        select(row.node);
       }
-    };
-    collect(tree);
-    setExpandedIds(allIds);
+      return;
+    }
+    if (!NAV_KEYS.includes(e.key)) return;
+    e.preventDefault();
+    const result = navigateRows(rows, id, e.key as NavKey);
+    if (!result) return;
+    if (result.action === 'focus') focusRow(result.id);
+    else toggle(result.id);
   };
 
-  const collapseAll = () => setExpandedIds(new Set());
+  if (isPending) return <CardSkeleton lines={6} />;
 
-  if (loading) {
-    return <div style={styles.loading}>Loading WBS...</div>;
-  }
-
-  if (error) {
-    return <div style={{ ...styles.loading, color: '#c62828' }}>{error}</div>;
+  if (isError) {
+    return (
+      <ErrorState
+        title="Could not load the WBS"
+        description="Something went wrong while loading the work breakdown structure."
+        action={
+          <Button variant="outlined" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
   }
 
   if (tree.length === 0) {
     return (
-      <div style={styles.empty}>
-        No WBS data. Import an MS Project file to populate.
-      </div>
+      <EmptyState
+        icon={<AccountTreeOutlinedIcon />}
+        title="No WBS yet"
+        description="Import an MS Project file to populate the work breakdown structure."
+        action={emptyAction}
+      />
     );
   }
 
+  const filtering = filter.visible !== null;
+
   return (
-    <div style={styles.container}>
-      {/* Stats */}
-      <div style={styles.statsBar}>
-        <span>{total} tasks total</span>
-        <span style={{ marginLeft: 'auto' }}>
-          <button
-            onClick={expandAll}
-            style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '13px' }}
-          >
-            Expand All
-          </button>
-          {' | '}
-          <button
-            onClick={collapseAll}
-            style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '13px' }}
-          >
-            Collapse All
-          </button>
-        </span>
-      </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+        <SearchField onChange={setQuery} label="Filter WBS" placeholder="Filter by code or title" fullWidth />
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Typography variant="caption" color="text.secondary" role="status" className="tabular-nums">
+            {filtering
+              ? `${formatNumber(filter.matches.size)} of ${formatNumber(data?.total ?? 0)} items match`
+              : `${formatNumber(data?.total ?? 0)} items`}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Button size="small" onClick={() => setExpandedOverride(expandableIds(tree))}>
+              Expand all
+            </Button>
+            <Button size="small" onClick={() => setExpandedOverride(new Set())}>
+              Collapse all
+            </Button>
+          </Box>
+        </Box>
+      </Box>
 
-      {/* Header */}
-      <div style={styles.header}>
-        <span style={{ width: '20px', flexShrink: 0 }} />
-        <span style={{ width: '100px', flexShrink: 0 }}>Code</span>
-        <span style={{ flex: 1 }}>Title</span>
-        <span style={{ width: '100px', flexShrink: 0, textAlign: 'right' }}>Start</span>
-        <span style={{ width: '100px', flexShrink: 0, textAlign: 'right' }}>Finish</span>
-        <span style={{ width: '120px', flexShrink: 0, paddingLeft: '12px' }}>Progress</span>
-      </div>
-
-      {/* Tree */}
-      {tree.map((node) => (
-        <TreeNodeRow
-          key={node.id}
-          node={node}
-          depth={0}
-          expandedIds={expandedIds}
-          toggleExpand={toggleExpand}
-          onNodeClick={onNodeClick}
-        />
-      ))}
-    </div>
+      {rows.length === 0 ? (
+        <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
+          No WBS items match “{query.trim()}”.
+        </Typography>
+      ) : (
+        <List
+          component="div"
+          role="tree"
+          aria-label="Work breakdown structure"
+          disablePadding
+          onKeyDown={onKeyDown}
+          sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+        >
+          {rows.map((row) => (
+            <TreeRow
+              key={row.node.id}
+              row={row}
+              selected={row.node.id === effectiveSelected}
+              focusable={row.node.id === tabStopId}
+              pert={pertTotals?.[row.node.id]}
+              onSelect={select}
+              onToggle={toggle}
+              onFocusRow={setFocusedId}
+              register={register}
+            />
+          ))}
+        </List>
+      )}
+    </Box>
   );
 };
 
