@@ -58,7 +58,9 @@ test('the four headline figures match the fixture', async ({ page }) => {
   await expect(card(page, 'Active projects')).toContainText('of 4 projects');
   await expect(card(page, 'Total estimate')).toContainText('$123.5K');
   await expect(card(page, 'WBS awaiting approval')).toContainText('3');
-  await expect(card(page, 'Open risks')).toContainText('9');
+  // "Risks" is also a column in the hidden portfolio table, so pin the stat card by its hint.
+  const risks = card(page, 'Risks').filter({ hasText: 'across 4 projects' });
+  await expect(risks).toContainText('9');
   // The animated digits are hidden from assistive tech; the final value is the accessible text.
   await expect(card(page, 'Total estimate').locator('[aria-hidden="true"]', { hasText: '$123.5K' })).toHaveCount(1);
 });
@@ -127,7 +129,7 @@ test('system health lists each component with a status word and an overall badge
   await page.goto('/');
   await ready(page);
   const section = page.getByRole('region', { name: 'System health' });
-  await expect(section.getByText('All systems healthy')).toBeVisible();
+  await expect(section.getByText('Core services healthy · 2 limited')).toBeVisible();
   const rows = section.getByRole('listitem');
   await expect(rows).toHaveCount(6);
   await expect(rows.filter({ hasText: 'Database' })).toContainText('Healthy');
@@ -178,7 +180,7 @@ test('stats failure shows an error state with retry while the charts still rende
   await expect(page.getByTestId('stats-error')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Estimate by project' }).locator('.MuiBarChart-element')).toHaveCount(10);
   await expect(page.getByRole('region', { name: 'Approval status' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'System health' }).getByText('All systems healthy')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'System health' }).getByText('Core services healthy · 2 limited')).toBeVisible();
   failing = false;
   await page.getByTestId('stats-error').getByRole('button', { name: 'Retry' }).click();
   await expect(card(page, 'Active projects')).toContainText('2');

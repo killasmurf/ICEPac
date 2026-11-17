@@ -77,20 +77,21 @@ export function StatCard({ label, value, icon, hint, trend, onClick, loading }: 
 
   return (
     <Card
-      sx={
-        onClick
+      sx={{
+        height: '100%',
+        ...(onClick
           ? {
               transition: `transform ${motion.base}ms ${motion.easing}`,
               '&:hover': { transform: 'translateY(-2px)' },
               '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
             }
-          : undefined
-      }
+          : {}),
+      }}
     >
       {onClick ? (
         <CardActionArea
           onClick={onClick}
-          sx={{ '&.Mui-focusVisible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main', outlineOffset: 2 } }}
+          sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', '&.Mui-focusVisible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main', outlineOffset: 2 } }}
         >
           {body}
         </CardActionArea>

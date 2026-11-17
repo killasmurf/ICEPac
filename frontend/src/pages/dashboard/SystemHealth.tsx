@@ -46,7 +46,11 @@ export function SystemHealth({ health, loading, failed, onRetry }: SystemHealthP
   } else {
     const rows = healthRows(health);
     const overallOk = health.overall === 'healthy';
-    badge = <Chip size="small" color={overallOk ? 'success' : 'warning'} variant="outlined" label={overallOk ? 'All systems healthy' : 'Degraded'} />;
+    const limited = rows.filter((r) => r.tone !== 'success').length;
+    // The backend reports "healthy" overall when only non-critical services are down,
+    // so the badge only claims everything is healthy when every row is.
+    const badgeLabel = !overallOk ? 'Degraded' : limited === 0 ? 'All systems healthy' : `Core services healthy · ${limited} limited`;
+    badge = <Chip size="small" color={overallOk ? 'success' : 'warning'} variant="outlined" label={badgeLabel} />;
     body = (
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {rows.map((r) => (

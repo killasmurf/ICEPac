@@ -105,9 +105,10 @@ const Dashboard: React.FC = () => {
         icon: <AssignmentTurnedInOutlined />,
       },
       {
-        label: 'Open risks',
+        // The stats endpoint counts every risk, not only open ones, so the label says "Risks".
+        label: 'Risks',
         value: s ? formatNumber(s.estimation.risks) : null,
-        hint: s ? `across ${formatNumber(s.estimation.assignments)} assignments` : undefined,
+        hint: s ? `across ${formatNumber(s.projects.total)} projects` : undefined,
         icon: <WarningAmberOutlined />,
       },
     ];
