@@ -88,3 +88,117 @@ test.describe('loading polish', () => {
     expect(Math.abs(gap)).toBeLessThanOrEqual(1);
   });
 });
+
+const GOLD = 'rgb(196, 164, 111)';
+const NAVY = 'rgb(21, 51, 81)';
+
+/** Describe the focused element and how its focus is drawn. */
+async function focusState(page: Page) {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    return {
+      name: el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 40) || el.tagName,
+      tag: el.tagName,
+      cls: el.outerHTML.slice(0, 160) + ' PARENT ' + (el.parentElement?.outerHTML.slice(0, 120) ?? ''),
+      role: el.getAttribute('role'),
+      id: el.id,
+      inSidebar: Boolean(el.closest('nav[aria-label="Main navigation"]')),
+      inHeader: Boolean(el.closest('header')),
+      outlineStyle: cs.outlineStyle,
+      outlineWidth: parseFloat(cs.outlineWidth),
+      outlineColor: cs.outlineColor,
+      boxShadow: cs.boxShadow,
+    };
+  });
+}
+
+test.describe('focus and keyboard', () => {
+  test('first Tab on / focuses a visible "Skip to content" link that moves focus to main', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await page.keyboard.press('Tab');
+    const skip = page.getByRole('link', { name: 'Skip to content' });
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press('Enter');
+    await expect(page.locator('main')).toBeFocused();
+    await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
+    // Not hidden away again when focus moves on, and not the focus ring around the whole page.
+    expect((await focusState(page))?.outlineStyle).toBe('none');
+  });
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`every Tab stop on / shows a focus ring, including the header (${scheme})`, async ({ page }) => {
+      await page.addInitScript((m) => window.localStorage.setItem('mui-mode', m), scheme);
+      await page.goto('/');
+      await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      const stops = [];
+      for (let i = 0; i < 24; i += 1) {
+        await page.keyboard.press('Tab');
+        const state = await focusState(page);
+        if (state?.tag === 'BODY') break; // tabbed past the last control
+        stops.push(state);
+      }
+      expect(stops.some((s) => s?.inHeader), 'header controls were reached').toBe(true);
+      for (const s of stops) {
+        expect(s, 'focused element').not.toBeNull();
+        const drawn = (s!.outlineStyle !== 'none' && s!.outlineWidth > 0) || s!.boxShadow !== 'none';
+        expect(drawn, `focus ring on ${JSON.stringify(s)}`).toBe(true);
+        if (s!.outlineStyle !== 'none') {
+          // Gold in the always-dark sidebar and in dark mode; navy on light surfaces.
+          const expected = s!.inSidebar || scheme === 'dark' ? GOLD : NAVY;
+          if (s!.name !== 'Skip to content') expect(s!.outlineColor, `ring colour on "${s!.name}"`).toBe(expected);
+        }
+      }
+    });
+  }
+
+  test('closing the command palette returns focus to the search button', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    const trigger = page.getByRole('button', { name: /search/i }).filter({ visible: true }).first();
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test('closing the mobile navigation drawer returns focus to the menu button', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'drawer is mobile only');
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    const trigger = page.getByRole('button', { name: 'Open navigation menu' });
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('form and confirm dialogs return focus to the button that opened them', async ({ page }) => {
+    await page.goto('/admin/users');
+    await expect(page.getByText('Test User 2')).toBeVisible();
+
+    const add = page.getByRole('button', { name: /^Add / }).first();
+    await add.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(add).toBeFocused();
+
+    const del = page.getByRole('button', { name: /^Delete user2/ });
+    await del.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(del).toBeFocused();
+  });
+});

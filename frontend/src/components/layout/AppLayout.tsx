@@ -6,6 +6,7 @@ import { layout, motion } from '../../theme/tokens';
 import CommandPalette from './CommandPalette';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import SkipLink, { MAIN_ID } from './SkipLink';
 import { useSidebarCollapsed } from './useSidebarCollapsed';
 
 const AppLayout: React.FC = () => {
@@ -33,6 +34,7 @@ const AppLayout: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <SkipLink />
       <Sidebar desktop={desktop} collapsed={collapsed} mobileOpen={mobileOpen} onMobileClose={closeMobile} />
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Header
@@ -41,7 +43,12 @@ const AppLayout: React.FC = () => {
           onMenuClick={desktop ? toggleCollapsed : () => setMobileOpen(true)}
           onSearchClick={() => setPaletteOpen(true)}
         />
-        <Box component="main" sx={{ flex: 1, position: 'relative', p: { xs: 2, md: 3 } }}>
+        <Box
+          component="main"
+          id={MAIN_ID}
+          tabIndex={-1}
+          sx={{ flex: 1, position: 'relative', p: { xs: 2, md: 3 }, '&:focus-visible': { outline: 'none' } }}
+        >
           <Box sx={{ maxWidth: layout.contentMaxWidth, mx: 'auto' }}>
             <Suspense
               fallback={<LinearProgress aria-label="Loading page" sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}

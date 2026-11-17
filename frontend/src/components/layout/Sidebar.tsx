@@ -30,7 +30,14 @@ const Sidebar: React.FC<SidebarProps> = ({ desktop, collapsed, mobileOpen, onMob
     <Box
       component="nav"
       aria-label="Main navigation"
-      sx={{ display: 'flex', flexDirection: 'column', height: '100%', color: onSurface(0.7) }}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        color: onSurface(0.7),
+        // The sidebar is dark in both colour modes, so its focus ring is always gold.
+        '& :focus-visible': { outline: `2px solid ${brand.gold}`, outlineOffset: 2 },
+      }}
     >
       <Box
         sx={{

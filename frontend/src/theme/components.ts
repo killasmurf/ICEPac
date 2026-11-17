@@ -18,6 +18,18 @@ export const components: Components<Theme> = {
           transitionDuration: '0.01ms !important',
         },
       },
+      // Focus ring for every keyboard-focusable element: navy on light surfaces, gold in dark mode.
+      // `body` raises the specificity above MUI's own `outline: 0` on ButtonBase; text inputs show their
+      // own 2px border instead. The always-dark sidebar overrides this with gold (see Sidebar).
+      'body :focus-visible:not(:where(.MuiInputBase-input))': {
+        outline: `2px solid ${tk(theme).palette.primary.main}`,
+        outlineOffset: 2,
+      },
+      // MUI X charts make their drawing surface tabbable but set `outline: none` inline, so it needs !important.
+      '.MuiChartsSurface-root > [tabindex="0"]:focus-visible': {
+        outline: `2px solid ${tk(theme).palette.primary.main} !important`,
+        outlineOffset: '-2px !important',
+      },
       '*': {
         scrollbarWidth: 'thin',
         scrollbarColor: `${tk(theme).palette.divider} transparent`,
