@@ -1,0 +1,23 @@
+{
+  "report_type": "cost_by_wbs",
+  "title": "Cost by WBS",
+  "generated_at": "2026-03-04T10:30:00",
+  "project_name": "Harbour Bridge Refurbishment",
+  "filters_applied": { "project_id": 1, "include_inactive": false },
+  "columns": [
+    { "key": "group_label", "label": "WBS Item" },
+    { "key": "best_total", "label": "Best ($)" },
+    { "key": "likely_total", "label": "Likely ($)" },
+    { "key": "worst_total", "label": "Worst ($)" },
+    { "key": "pert_total", "label": "PERT ($)" },
+    { "key": "assignment_count", "label": "Assignments" }
+  ],
+  "rows": [
+    { "group_key": 1, "group_label": "Pier foundations", "best_total": 120000, "likely_total": 150000, "worst_total": 210000, "pert_total": 155000, "assignment_count": 6 },
+    { "group_key": 2, "group_label": "Steel blasting", "best_total": 80000.5, "likely_total": 95000, "worst_total": 140000, "pert_total": 100000.08, "assignment_count": 9 },
+    { "group_key": 3, "group_label": "Repainting", "best_total": 45000, "likely_total": 60000, "worst_total": 90000, "pert_total": 63750, "assignment_count": 4 }
+  ],
+  "totals": { "best_total": 245000.5, "likely_total": 305000, "worst_total": 440000, "pert_total": 318750.08, "assignment_count": 19 },
+  "row_count": 3,
+  "metadata": { "report_catalog_category": "cost_control" }
+}

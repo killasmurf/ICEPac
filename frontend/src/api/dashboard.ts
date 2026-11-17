@@ -1,5 +1,14 @@
 import client from './client';
 
+export interface RecentActivity {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id: number | null;
+  username: string | null;
+  created_at: string | null;
+}
+
 export interface DashboardStats {
   projects: { total: number; active: number };
   wbs: { total: number; approved: number; pending: number };
@@ -7,7 +16,7 @@ export interface DashboardStats {
   admin: { users: number; active_users: number; resources: number; suppliers: number };
   reports: { generated: number; available_types: number };
   help: { topics: number };
-  recent_activity: unknown[];
+  recent_activity: RecentActivity[];
 }
 
 export interface HealthStatus {

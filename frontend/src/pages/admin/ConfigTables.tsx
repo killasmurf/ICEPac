@@ -1,152 +1,322 @@
 /**
- * ConfigTables - Dynamic configuration table management.
- * Supports 10 config tables including weighted tables (probability, severity, PMB).
+ * ConfigTables - manage the lookup tables behind the estimation forms.
+ * Table list comes from GET /admin/config; items from /admin/config/{table}.
+ * The selected table lives in the URL (?table=cost-types).
  */
-import React, { useState } from 'react';
-import DataGrid, { Column, StatusBadge } from '../../components/admin/DataGrid';
-import FormDialog from '../../components/admin/FormDialog';
-import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import { ConfigItem, ConfigTableInfo } from '../../api/admin';
-
-const TABLE_INFO: ConfigTableInfo[] = [
-  { name: 'cost_types', label: 'Cost Types', description: 'Element of Cost classifications', weighted: false },
-  { name: 'expense_types', label: 'Expense Types', description: 'Expense type categories', weighted: false },
-  { name: 'regions', label: 'Regions', description: 'Geographic regions', weighted: false },
-  { name: 'business_areas', label: 'Business Areas', description: 'Business area classifications', weighted: false },
-  { name: 'estimating_techniques', label: 'Estimating Techniques', description: 'Available estimation methods', weighted: false },
-  { name: 'risk_categories', label: 'Risk Categories', description: 'Risk classification categories', weighted: false },
-  { name: 'expenditure_indicators', label: 'Expenditure Indicators', description: 'Expenditure indicator types', weighted: false },
-  { name: 'probability_levels', label: 'Probability Levels', description: 'Probability with weights', weighted: true },
-  { name: 'severity_levels', label: 'Severity Levels', description: 'Severity with weights', weighted: true },
-  { name: 'pmb_weights', label: 'PMB Weights', description: 'PMB weight configuration', weighted: true },
-];
-
-const MOCK_DATA: Record<string, ConfigItem[]> = {
-  cost_types: [
-    { id: 1, name: 'Labor', code: 'LBR', description: 'Direct labor costs', is_active: true, sort_order: 1, created_at: '2026-01-01', updated_at: '2026-01-01' },
-    { id: 2, name: 'Materials', code: 'MAT', description: 'Materials and supplies', is_active: true, sort_order: 2, created_at: '2026-01-01', updated_at: '2026-01-01' },
-    { id: 3, name: 'Subcontract', code: 'SUB', description: 'Subcontractor costs', is_active: true, sort_order: 3, created_at: '2026-01-01', updated_at: '2026-01-01' },
-  ],
-  probability_levels: [
-    { id: 1, name: 'Very Low', description: '<10%', weight: 0.05, level: 1, is_active: true, sort_order: 1, created_at: '2026-01-01', updated_at: '2026-01-01' },
-    { id: 2, name: 'Low', description: '10-25%', weight: 0.175, level: 2, is_active: true, sort_order: 2, created_at: '2026-01-01', updated_at: '2026-01-01' },
-    { id: 3, name: 'Medium', description: '25-50%', weight: 0.375, level: 3, is_active: true, sort_order: 3, created_at: '2026-01-01', updated_at: '2026-01-01' },
-  ],
-};
-
-const EMPTY_FORM = { name: '', code: '', description: '', sort_order: 0, weight: 0, level: 1, category: '' };
+import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import TuneIcon from '@mui/icons-material/Tune';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Switch from '@mui/material/Switch';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import type { GridColDef } from '@mui/x-data-grid';
+import { configApi, type ConfigItem } from '../../api/admin';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import DataTable from '../../components/common/DataTable';
+import EmptyState from '../../components/common/EmptyState';
+import ErrorState from '../../components/common/ErrorState';
+import FormDialog from '../../components/common/FormDialog';
+import PageHeader from '../../components/common/PageHeader';
+import StatusChip from '../../components/common/StatusChip';
+import TableSkeleton from '../../components/common/TableSkeleton';
+import { useToast } from '../../components/feedback/ToastProvider';
+import { formatNumber } from '../../utils/format';
+import {
+  configFormFromItem,
+  configFormToInput,
+  emptyConfigForm,
+  validateConfigForm,
+  type ConfigFormErrors,
+  type ConfigFormValues,
+} from './configForm';
 
 export default function ConfigTables() {
-  const [activeTable, setActiveTable] = useState(TABLE_INFO[0]);
-  const [items, setItems] = useState<ConfigItem[]>(MOCK_DATA[TABLE_INFO[0].name] || []);
-  const [showForm, setShowForm] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [selected, setSelected] = useState<ConfigItem | null>(null);
-  const [form, setForm] = useState<any>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const toast = useToast();
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ message: msg, type }); setTimeout(() => setToast(null), 3000); };
+  const tablesQuery = useQuery({ queryKey: ['admin', 'config', 'tables'], queryFn: configApi.listTables });
+  const tables = useMemo(() => tablesQuery.data ?? [], [tablesQuery.data]);
+  const requested = searchParams.get('table');
+  const active = tables.find((t) => t.key === requested) ?? tables[0];
+  const tableKey = active?.key;
+  const weighted = active?.weighted ?? false;
 
-  const switchTable = (info: ConfigTableInfo) => {
-    setActiveTable(info);
-    setItems(MOCK_DATA[info.name] || []);
+  const itemsQuery = useQuery({
+    queryKey: ['admin', 'config', tableKey, {}],
+    queryFn: () => configApi.listItems(tableKey as string),
+    enabled: Boolean(tableKey),
+  });
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ConfigItem | null>(null);
+  const [form, setForm] = useState<ConfigFormValues>(emptyConfigForm);
+  const [errors, setErrors] = useState<ConfigFormErrors>({});
+  const [deleting, setDeleting] = useState<ConfigItem | null>(null);
+
+  const selectTable = (key: string) => setSearchParams({ table: key }, { replace: true });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'config', tableKey] });
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const body = configFormToInput(form, weighted);
+      return editing
+        ? configApi.updateItem(tableKey as string, editing.id, body)
+        : configApi.createItem(tableKey as string, body);
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'Item updated' : 'Item created');
+      setDialogOpen(false);
+      void invalidate();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (item: ConfigItem) => configApi.deleteItem(tableKey as string, item.id),
+    onSuccess: () => {
+      toast.success('Item deleted');
+      setDeleting(null);
+      void invalidate();
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyConfigForm());
+    setErrors({});
+    setDialogOpen(true);
   };
 
-  const handleCreate = () => { setSelected(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
-  const handleEdit = (item: ConfigItem) => { setSelected(item); setForm({ name: item.name, code: item.code || '', description: item.description || '', sort_order: item.sort_order, weight: item.weight || 0, level: item.level || 1, category: item.category || '' }); setShowForm(true); };
+  const openEdit = (item: ConfigItem) => {
+    setEditing(item);
+    setForm(configFormFromItem(item));
+    setErrors({});
+    setDialogOpen(true);
+  };
 
-  const handleSubmit = () => {
-    setSaving(true);
-    if (selected) {
-      setItems(prev => prev.map(i => i.id === selected.id ? { ...i, ...form } : i));
-      showToast(`Item "${form.name}" updated`);
-    } else {
-      setItems(prev => [...prev, { ...form, id: (prev.length ? Math.max(...prev.map(i => i.id)) : 0) + 1, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
-      showToast(`Item "${form.name}" created`);
+  const submit = () => {
+    const found = validateConfigForm(form, weighted);
+    setErrors(found);
+    if (Object.keys(found).length === 0) saveMutation.mutate();
+  };
+
+  const columns = useMemo<GridColDef<ConfigItem>[]>(() => {
+    const cols: GridColDef<ConfigItem>[] = [
+      { field: 'code', headerName: 'Code', width: 140 },
+      { field: 'description', headerName: 'Description', flex: 1, minWidth: 200 },
+    ];
+    if (weighted) {
+      cols.push({
+        field: 'weight',
+        headerName: 'Weight',
+        type: 'number',
+        width: 110,
+        align: 'right',
+        headerAlign: 'right',
+        cellClassName: 'tabular-nums',
+        valueFormatter: (value: number | undefined) => (value === undefined ? '—' : formatNumber(value)),
+      });
     }
-    setShowForm(false); setSaving(false);
-  };
+    cols.push(
+      {
+        field: 'is_active',
+        headerName: 'Status',
+        width: 120,
+        renderCell: (p) => <StatusChip kind="active" value={p.row.is_active} size="small" />,
+      },
+      {
+        field: 'actions',
+        headerName: 'Actions',
+        width: 110,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (p) => (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
+            <Tooltip title="Edit">
+              <IconButton size="small" aria-label={`Edit ${p.row.code}`} onClick={() => openEdit(p.row)}>
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" aria-label={`Delete ${p.row.code}`} onClick={() => setDeleting(p.row)}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      },
+    );
+    return cols;
+  }, [weighted]);
 
-  const confirmDelete = () => {
-    if (!selected) return;
-    setItems(prev => prev.filter(i => i.id !== selected.id));
-    showToast(`Item "${selected.name}" deleted`);
-    setShowDelete(false); setSelected(null);
-  };
+  const addButton = (
+    <Button color="secondary" variant="contained" startIcon={<AddIcon />} onClick={openCreate} disabled={!active}>
+      Add item
+    </Button>
+  );
 
-  const baseColumns: Column<ConfigItem>[] = [
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'code', label: 'Code', width: '80px', render: v => v || '—' },
-    { key: 'description', label: 'Description', render: v => v || '—' },
-    { key: 'sort_order', label: 'Order', width: '70px' },
-    { key: 'is_active', label: 'Status', width: '90px', render: v => <StatusBadge active={v} /> },
-  ];
-
-  const weightedColumns: Column<ConfigItem>[] = [
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'description', label: 'Description', render: v => v || '—' },
-    { key: 'weight', label: 'Weight', width: '80px', render: v => v?.toFixed(3) || '0' },
-    { key: 'level', label: 'Level', width: '70px', render: v => v || '—' },
-    { key: 'sort_order', label: 'Order', width: '70px' },
-    { key: 'is_active', label: 'Status', width: '90px', render: v => <StatusBadge active={v} /> },
-  ];
-
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' };
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' };
+  let body: React.ReactNode;
+  if (tablesQuery.isPending) {
+    body = <TableSkeleton rows={6} columns={4} />;
+  } else if (tablesQuery.isError) {
+    body = (
+      <ErrorState
+        title="Could not load configuration tables"
+        description="Something went wrong while loading. Check your connection and try again."
+        action={
+          <Button variant="outlined" onClick={() => void tablesQuery.refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
+  } else if (tables.length === 0) {
+    body = <EmptyState icon={<TuneIcon />} title="No configuration tables" description="The server did not report any configuration tables." />;
+  } else {
+    body = (
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, alignItems: { md: 'flex-start' } }}>
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+          <FormControl fullWidth size="small">
+            <InputLabel id="config-table-label">Table</InputLabel>
+            <Select
+              labelId="config-table-label"
+              label="Table"
+              value={tableKey ?? ''}
+              onChange={(e) => selectTable(e.target.value)}
+            >
+              {tables.map((t) => (
+                <MenuItem key={t.key} value={t.key}>
+                  {t.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+        <Card sx={{ display: { xs: 'none', md: 'block' }, width: 260, flexShrink: 0 }}>
+          <Tabs
+            orientation="vertical"
+            value={tableKey ?? false}
+            onChange={(_, v: string) => selectTable(v)}
+            aria-label="Configuration tables"
+            sx={{ '& .MuiTab-root': { alignItems: 'flex-start', textAlign: 'left', textTransform: 'none' } }}
+          >
+            {tables.map((t) => (
+              <Tab key={t.key} value={t.key} label={t.label} />
+            ))}
+          </Tabs>
+        </Card>
+        <Card sx={{ flex: 1, minWidth: 0 }}>
+          <CardContent>
+            <Typography variant="h6" component="h2">
+              {active?.label}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {active?.description}
+            </Typography>
+            <DataTable<ConfigItem>
+              rows={itemsQuery.data?.items ?? []}
+              columns={columns}
+              loading={itemsQuery.isPending || itemsQuery.isFetching}
+              error={itemsQuery.isError ? itemsQuery.error : undefined}
+              onRetry={() => void itemsQuery.refetch()}
+              ariaLabel={`${active?.label ?? 'Configuration'} items`}
+              emptyTitle="No items yet"
+              emptyDescription={`Add the first item to ${active?.label ?? 'this table'}.`}
+              emptyAction={
+                <Button variant="outlined" startIcon={<AddIcon />} onClick={openCreate}>
+                  Add item
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: '1400px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Configuration Tables</h1>
-          <p style={{ fontSize: '15px', color: '#64748b' }}>Manage lookup tables and system configuration</p>
-        </div>
-        <button onClick={handleCreate} style={{ padding: '10px 20px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
-      </div>
+    <Box>
+      <PageHeader
+        title="Config Tables"
+        subtitle="Lookup values used across estimation, risk and project forms."
+        actions={tables.length > 0 ? addButton : undefined}
+      />
+      {body}
 
-      {/* Table selector */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-        {TABLE_INFO.map(t => (
-          <button key={t.name} onClick={() => switchTable(t)} style={{
-            padding: '8px 16px', border: '1px solid', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-            backgroundColor: activeTable.name === t.name ? '#0f172a' : '#fff',
-            color: activeTable.name === t.name ? '#fff' : '#475569',
-            borderColor: activeTable.name === t.name ? '#0f172a' : '#e2e8f0',
-          }}>
-            {t.label} {t.weighted && '⚖️'}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ backgroundColor: '#f0fdf4', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', color: '#166534' }}>
-        <strong>{activeTable.label}</strong> — {activeTable.description}
-        {activeTable.weighted && <span style={{ marginLeft: '8px', opacity: 0.7 }}>(weighted table)</span>}
-      </div>
-
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <DataGrid columns={activeTable.weighted ? weightedColumns : baseColumns} data={items} total={items.length}
-          actions={(row: ConfigItem) => (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleEdit(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
-              <button onClick={() => { setSelected(row); setShowDelete(true); }} style={{ padding: '4px 12px', border: '1px solid #fee2e2', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>Delete</button>
-            </div>
-          )} />
-      </div>
-
-      <FormDialog open={showForm} title={selected ? `Edit ${activeTable.label} Item` : `Add ${activeTable.label} Item`} onClose={() => setShowForm(false)} onSubmit={handleSubmit} loading={saving}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-          <div><label style={labelStyle}>Name</label><input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-          {!activeTable.weighted && <div><label style={labelStyle}>Code</label><input style={inputStyle} value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} /></div>}
-          <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Description</label><input style={inputStyle} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-          {activeTable.weighted && <div><label style={labelStyle}>Weight (0-1)</label><input style={inputStyle} type="number" step="0.001" min="0" max="1" value={form.weight} onChange={e => setForm({ ...form, weight: parseFloat(e.target.value) || 0 })} /></div>}
-          {activeTable.weighted && <div><label style={labelStyle}>Level</label><input style={inputStyle} type="number" min="1" value={form.level} onChange={e => setForm({ ...form, level: parseInt(e.target.value) || 1 })} /></div>}
-          <div><label style={labelStyle}>Sort Order</label><input style={inputStyle} type="number" min="0" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} /></div>
-        </div>
+      <FormDialog
+        open={dialogOpen}
+        title={`${editing ? 'Edit' : 'Add'} ${active?.label ?? 'item'}`}
+        submitLabel={editing ? 'Save changes' : 'Create'}
+        loading={saveMutation.isPending}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={submit}
+      >
+        <TextField
+          label="Code"
+          value={form.code}
+          onChange={(e) => setForm({ ...form, code: e.target.value })}
+          error={Boolean(errors.code)}
+          helperText={errors.code ?? 'Stored in upper case'}
+          autoFocus
+          slotProps={{ htmlInput: { 'aria-required': true } }}
+          fullWidth
+        />
+        <TextField
+          label="Description"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          error={Boolean(errors.description)}
+          helperText={errors.description}
+          slotProps={{ htmlInput: { 'aria-required': true } }}
+          fullWidth
+        />
+        {weighted && (
+          <TextField
+            label="Weight"
+            type="number"
+            value={form.weight}
+            onChange={(e) => setForm({ ...form, weight: e.target.value })}
+            error={Boolean(errors.weight)}
+            helperText={errors.weight ?? 'A number from 0 to 100'}
+            slotProps={{ htmlInput: { step: 'any', 'aria-required': true } }}
+              fullWidth
+          />
+        )}
+        <FormControlLabel
+          control={<Switch checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />}
+          label="Active"
+        />
       </FormDialog>
 
-      <ConfirmDialog open={showDelete} title="Delete Item" message={`Delete "${selected?.name}" from ${activeTable.label}?`} onClose={() => setShowDelete(false)} onConfirm={confirmDelete} confirmLabel="Delete" danger />
-      {toast && <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 2000, backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444' }}>{toast.message}</div>}
-    </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete item"
+        message={`Delete ${deleting?.code ?? 'this item'}? Records that use it may be affected.`}
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
+        onClose={() => setDeleting(null)}
+      />
+    </Box>
   );
 }
