@@ -2,7 +2,7 @@
  * Reports - choose a report, set filters, generate a preview and export it.
  * The selected report and filters live in the URL query string so a view can be bookmarked.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Alert from '@mui/material/Alert';
@@ -79,9 +79,24 @@ export default function Reports() {
     setState(type, pruneFilters(type, values), false);
   };
 
+  // React Router's functional setSearchParams reads the params from the last render, not from
+  // an update that is still pending, so two filter edits in quick succession (for example both
+  // date fields) would drop the first one. Keep the newest params in a ref and build on that.
+  const latestParams = useRef(params);
+  const pendingParams = useRef<string | null>(null);
+  useEffect(() => {
+    // Ignore a render that is older than the update we have already queued.
+    if (pendingParams.current !== null && params.toString() !== pendingParams.current) return;
+    latestParams.current = params;
+    pendingParams.current = null;
+  }, [params]);
+
   const onFiltersChange = (patch: Partial<FilterValues>) => {
     if (!selected) return;
-    setParams((prev) => paramsFromState(selected, { ...valuesFromParams(prev), ...patch }), { replace: true });
+    const next = paramsFromState(selected, { ...valuesFromParams(latestParams.current), ...patch });
+    latestParams.current = next;
+    pendingParams.current = next.toString();
+    setParams(next, { replace: true });
   };
 
   return (
