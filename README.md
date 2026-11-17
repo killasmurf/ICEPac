@@ -14,6 +14,7 @@
 - [Project Status](#project-status)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
+- [Frontend / UI](#frontend--ui)
 - [Architecture](#architecture)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -154,6 +155,21 @@ pytest
 
 ---
 
+## Frontend / UI
+
+The web app lives in [`frontend/`](frontend/): React 19, TypeScript, MUI 7 with the Adalex Consulting theme (light and dark), TanStack Query and Vite, talking to the FastAPI backend.
+
+```bash
+cd frontend
+npm ci
+npm run dev        # http://localhost:3000, API at VITE_API_URL (default http://localhost:8000/api/v1)
+npm run verify     # the full gate: typecheck, lint, style and bundle budgets, unit tests, build, e2e
+```
+
+See [`frontend/README.md`](frontend/README.md) for the scripts, environment variables, theme and brand rules, how to add a screen, and testing conventions. The design plan is in [UI_MODERNIZATION_PLAN.md](UI_MODERNIZATION_PLAN.md).
+
+---
+
 ## Architecture
 
 ### Modern Application (app/)
@@ -220,11 +236,11 @@ icepac/
 - MPXJ via JPype1 (MS Project parsing)
 
 **Frontend:**
-- React 18+
+- React 19
 - TypeScript
-- Material-UI or Ant Design
-- React Query
-- React Router
+- MUI 7 (Adalex theme)
+- TanStack Query
+- React Router 7
 
 **Infrastructure:**
 - AWS (ECS/Fargate, RDS, S3)

@@ -37,10 +37,10 @@
 - [ ] Implement logging middleware
 - [ ] Configure Celery for async tasks
 - [ ] Set up Redis caching
-- [ ] Create React application skeleton (Create React App or Vite)
-- [ ] Set up React Router
-- [ ] Implement API client layer
-- [ ] Set up basic layout components
+- [x] Create React application skeleton (Create React App or Vite) (Vite, React 19, MUI 7)
+- [x] Set up React Router
+- [x] Implement API client layer
+- [x] Set up basic layout components
 - [ ] Configure testing frameworks (pytest, Vitest)
 - [ ] Create "Hello World" endpoint
 - [ ] Deploy to staging
@@ -82,13 +82,13 @@
 - [ ] Test API endpoints with Postman
 
 ### Frontend & Testing (Week 7)
-- [ ] Create HelpPage component
-- [ ] Create TopicList component
-- [ ] Create SearchBar component
-- [ ] Create TopicDetail component
-- [ ] Implement help search functionality
-- [ ] Add topic display with formatting
-- [ ] Write frontend tests (React Testing Library)
+- [x] Create HelpPage component (`pages/Help.tsx`; topic list, search and detail are in `Help.tsx` / `HelpTopic.tsx`)
+- [x] Create TopicList component
+- [x] Create SearchBar component
+- [x] Create TopicDetail component
+- [x] Implement help search functionality
+- [x] Add topic display with formatting
+- [x] Write frontend tests (React Testing Library)
 - [ ] User acceptance testing with stakeholders
 - [ ] Deploy to staging
 - [ ] Create feature flag for Help circuit
@@ -158,21 +158,21 @@
 - [ ] Test all endpoints
 
 ### Frontend & UAT (Weeks 14-15)
-- [ ] Create UserManagement page
-- [ ] Create UserList component with data grid
-- [ ] Create UserForm component (create/edit)
-- [ ] Create ResourceLibrary page
-- [ ] Create ResourceList component
-- [ ] Create ResourceForm component
-- [ ] Create SupplierManagement page
-- [ ] Create SupplierList component
-- [ ] Create SupplierForm component
-- [ ] Create ConfigurationTables page
-- [ ] Create generic CRUDTable component
-- [ ] Implement sorting and filtering
-- [ ] Add form validation
-- [ ] Implement permission-based UI rendering
-- [ ] Write frontend tests
+- [x] Create UserManagement page
+- [x] Create UserList component with data grid (list, form dialog and delete confirm live in each admin page on the shared `DataTable`/`FormDialog`)
+- [x] Create UserForm component (create/edit)
+- [x] Create ResourceLibrary page
+- [x] Create ResourceList component
+- [x] Create ResourceForm component
+- [x] Create SupplierManagement page
+- [x] Create SupplierList component
+- [x] Create SupplierForm component
+- [x] Create ConfigurationTables page
+- [x] Create generic CRUDTable component (`ConfigTables.tsx` drives any config table from the API)
+- [x] Implement sorting and filtering
+- [x] Add form validation
+- [x] Implement permission-based UI rendering
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Deploy to staging
 - [ ] Create feature flag for Admin circuit
@@ -222,15 +222,15 @@
 - [ ] Load test with large files (100+ tasks)
 
 ### Frontend & Testing (Weeks 12-13)
-- [ ] Create ProjectUpload component
-- [ ] Implement file upload UI
-- [ ] Add progress bar for upload
-- [ ] Show processing status
+- [x] Create ProjectUpload component
+- [x] Implement file upload UI
+- [x] Add progress bar for upload
+- [x] Show processing status
 - [ ] Display parsing errors to user
 - [ ] Create ProjectPreview component
 - [ ] Display parsed project data
 - [ ] Allow task review before import
-- [ ] Write frontend tests
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Deploy to staging
 
@@ -325,20 +325,20 @@
 - [ ] Write tests
 
 ### Frontend & UAT (Week 27)
-- [ ] Create ProjectList page
-- [ ] Create ProjectDetail page
-- [ ] Create WBSTree component (hierarchical)
-- [ ] Create TaskDetail component
-- [ ] Create ResourceAssignmentForm component
+- [x] Create ProjectList page
+- [x] Create ProjectDetail page
+- [x] Create WBSTree component (hierarchical)
+- [x] Create TaskDetail component (`WBSDetailPanel`)
+- [x] Create ResourceAssignmentForm component
   - [ ] Three-point estimation inputs
   - [ ] Calculation preview
   - [ ] Validation
-- [ ] Create RiskAssessment component
-- [ ] Create ApprovalWorkflow component
+- [x] Create RiskAssessment component (`RiskForm`, `RiskList`, `ProjectRiskRegister`)
+- [x] Create ApprovalWorkflow component
 - [ ] Implement drag-and-drop for task hierarchy
-- [ ] Add real-time calculation previews
+- [x] Add real-time calculation previews
 - [ ] Implement approval notifications
-- [ ] Write frontend tests
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Deploy to staging
 - [ ] Create feature flag for Estimation circuit
@@ -417,15 +417,15 @@
 - [ ] Write tests
 
 ### Frontend & UAT (Weeks 42-43)
-- [ ] Create ReportSelector component
-- [ ] Create FilterPanel component
-- [ ] Create ReportPreview component
-- [ ] Create ExportOptions component
+- [x] Create ReportSelector component
+- [x] Create FilterPanel component
+- [x] Create ReportPreview component
+- [x] Create ExportOptions component
 - [ ] Implement report scheduling (optional)
 - [ ] Add report history
 - [ ] Add favorite reports
 - [ ] Implement charts/visualizations
-- [ ] Write frontend tests
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Performance optimization
 - [ ] Deploy to staging
@@ -457,12 +457,22 @@
 - [ ] Code cleanup and refactoring
 - [ ] Update documentation
 
+### UI modernization (see `UI_MODERNIZATION_PLAN.md`; frontend details in `frontend/README.md`)
+- [x] Adalex brand theme (colours, Plus Jakarta Sans, light and dark mode) and shared components
+- [x] Application shell: sidebar, header, breadcrumbs, command palette, toasts, lazy routes
+- [x] Every screen converted to the shared components and wired to the real API through TanStack Query
+- [x] Dashboard with charts (lazy loaded)
+- [x] Motion and polish: route fade, optimistic updates, loading bar, focus rings, skip link
+- [x] Bundle budget (entry JavaScript under 350 kB gzip) and favicon / PWA icons from the Adalex mark
+- [x] Frontend gate `npm run verify` in CI: axe clean on every route in light and dark, no horizontal scroll at 390px, style budget 0/0/0
+- [ ] Sign-off: manual check by Adam against `docker compose up` (sign in, open a project, edit an estimate, run a report, switch to dark mode)
+
 ### Integration Testing (Week 46)
 - [ ] End-to-end testing
 - [ ] Cross-circuit integration tests
 - [ ] Performance testing under load
 - [ ] Security testing (penetration testing)
-- [ ] Accessibility testing
+- [ ] Accessibility testing (automated axe checks run in CI for every route; manual screen-reader pass still open)
 - [ ] Browser compatibility testing
 - [ ] Bug fixes
 
