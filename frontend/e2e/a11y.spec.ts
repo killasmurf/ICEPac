@@ -13,8 +13,7 @@ test.afterEach(() => {
   expect(api.unmatched, 'API requests without a mock').toEqual([]);
 });
 
-// Exclusions are page-body elements that Phase 4 rebuilds; they cannot be fixed without restyling the page.
-const pages: { name: string; path: string; auth: boolean; ready: string; exclude?: string[] }[] = [
+const pages: { name: string; path: string; auth: boolean; ready: string }[] = [
   { name: 'login', path: '/login', auth: false, ready: 'Welcome back' },
   { name: 'dashboard', path: '/', auth: true, ready: 'Dashboard' },
   { name: 'projects', path: '/projects', auth: true, ready: 'Harbour Bridge Refurbishment' },
@@ -28,9 +27,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.goto(p.path);
       await expect(page.getByText(p.ready).first()).toBeVisible();
       await page.waitForTimeout(500); // let transitions settle so contrast is measured on final colours
-      let axe = new AxeBuilder({ page });
-      for (const selector of p.exclude ?? []) axe = axe.exclude(selector);
-      const results = await axe.analyze();
+      const results = await new AxeBuilder({ page }).analyze();
       const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
       expect(
         blocking.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target.join(' ')) })),

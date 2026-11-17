@@ -6,7 +6,7 @@
  * shows a result summary and the project's import history.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -116,7 +116,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
   const inputRef = useRef<HTMLInputElement>(null);
   const notifiedJob = useRef<number | null>(null);
 
-  const historyKey = ['projects', projectId, 'imports'] as const;
+  const historyKey = useMemo(() => ['projects', projectId, 'imports'] as const, [projectId]);
 
   const history = useQuery({
     queryKey: historyKey,
@@ -141,6 +141,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
     },
   });
 
+  const { reset: resetUpload } = upload;
   const currentJob: ImportJob | undefined = job.data;
   const jobRunning = jobId != null && !isTerminalStatus(currentJob?.status) && !job.isError;
   const busy = upload.isPending || jobRunning;
@@ -157,21 +158,19 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
     } else {
       toast.error(currentJob.error_message || 'Import failed');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentJob]);
+  }, [currentJob, historyKey, onImportComplete, projectId, queryClient, toast]);
 
   const chooseFile = useCallback((file: File | undefined) => {
     if (!file) return;
     const message = validateUploadFile(file);
     setValidationError(message);
     if (!message) {
-      upload.reset();
+      resetUpload();
       setSelectedFile(file);
     } else {
       setSelectedFile(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [resetUpload]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
