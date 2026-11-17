@@ -1,157 +1,396 @@
 /**
- * UserManagement - Admin page for managing users with full CRUD.
+ * UserManagement - Admin page for managing user accounts (list, create, edit, reset password, delete).
  */
-import React, { useState } from 'react';
-import DataGrid, { Column, StatusBadge, RoleBadge } from '../../components/admin/DataGrid';
-import FormDialog from '../../components/admin/FormDialog';
-import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import SearchBar from '../../components/admin/SearchBar';
-import { User } from '../../api/admin';
+import React, { useMemo, useState } from 'react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import LockResetIcon from '@mui/icons-material/LockReset';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import { usersApi, type User, type UserCreate, type UserRole, type UserUpdate } from '../../api/admin';
+import { useAuth } from '../../auth/AuthContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import DataTable from '../../components/common/DataTable';
+import ErrorState from '../../components/common/ErrorState';
+import FormDialog from '../../components/common/FormDialog';
+import PageHeader from '../../components/common/PageHeader';
+import SearchField from '../../components/common/SearchField';
+import StatusChip from '../../components/common/StatusChip';
+import { useToast } from '../../components/feedback/ToastProvider';
+import { formatDateTime } from '../../utils/format';
+import RowActionButton from './RowActionButton';
+import { filterUsers, hasUserFilters, NO_USER_FILTERS, type UserFilters } from './userFilters';
 
-// Mock data for development
-const MOCK_USERS: User[] = [
-  { id: 1, email: 'admin@icepac.com', username: 'admin', full_name: 'System Admin', role: 'admin', is_active: true, is_verified: true, created_at: '2026-01-01', updated_at: '2026-01-15', last_login: '2026-01-15' },
-  { id: 2, email: 'jsmith@company.com', username: 'jsmith', full_name: 'John Smith', role: 'manager', is_active: true, is_verified: true, created_at: '2026-01-05', updated_at: '2026-01-14', last_login: '2026-01-14' },
-  { id: 3, email: 'mjones@company.com', username: 'mjones', full_name: 'Mary Jones', role: 'user', is_active: true, is_verified: true, created_at: '2026-01-08', updated_at: '2026-01-12', last_login: '2026-01-12' },
-  { id: 4, email: 'inactive@company.com', username: 'olduser', full_name: 'Old User', role: 'viewer', is_active: false, is_verified: false, created_at: '2025-06-01', updated_at: '2025-12-01', last_login: null },
-];
+const ROLES: UserRole[] = ['admin', 'manager', 'user', 'viewer'];
+const ROLE_LABEL: Record<UserRole, string> = { admin: 'Admin', manager: 'Manager', user: 'User', viewer: 'Viewer' };
+const FILTERED_FETCH_LIMIT = 1000; // the API maximum; used when client-side filters are active
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const EMPTY_FORM = { username: '', email: '', full_name: '', password: '', role: 'user', is_active: true };
+interface UserForm {
+  username: string;
+  email: string;
+  full_name: string;
+  password: string;
+  role: UserRole;
+  is_active: boolean;
+}
+
+const EMPTY_FORM: UserForm = { username: '', email: '', full_name: '', password: '', role: 'user', is_active: true };
+
+type FormErrors = Partial<Record<keyof UserForm, string>>;
+
+function validate(form: UserForm, creating: boolean): FormErrors {
+  const errors: FormErrors = {};
+  if (form.username.trim().length < 3) errors.username = 'Username must be at least 3 characters';
+  if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = 'Enter a valid email address';
+  if (creating && (form.password.length < 8 || form.password.length > 128)) {
+    errors.password = 'Password must be 8 to 128 characters';
+  }
+  return errors;
+}
+
+interface PasswordForm {
+  current: string;
+  next: string;
+  confirm: string;
+}
+const EMPTY_PASSWORD: PasswordForm = { current: '', next: '', confirm: '' };
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [, setTotal] = useState(MOCK_USERS.length);
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [loading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [form, setForm] = useState<any>(EMPTY_FORM);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { user: me } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 10 });
+  const [filters, setFilters] = useState<UserFilters>(NO_USER_FILTERS);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
+  const [form, setForm] = useState<UserForm>(EMPTY_FORM);
+  const [submitted, setSubmitted] = useState(false);
+  const [deleting, setDeleting] = useState<User | null>(null);
+  const [resetting, setResetting] = useState<User | null>(null);
+  const [passwordForm, setPasswordForm] = useState<PasswordForm>(EMPTY_PASSWORD);
+  const [passwordSubmitted, setPasswordSubmitted] = useState(false);
 
-  const handleEdit = (user: User) => {
-    setEditingUser(user);
-    setForm({ username: user.username, email: user.email, full_name: user.full_name || '', role: user.role, is_active: user.is_active, password: '' });
-    setShowForm(true);
-  };
+  const filtered = hasUserFilters(filters);
+  const params = filtered
+    ? { skip: 0, limit: FILTERED_FETCH_LIMIT }
+    : { skip: paginationModel.page * paginationModel.pageSize, limit: paginationModel.pageSize };
 
-  const handleCreate = () => {
-    setEditingUser(null);
-    setForm({ ...EMPTY_FORM });
-    setShowForm(true);
-  };
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      if (editingUser) {
-        // Update mock
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...form, updated_at: new Date().toISOString() } : u));
-        showToast(`User "${form.username}" updated`);
-      } else {
-        const newUser: User = { ...form, id: Math.max(...users.map(u => u.id)) + 1, is_verified: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_login: null };
-        setUsers(prev => [...prev, newUser]);
-        setTotal(t => t + 1);
-        showToast(`User "${form.username}" created`);
-      }
-      setShowForm(false);
-    } catch (e: any) {
-      showToast(e.message, 'error');
-    }
-    setSaving(false);
-  };
-
-  const confirmDelete = async () => {
-    if (!editingUser) return;
-    setSaving(true);
-    setUsers(prev => prev.filter(u => u.id !== editingUser.id));
-    setTotal(t => t - 1);
-    showToast(`User "${editingUser.username}" deleted`);
-    setShowDelete(false);
-    setEditingUser(null);
-    setSaving(false);
-  };
-
-  const columns: Column<User>[] = [
-    { key: 'username', label: 'Username', sortable: true },
-    { key: 'full_name', label: 'Full Name', sortable: true },
-    { key: 'email', label: 'Email', sortable: true },
-    { key: 'role', label: 'Role', render: (v) => <RoleBadge role={v} /> },
-    { key: 'is_active', label: 'Status', render: (v) => <StatusBadge active={v} /> },
-    { key: 'last_login', label: 'Last Login', render: (v) => v ? new Date(v).toLocaleDateString() : 'Never' },
-  ];
-
-  const filtered = users.filter(u => {
-    if (search && !u.username.toLowerCase().includes(search.toLowerCase()) && !(u.full_name || '').toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false;
-    if (roleFilter && u.role !== roleFilter) return false;
-    if (statusFilter === 'active' && !u.is_active) return false;
-    if (statusFilter === 'inactive' && u.is_active) return false;
-    return true;
+  const query = useQuery({
+    queryKey: ['admin', 'users', params],
+    queryFn: () => usersApi.list(params),
+    placeholderData: keepPreviousData,
   });
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' };
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' };
-  const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
+  const rows = useMemo(
+    () => (query.data ? (filtered ? filterUsers(query.data.items, filters) : query.data.items) : []),
+    [query.data, filtered, filters],
+  );
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+
+  const saveMutation = useMutation({
+    mutationFn: (): Promise<User> => {
+      if (editing) {
+        const body: UserUpdate = {
+          username: form.username.trim(),
+          email: form.email.trim(),
+          full_name: form.full_name.trim(),
+          role: form.role,
+          is_active: form.is_active,
+        };
+        return usersApi.update(editing.id, body);
+      }
+      const body: UserCreate = {
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+        ...(form.full_name.trim() ? { full_name: form.full_name.trim() } : {}),
+      };
+      return usersApi.create(body);
+    },
+    onSuccess: (saved) => {
+      toast.success(editing ? `User "${saved.username}" updated` : `User "${saved.username}" created`);
+      setFormOpen(false);
+      void invalidate();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (user: User) => usersApi.delete(user.id),
+    onSuccess: (_data, user) => {
+      toast.success(`User "${user.username}" deleted`);
+      setDeleting(null);
+      void invalidate();
+    },
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: ({ user, form: f }: { user: User; form: PasswordForm }) =>
+      usersApi.changePassword(user.id, f.next, f.current),
+    onSuccess: (_data, { user }) => {
+      toast.success(`Password updated for "${user.username}"`);
+      setResetting(null);
+    },
+  });
+
+  const isSelf = (u: User | null) => u != null && me != null && u.id === me.id;
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setSubmitted(false);
+    setFormOpen(true);
+  };
+  const openEdit = (u: User) => {
+    setEditing(u);
+    setForm({ username: u.username, email: u.email, full_name: u.full_name ?? '', password: '', role: u.role, is_active: u.is_active });
+    setSubmitted(false);
+    setFormOpen(true);
+  };
+  const openReset = (u: User) => {
+    setResetting(u);
+    setPasswordForm(EMPTY_PASSWORD);
+    setPasswordSubmitted(false);
+  };
+
+  const errors = submitted ? validate(form, editing === null) : {};
+  const submit = () => {
+    setSubmitted(true);
+    if (Object.keys(validate(form, editing === null)).length === 0) saveMutation.mutate();
+  };
+
+  const passwordErrors: Partial<Record<keyof PasswordForm, string>> = {};
+  if (passwordSubmitted) {
+    if (!passwordForm.current) passwordErrors.current = 'Enter the current password';
+    if (passwordForm.next.length < 8 || passwordForm.next.length > 128) passwordErrors.next = 'Password must be 8 to 128 characters';
+    if (passwordForm.confirm !== passwordForm.next) passwordErrors.confirm = 'Passwords do not match';
+  }
+  const submitPassword = () => {
+    setPasswordSubmitted(true);
+    if (!resetting) return;
+    if (passwordForm.current && passwordForm.next.length >= 8 && passwordForm.next.length <= 128 && passwordForm.confirm === passwordForm.next) {
+      passwordMutation.mutate({ user: resetting, form: passwordForm });
+    }
+  };
+
+  const columns: GridColDef<User>[] = [
+    {
+      field: 'full_name',
+      headerName: 'Name',
+      flex: 1,
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (_v, row) => row.full_name ?? '',
+      renderCell: ({ row }) => row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>,
+    },
+    { field: 'username', headerName: 'Username', flex: 1, minWidth: 130, sortable: false },
+    { field: 'email', headerName: 'Email', flex: 1.3, minWidth: 200, sortable: false },
+    {
+      field: 'role',
+      headerName: 'Role',
+      width: 120,
+      sortable: false,
+      renderCell: ({ row }) => <StatusChip kind="role" value={row.role} />,
+    },
+    {
+      field: 'is_active',
+      headerName: 'Status',
+      width: 110,
+      sortable: false,
+      renderCell: ({ row }) => <StatusChip kind="active" value={row.is_active} />,
+    },
+    {
+      field: 'last_login',
+      headerName: 'Last login',
+      width: 180,
+      sortable: false,
+      valueGetter: (_v, row) => row.last_login ?? '',
+      renderCell: ({ row }) => (row.last_login ? formatDateTime(row.last_login) : 'Never'),
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 150,
+      sortable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <RowActionButton label={`Edit ${row.username}`} icon={<EditOutlinedIcon fontSize="small" />} onClick={() => openEdit(row)} />
+          <RowActionButton label={`Reset password for ${row.username}`} icon={<LockResetIcon fontSize="small" />} onClick={() => openReset(row)} />
+          <RowActionButton
+            label={`Delete ${row.username}`}
+            icon={<DeleteOutlineIcon fontSize="small" />}
+            color="error"
+            onClick={() => setDeleting(row)}
+            disabledReason={isSelf(row) ? 'You cannot delete your own account' : undefined}
+          />
+        </Box>
+      ),
+    },
+  ];
+
+  const toolbar = (
+    <>
+      <SearchField
+        label="Search users"
+        placeholder="Search users"
+        onChange={(search) => {
+          setFilters((f) => ({ ...f, search }));
+          setPaginationModel((m) => ({ ...m, page: 0 }));
+        }}
+      />
+      <TextField
+        select
+        size="small"
+        label="Role"
+        value={filters.role}
+        onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value as UserFilters['role'] }))}
+        sx={{ minWidth: 140 }}
+      >
+        <MenuItem value="">All roles</MenuItem>
+        {ROLES.map((r) => (
+          <MenuItem key={r} value={r}>
+            {ROLE_LABEL[r]}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        select
+        size="small"
+        label="Status"
+        value={filters.status}
+        onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as UserFilters['status'] }))}
+        sx={{ minWidth: 140 }}
+      >
+        <MenuItem value="">All statuses</MenuItem>
+        <MenuItem value="active">Active</MenuItem>
+        <MenuItem value="inactive">Inactive</MenuItem>
+      </TextField>
+    </>
+  );
+
+  const failedFirstLoad = query.isError && !query.data;
+  const editingSelf = isSelf(editing);
 
   return (
-    <div style={{ maxWidth: '1400px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>User Management</h1>
-          <p style={{ fontSize: '15px', color: '#64748b' }}>Manage user accounts, roles, and permissions</p>
-        </div>
-        <button onClick={handleCreate} style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>+ Add User</button>
-      </div>
+    <Box>
+      <PageHeader
+        title="User management"
+        subtitle="Manage user accounts, roles and access"
+        actions={
+          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>
+            Add user
+          </Button>
+        }
+      />
 
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <SearchBar value={search} onChange={setSearch} placeholder="Search users..." />
-        <select style={selectStyle} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-          <option value="">All Roles</option>
-          <option value="admin">Admin</option>
-          <option value="manager">Manager</option>
-          <option value="user">User</option>
-          <option value="viewer">Viewer</option>
-        </select>
-        <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
+      <Card sx={{ p: 2 }}>
+        {failedFirstLoad ? (
+          <ErrorState
+            title="Could not load users"
+            description="Something went wrong while loading users. Check your connection and try again."
+            action={
+              <Button variant="outlined" onClick={() => query.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        ) : (
+          <DataTable<User>
+            ariaLabel="Users"
+            rows={rows}
+            columns={columns}
+            loading={query.isLoading || (query.isFetching && query.isPlaceholderData)}
+            rowCount={filtered ? undefined : (query.data?.total ?? 0)}
+            paginationModel={filtered ? undefined : paginationModel}
+            onPaginationModelChange={filtered ? undefined : setPaginationModel}
+            toolbar={toolbar}
+            emptyTitle={filtered ? 'No users match your filters' : 'No users yet'}
+            emptyDescription={filtered ? 'Try a different search or clear the filters.' : 'Add the first user to get started.'}
+            emptyAction={
+              filtered ? (
+                <Button variant="outlined" onClick={() => setFilters(NO_USER_FILTERS)}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button variant="contained" color="secondary" onClick={openCreate}>
+                  Add user
+                </Button>
+              )
+            }
+          />
+        )}
+      </Card>
 
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <DataGrid columns={columns} data={filtered} total={filtered.length} page={page} pageSize={20} onPageChange={setPage} loading={loading}
-          actions={(row: User) => (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleEdit(row)} style={{ padding: '4px 12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
-              <button onClick={() => { setEditingUser(row); setShowDelete(true); }} style={{ padding: '4px 12px', border: '1px solid #fee2e2', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>Delete</button>
-            </div>
-          )} />
-      </div>
-
-      <FormDialog open={showForm} title={editingUser ? 'Edit User' : 'Create User'} onClose={() => setShowForm(false)} onSubmit={handleSubmit} loading={saving}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-          <div><label style={labelStyle}>Username</label><input style={inputStyle} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} /></div>
-          <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label style={labelStyle}>Full Name</label><input style={inputStyle} value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></div>
-          {!editingUser && <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></div>}
-          <div><label style={labelStyle}>Role</label><select style={selectStyle} value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option value="admin">Admin</option><option value="manager">Manager</option><option value="user">User</option><option value="viewer">Viewer</option></select></div>
-          <div><label style={labelStyle}>Status</label><select style={selectStyle} value={form.is_active ? 'active' : 'inactive'} onChange={e => setForm({ ...form, is_active: e.target.value === 'active' })}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-        </div>
+      <FormDialog
+        open={formOpen}
+        title={editing ? 'Edit user' : 'Add user'}
+        submitLabel={editing ? 'Save changes' : 'Create user'}
+        onClose={() => setFormOpen(false)}
+        onSubmit={submit}
+        loading={saveMutation.isPending}
+      >
+        <TextField label="Username" slotProps={{ inputLabel: { required: true } }} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} error={Boolean(errors.username)} helperText={errors.username ?? 'At least 3 characters'} autoComplete="off" />
+        <TextField label="Email" type="email" slotProps={{ inputLabel: { required: true } }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={Boolean(errors.email)} helperText={errors.email} autoComplete="off" />
+        <TextField label="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+        {!editing && (
+          <TextField label="Password" type="password" slotProps={{ inputLabel: { required: true } }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={Boolean(errors.password)} helperText={errors.password ?? 'At least 8 characters'} autoComplete="new-password" />
+        )}
+        <TextField select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
+          {ROLES.map((r) => (
+            <MenuItem key={r} value={r}>
+              {ROLE_LABEL[r]}
+            </MenuItem>
+          ))}
+        </TextField>
+        {editing && (
+          <TextField
+            select
+            label="Status"
+            value={form.is_active ? 'active' : 'inactive'}
+            onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}
+            disabled={editingSelf}
+            helperText={editingSelf ? 'You cannot deactivate your own account' : undefined}
+          >
+            <MenuItem value="active">Active</MenuItem>
+            <MenuItem value="inactive">Inactive</MenuItem>
+          </TextField>
+        )}
       </FormDialog>
 
-      <ConfirmDialog open={showDelete} title="Delete User" message={`Are you sure you want to delete user "${editingUser?.username}"? This action cannot be undone.`} onClose={() => setShowDelete(false)} onConfirm={confirmDelete} loading={saving} confirmLabel="Delete" danger />
+      <FormDialog
+        open={resetting !== null}
+        title={`Reset password${resetting ? ` for ${resetting.username}` : ''}`}
+        submitLabel="Update password"
+        onClose={() => setResetting(null)}
+        onSubmit={submitPassword}
+        loading={passwordMutation.isPending}
+      >
+        <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'The API verifies the existing password before changing it'} autoComplete="off" />
+        <TextField label="New password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} error={Boolean(passwordErrors.next)} helperText={passwordErrors.next ?? 'At least 8 characters'} autoComplete="new-password" />
+        <TextField label="Confirm new password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} error={Boolean(passwordErrors.confirm)} helperText={passwordErrors.confirm} autoComplete="new-password" />
+      </FormDialog>
 
-      {toast && <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 500, zIndex: 2000, backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444' }}>{toast.message}</div>}
-    </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete user"
+        message={`Delete user "${deleting?.username ?? ''}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
+      />
+    </Box>
   );
 }

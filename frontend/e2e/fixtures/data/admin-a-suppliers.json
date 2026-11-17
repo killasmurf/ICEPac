@@ -1,0 +1,151 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "supplier_code": "SUP-001",
+      "name": "Supplier 1 Pty Ltd",
+      "contact": "Contact 1",
+      "email": "sales1@supplier.test",
+      "phone": "03 9000 1001",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "supplier_code": "SUP-002",
+      "name": "Supplier 2 Pty Ltd",
+      "contact": "Contact 2",
+      "email": "sales2@supplier.test",
+      "phone": "03 9000 1002",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "supplier_code": "SUP-003",
+      "name": "Supplier 3 Pty Ltd",
+      "contact": null,
+      "email": "sales3@supplier.test",
+      "phone": "03 9000 1003",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 4,
+      "supplier_code": "SUP-004",
+      "name": "Supplier 4 Pty Ltd",
+      "contact": "Contact 4",
+      "email": "sales4@supplier.test",
+      "phone": "03 9000 1004",
+      "notes": null,
+      "is_active": false,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "supplier_code": "SUP-005",
+      "name": "Supplier 5 Pty Ltd",
+      "contact": "Contact 5",
+      "email": "sales5@supplier.test",
+      "phone": "03 9000 1005",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 6,
+      "supplier_code": "SUP-006",
+      "name": "Supplier 6 Pty Ltd",
+      "contact": "Contact 6",
+      "email": "sales6@supplier.test",
+      "phone": "03 9000 1006",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 7,
+      "supplier_code": "SUP-007",
+      "name": "Supplier 7 Pty Ltd",
+      "contact": "Contact 7",
+      "email": "sales7@supplier.test",
+      "phone": "03 9000 1007",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 8,
+      "supplier_code": "SUP-008",
+      "name": "Supplier 8 Pty Ltd",
+      "contact": "Contact 8",
+      "email": "sales8@supplier.test",
+      "phone": "03 9000 1008",
+      "notes": null,
+      "is_active": false,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 9,
+      "supplier_code": "SUP-009",
+      "name": "Supplier 9 Pty Ltd",
+      "contact": "Contact 9",
+      "email": "sales9@supplier.test",
+      "phone": "03 9000 1009",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 10,
+      "supplier_code": "SUP-010",
+      "name": "Supplier 10 Pty Ltd",
+      "contact": "Contact 10",
+      "email": "sales10@supplier.test",
+      "phone": "03 9000 1010",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 11,
+      "supplier_code": "SUP-011",
+      "name": "Supplier 11 Pty Ltd",
+      "contact": "Contact 11",
+      "email": "sales11@supplier.test",
+      "phone": "03 9000 1011",
+      "notes": null,
+      "is_active": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    },
+    {
+      "id": 12,
+      "supplier_code": "SUP-012",
+      "name": "Supplier 12 Pty Ltd",
+      "contact": "Contact 12",
+      "email": "sales12@supplier.test",
+      "phone": "03 9000 1012",
+      "notes": null,
+      "is_active": false,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z"
+    }
+  ],
+  "total": 12,
+  "skip": 0,
+  "limit": 100
+}

@@ -1,0 +1,151 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "email": "jordan.lee@example.com",
+      "username": "jordan",
+      "full_name": "Jordan Lee",
+      "role": "admin",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 2,
+      "email": "user2@example.com",
+      "username": "user2",
+      "full_name": "Test User 2",
+      "role": "user",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 3,
+      "email": "user3@example.com",
+      "username": "user3",
+      "full_name": "Test User 3",
+      "role": "viewer",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": null
+    },
+    {
+      "id": 4,
+      "email": "user4@example.com",
+      "username": "user4",
+      "full_name": "Test User 4",
+      "role": "admin",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 5,
+      "email": "user5@example.com",
+      "username": "user5",
+      "full_name": null,
+      "role": "manager",
+      "is_active": false,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 6,
+      "email": "user6@example.com",
+      "username": "user6",
+      "full_name": "Test User 6",
+      "role": "user",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": null
+    },
+    {
+      "id": 7,
+      "email": "user7@example.com",
+      "username": "user7",
+      "full_name": "Test User 7",
+      "role": "viewer",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 8,
+      "email": "user8@example.com",
+      "username": "user8",
+      "full_name": "Test User 8",
+      "role": "admin",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 9,
+      "email": "user9@example.com",
+      "username": "user9",
+      "full_name": "Test User 9",
+      "role": "manager",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": null
+    },
+    {
+      "id": 10,
+      "email": "user10@example.com",
+      "username": "user10",
+      "full_name": "Test User 10",
+      "role": "user",
+      "is_active": false,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 11,
+      "email": "user11@example.com",
+      "username": "user11",
+      "full_name": "Test User 11",
+      "role": "viewer",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": "2026-11-15T09:30:00Z"
+    },
+    {
+      "id": 12,
+      "email": "user12@example.com",
+      "username": "user12",
+      "full_name": "Test User 12",
+      "role": "admin",
+      "is_active": true,
+      "is_verified": true,
+      "created_at": "2026-01-05T00:00:00Z",
+      "updated_at": "2026-01-05T00:00:00Z",
+      "last_login": null
+    }
+  ],
+  "total": 12,
+  "skip": 0,
+  "limit": 100
+}
