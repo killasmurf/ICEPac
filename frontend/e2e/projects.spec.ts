@@ -49,7 +49,7 @@ test.describe('projects list', () => {
     await saveScreenshot(page, testInfo, PHASE, 'projects-cards-light');
     expect(await axeBlocking(page)).toEqual([]);
 
-    await page.evaluate(() => window.localStorage.setItem('mui-mode', 'dark'));
+    await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'dark'));
     await page.reload();
     await expect(page.getByRole('link', { name: 'Harbour Bridge Refurbishment' })).toBeVisible();
     await saveScreenshot(page, testInfo, PHASE, 'projects-cards-dark');
@@ -220,7 +220,7 @@ test.describe('project import (ProjectUpload on the project page)', () => {
     await saveScreenshot(page, testInfo, PHASE, 'project-import-light');
     expect(await axeBlocking(page)).toEqual([]);
 
-    await page.evaluate(() => window.localStorage.setItem('mui-mode', 'dark'));
+    await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'dark'));
     await page.reload();
     await page.getByRole('tab', { name: 'Import' }).click();
     await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();

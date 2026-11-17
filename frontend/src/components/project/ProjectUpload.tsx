@@ -293,7 +293,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
         ) : history.data.items.length === 0 ? (
           <EmptyState title="No imports yet" description="Imports of MS Project files for this project will be listed here." />
         ) : (
-          <TableContainer sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
+          <TableContainer tabIndex={0} role="region" aria-label="Import history, scrollable" sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
             <Table size="small" aria-label="Import history">
               <TableHead>
                 <TableRow>
@@ -308,7 +308,7 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
               <TableBody>
                 {history.data.items.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell sx={{ overflowWrap: 'anywhere' }}>
+                    <TableCell sx={{ minWidth: 200 }}>
                       {item.filename}
                       {item.status === 'failed' && item.error_message && (
                         <Typography variant="caption" color="error" component="div">
