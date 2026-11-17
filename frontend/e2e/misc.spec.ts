@@ -1,7 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, MockApiHandle } from './fixtures/mockApi';
-import { miscRoutes } from './fixtures/miscRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 const PHASE = 'phase-4';
@@ -9,7 +8,7 @@ const CORS = { 'access-control-allow-origin': '*' };
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, miscRoutes);
+  api = await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'light'));
 });

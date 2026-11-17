@@ -2,13 +2,12 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { estimationRoutes } from './fixtures/estimationRoutes';
-import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, { ...projectDetailRoutes, ...(estimationRoutes as Record<string, never>) });
+  api = await mockApi(page, estimationRoutes);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await loginAs(page, 'admin');
 });

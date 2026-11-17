@@ -1,7 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, loadFixture, type MockApiHandle } from './fixtures/mockApi';
-import { reportsRoutes } from './fixtures/reportsRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
@@ -14,7 +13,7 @@ const CORS = {
 };
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, reportsRoutes);
+  api = await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'light'));
   await loginAs(page, 'admin');
@@ -33,6 +32,8 @@ async function fulfillJson(route: Route, status: number, body: unknown) {
 async function chooseProject(page: Page, name = 'Harbour Bridge Refurbishment') {
   await page.getByRole('combobox', { name: /Project/ }).click();
   await page.getByRole('option', { name }).click();
+  // Wait for the selection to be committed to the URL-backed filter state before the next edit.
+  await expect(page.getByRole('combobox', { name: /Project/ })).toHaveText(name);
 }
 
 async function openReport(page: Page, url = '/reports') {

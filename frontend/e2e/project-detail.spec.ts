@@ -1,13 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, loadFixture, MockApiHandle } from './fixtures/mockApi';
-import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, projectDetailRoutes);
+  api = await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await loginAs(page, 'admin');
 });

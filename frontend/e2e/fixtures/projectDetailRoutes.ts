@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 const configItems = (table: string, rows: { code: string; description: string; weight?: number }[]) => ({
   items: rows.map((r, i) => ({

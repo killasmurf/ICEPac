@@ -2,7 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { projectsRoutes } from './fixtures/projectsRoutes';
-import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 const PHASE = 'phase-4';
@@ -13,7 +12,7 @@ test.afterEach(() => {
 });
 
 async function setup(page: Page, opts: { many?: boolean; scheme?: 'light' | 'dark'; view?: 'cards' | 'table' } = {}) {
-  api = await mockApi(page, { ...projectDetailRoutes, ...projectsRoutes({ many: opts.many }) });
+  api = await mockApi(page, opts.many ? projectsRoutes({ many: true }) : {});
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(
     ([scheme, view]) => {

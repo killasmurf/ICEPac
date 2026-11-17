@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 /** Mock routes for the login, help and dashboard specs (extra argument of mockApi). */
 export const miscRoutes = {

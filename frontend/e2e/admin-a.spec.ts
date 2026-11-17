@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, MockApiHandle } from './fixtures/mockApi';
 import { saveScreenshot } from './fixtures/screenshot';
-import { adminARoutes, emptyList } from './fixtures/adminARoutes';
+import { emptyList } from './fixtures/adminARoutes';
 
 const PHASE = 'phase-4';
 let api: MockApiHandle;
@@ -37,7 +37,7 @@ async function emptyAt(page: Page, pattern: RegExp) {
 }
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, { ...adminARoutes, ...writes });
+  api = await mockApi(page, writes);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await loginAs(page, 'admin');
 });

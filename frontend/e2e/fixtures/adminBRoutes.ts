@@ -1,4 +1,4 @@
-import { loadFixture } from './mockApi';
+import { loadFixture } from './load';
 
 /** Extra mock routes for the admin config tables, audit logs and overview screens. */
 export const adminBRoutes = {
