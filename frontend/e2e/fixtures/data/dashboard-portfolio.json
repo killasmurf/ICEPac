@@ -1,0 +1,130 @@
+{
+  "projects": [
+    {
+      "project_id": 1,
+      "name": "Harbour Bridge Refurbishment",
+      "status": "imported",
+      "wbs_total": 19,
+      "wbs_approved": 6,
+      "wbs_submitted": 1,
+      "total_pert": 2480000.0,
+      "risk_count": 1
+    },
+    {
+      "project_id": 2,
+      "name": "Data Centre Fit-out",
+      "status": "draft",
+      "wbs_total": 18,
+      "wbs_approved": 6,
+      "wbs_submitted": 1,
+      "total_pert": 1920000.0,
+      "risk_count": 2
+    },
+    {
+      "project_id": 3,
+      "name": "Northern Rail Corridor Signalling Upgrade and Interlocking Replacement Programme",
+      "status": "active",
+      "wbs_total": 17,
+      "wbs_approved": 5,
+      "wbs_submitted": 1,
+      "total_pert": 1675000.0,
+      "risk_count": 3
+    },
+    {
+      "project_id": 4,
+      "name": "Metro Tunnel Fit-out Package B",
+      "status": "active",
+      "wbs_total": 16,
+      "wbs_approved": 5,
+      "wbs_submitted": 1,
+      "total_pert": 1310000.0,
+      "risk_count": 4
+    },
+    {
+      "project_id": 5,
+      "name": "Airport Terminal 2 Expansion",
+      "status": "active",
+      "wbs_total": 15,
+      "wbs_approved": 5,
+      "wbs_submitted": 1,
+      "total_pert": 1105000.0,
+      "risk_count": 0
+    },
+    {
+      "project_id": 6,
+      "name": "Regional Hospital Redevelopment Stage 3",
+      "status": "imported",
+      "wbs_total": 14,
+      "wbs_approved": 4,
+      "wbs_submitted": 1,
+      "total_pert": 880000.0,
+      "risk_count": 1
+    },
+    {
+      "project_id": 7,
+      "name": "Water Treatment Plant Upgrade",
+      "status": "active",
+      "wbs_total": 13,
+      "wbs_approved": 4,
+      "wbs_submitted": 1,
+      "total_pert": 640000.0,
+      "risk_count": 2
+    },
+    {
+      "project_id": 8,
+      "name": "Solar Farm Grid Connection",
+      "status": "draft",
+      "wbs_total": 12,
+      "wbs_approved": 4,
+      "wbs_submitted": 1,
+      "total_pert": 415000.0,
+      "risk_count": 3
+    },
+    {
+      "project_id": 9,
+      "name": "Port Logistics Hub",
+      "status": "imported",
+      "wbs_total": 11,
+      "wbs_approved": 3,
+      "wbs_submitted": 1,
+      "total_pert": 262000.0,
+      "risk_count": 4
+    },
+    {
+      "project_id": 10,
+      "name": "Library Digital Archive",
+      "status": "draft",
+      "wbs_total": 10,
+      "wbs_approved": 3,
+      "wbs_submitted": 1,
+      "total_pert": 118000.0,
+      "risk_count": 0
+    },
+    {
+      "project_id": 11,
+      "name": "School Modular Classrooms",
+      "status": "active",
+      "wbs_total": 9,
+      "wbs_approved": 3,
+      "wbs_submitted": 1,
+      "total_pert": 64000.0,
+      "risk_count": 1
+    },
+    {
+      "project_id": 12,
+      "name": "Depot Roof Replacement",
+      "status": "draft",
+      "wbs_total": 4,
+      "wbs_approved": 1,
+      "wbs_submitted": 1,
+      "total_pert": 21500.0,
+      "risk_count": 2
+    }
+  ],
+  "approval_totals": {
+    "draft": 20,
+    "submitted": 3,
+    "approved": 12,
+    "rejected": 5
+  }
+}
