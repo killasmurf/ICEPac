@@ -58,13 +58,26 @@ export interface DataTableProps<R extends { id?: GridRowId } = Record<string, un
   disableVirtualization?: boolean;
 }
 
-function NoRowsOverlay({ emptyTitle, emptyDescription, emptyAction }: {
+function NoRowsOverlay({
+  emptyTitle,
+  emptyDescription,
+  emptyAction,
+}: {
   emptyTitle?: string;
   emptyDescription?: React.ReactNode;
   emptyAction?: React.ReactNode;
 }) {
   return (
-    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
+    <Box
+      sx={{
+        height: '100%',
+        minHeight: 240,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 2,
+      }}
+    >
       <EmptyState icon={<InboxOutlined />} title={emptyTitle ?? 'Nothing to show'} description={emptyDescription} action={emptyAction} />
     </Box>
   );
@@ -74,7 +87,9 @@ function NoRowsOverlay({ emptyTitle, emptyDescription, emptyAction }: {
 function LoadingOverlay() {
   const apiRef = useGridApiContext();
   const hasRows = useGridSelector(apiRef, gridDataRowIdsSelector).length > 0;
-  return hasRows ? <LinearProgress /> : (
+  return hasRows ? (
+    <LinearProgress />
+  ) : (
     <Box sx={{ p: 2 }}>
       <TableSkeleton rows={5} columns={4} />
     </Box>
@@ -88,10 +103,7 @@ function LoadingOverlay() {
 export function useResponsiveColumns(hiddenBelowSm: readonly string[]): GridColumnVisibilityModel {
   const theme = useTheme();
   const small = useMediaQuery(theme.breakpoints.down('sm'));
-  return React.useMemo(
-    () => (small ? Object.fromEntries(hiddenBelowSm.map((field) => [field, false])) : {}),
-    [small, hiddenBelowSm],
-  );
+  return React.useMemo(() => (small ? Object.fromEntries(hiddenBelowSm.map((field) => [field, false])) : {}), [small, hiddenBelowSm]);
 }
 
 export function DataTable<R extends { id?: GridRowId } = Record<string, unknown> & { id?: GridRowId }>({
@@ -116,67 +128,116 @@ export function DataTable<R extends { id?: GridRowId } = Record<string, unknown>
   disableVirtualization,
 }: DataTableProps<R>) {
   const server = rowCount !== undefined;
+  // An empty grid has no rows, which breaks the ARIA grid structure (axe: aria-required-children),
+  // so a table that is empty and not loading shows the empty state in place of the grid.
+  const isEmpty = !loading && rows.length === 0 && (!server || rowCount === 0);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
-      {toolbar && <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>{toolbar}</Box>}
+      {toolbar && (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          {toolbar}
+        </Box>
+      )}
       {error != null && (
         <ErrorState
           title="Could not load data"
           description="Something went wrong while loading. Check your connection and try again."
-          action={onRetry && <Button variant="outlined" onClick={onRetry}>Retry</Button>}
+          action={
+            onRetry && (
+              <Button variant="outlined" onClick={onRetry}>
+                Retry
+              </Button>
+            )
+          }
         />
       )}
       <Box
-        sx={{ width: '100%', minHeight: 240, minWidth: 0, border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden', bgcolor: 'background.paper' }}
+        sx={{
+          width: '100%',
+          minHeight: 240,
+          minWidth: 0,
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          overflow: 'hidden',
+          bgcolor: 'background.paper',
+        }}
       >
-        <DataGrid<R>
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          aria-label={ariaLabel}
-          density="comfortable"
-          disableRowSelectionOnClick
-          autoHeight
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
-          paginationMode={server ? 'server' : 'client'}
-          sortingMode={server ? 'server' : 'client'}
-          rowCount={server ? rowCount : undefined}
-          paginationModel={paginationModel}
-          onPaginationModelChange={onPaginationModelChange}
-          sortModel={sortModel}
-          onSortModelChange={onSortModelChange}
-          columnVisibilityModel={columnVisibilityModel}
-          onRowClick={onRowClick ? (params) => onRowClick(params.row) : undefined}
-          disableVirtualization={disableVirtualization}
-          slots={{ noRowsOverlay: NoRowsOverlay, loadingOverlay: LoadingOverlay }}
-          slotProps={{ noRowsOverlay: { emptyTitle, emptyDescription, emptyAction } }}
-          sx={(theme) => {
-            const p = (theme.vars ?? theme).palette;
-            return {
-              '--DataGrid-t-color-background-base': p.background.paper,
-              '--DataGrid-t-header-background-base': p.background.paper,
-              backgroundColor: p.background.paper,
-              border: 0,
-              borderRadius: 0,
-              '& .MuiDataGrid-columnHeaders': { borderBottomColor: p.divider },
-              '& .MuiDataGrid-columnHeaderTitle': {
-                fontWeight: 600,
-                color: p.text.secondary,
-                textTransform: 'uppercase',
-                fontSize: '0.75rem',
-                letterSpacing: '0.04em',
-              },
-              '& .MuiDataGrid-cell, & .MuiDataGrid-footerContainer': { borderColor: p.divider },
-              '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
-                outline: `2px solid ${p.primary.main}`,
-                outlineOffset: -2,
-              },
-              '& .MuiDataGrid-row:hover': onRowClick ? { cursor: 'pointer' } : undefined,
-            };
-          }}
-        />
+        {isEmpty ? (
+          <NoRowsOverlay emptyTitle={emptyTitle} emptyDescription={emptyDescription} emptyAction={emptyAction} />
+        ) : (
+          <DataGrid<R>
+            rows={rows}
+            columns={columns}
+            loading={loading}
+            aria-label={ariaLabel}
+            density="comfortable"
+            disableRowSelectionOnClick
+            disableColumnMenu
+            disableColumnResize
+            autoHeight
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 10, page: 0 } },
+            }}
+            paginationMode={server ? 'server' : 'client'}
+            sortingMode={server ? 'server' : 'client'}
+            rowCount={server ? rowCount : undefined}
+            paginationModel={paginationModel}
+            onPaginationModelChange={onPaginationModelChange}
+            sortModel={sortModel}
+            onSortModelChange={onSortModelChange}
+            columnVisibilityModel={columnVisibilityModel}
+            onRowClick={onRowClick ? (params) => onRowClick(params.row) : undefined}
+            disableVirtualization={disableVirtualization}
+            slots={{
+              noRowsOverlay: NoRowsOverlay,
+              loadingOverlay: LoadingOverlay,
+            }}
+            slotProps={{
+              noRowsOverlay: { emptyTitle, emptyDescription, emptyAction },
+            }}
+            sx={(theme) => {
+              const p = (theme.vars ?? theme).palette;
+              return {
+                '--DataGrid-t-color-background-base': p.background.paper,
+                '--DataGrid-t-header-background-base': p.background.paper,
+                backgroundColor: p.background.paper,
+                border: 0,
+                borderRadius: 0,
+                '& .MuiDataGrid-columnHeaders': {
+                  borderBottomColor: p.divider,
+                },
+                '& .MuiDataGrid-columnHeaderTitle': {
+                  fontWeight: 600,
+                  color: p.text.secondary,
+                  textTransform: 'uppercase',
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.04em',
+                },
+                // The separators overhang the last column and add a few px of hidden overflow, which focus can scroll into view
+                // and clip the first column. Resizing is off, so they are not needed.
+                '& .MuiDataGrid-columnSeparator': { display: 'none' },
+                '& .MuiDataGrid-cell, & .MuiDataGrid-footerContainer': {
+                  borderColor: p.divider,
+                },
+                '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
+                  outline: `2px solid ${p.primary.main}`,
+                  outlineOffset: -2,
+                },
+                '& .MuiDataGrid-row:hover': onRowClick ? { cursor: 'pointer' } : undefined,
+              };
+            }}
+          />
+        )}
         {footer && <Box sx={{ borderTop: 1, borderColor: 'divider' }}>{footer}</Box>}
       </Box>
     </Box>

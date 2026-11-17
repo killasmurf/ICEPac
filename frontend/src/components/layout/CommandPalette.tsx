@@ -71,7 +71,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     }));
     const actions: PaletteOption[] = [
       // The projects screen owns the create dialog; Phase 4 can open it directly from here.
-      { id: 'action:new-project', label: 'New project', group: 'Actions', icon: <AddIcon />, run: go('/projects') },
+      { id: 'action:new-project', label: 'New project', group: 'Actions', icon: <AddIcon />, run: go('/projects?new=1') },
       {
         id: 'action:toggle-mode',
         label: 'Toggle colour mode',

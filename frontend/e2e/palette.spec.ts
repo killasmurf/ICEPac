@@ -52,3 +52,15 @@ test('actions: toggle colour mode and sign out', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('New project action opens the create dialog on the Projects page', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await page.keyboard.press('Control+k');
+  await page.getByRole('combobox').fill('New project');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/projects\?new=1$/);
+  const dialog = page.getByRole('dialog', { name: 'New project' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel(/Project name/)).toBeFocused();
+});

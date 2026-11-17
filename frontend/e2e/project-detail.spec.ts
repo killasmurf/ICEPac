@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, loadFixture, MockApiHandle } from './fixtures/mockApi';
 import { saveScreenshot } from './fixtures/screenshot';
@@ -84,23 +84,27 @@ test('an unknown tab value falls back to WBS', async ({ page }) => {
   await expect(tree(page)).toBeVisible();
 });
 
+/** The estimate editor: an inline pane beside the tree on desktop, a drawer on mobile. */
+const detail = (page: Page, testInfo: TestInfo) =>
+  isMobile(testInfo.project.name) ? page.locator('.MuiDrawer-paper') : page.locator('section[aria-labelledby]').filter({ has: page.getByRole('tab', { name: 'Assignments' }) });
+
 test('selecting a WBS node opens the detail panel and keeps the id in the URL', async ({ page }, testInfo) => {
   await page.goto('/projects/1');
   await page.getByRole('button', { name: 'Expand all' }).click();
   await item(page, /Excavation/).click();
   await expect(page).toHaveURL(/wbs=4/);
-  await expect(page.locator('[data-wbs-id="4"]')).toHaveAttribute('aria-selected', 'true'); // tree is aria-hidden behind the modal
-  const drawer = page.locator('.MuiDrawer-paper');
+  await expect(page.locator('[data-wbs-id="4"]')).toHaveAttribute('aria-selected', 'true');
+  const drawer = detail(page, testInfo);
   await expect(drawer.getByRole('heading', { name: 'Excavation' })).toBeVisible();
   await expect(drawer.getByRole('tab', { name: 'Assignments' })).toBeVisible();
   await saveScreenshot(page, testInfo, 'phase-4', 'project-detail-wbs-selected-light');
 
   // Reload restores the selection.
   await page.reload();
-  await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Excavation' })).toBeVisible();
+  await expect(detail(page, testInfo).getByRole('heading', { name: 'Excavation' })).toBeVisible();
 });
 
-test('desktop: split view shows a prompt, then the node summary', async ({ page }, testInfo) => {
+test('desktop: split view shows a prompt, then the inline estimate editor', async ({ page }, testInfo) => {
   test.skip(isMobile(testInfo.project.name), 'split view is md and up');
   await page.goto('/projects/1');
   await expect(page.getByText('Select a WBS item')).toBeVisible();
@@ -109,12 +113,14 @@ test('desktop: split view shows a prompt, then the node summary', async ({ page 
   expect(treeBox?.width ?? 0).toBeGreaterThanOrEqual(280);
 
   await item(page, /Steelwork/).click();
-  await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Steelwork' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(page.getByRole('heading', { level: 2, name: 'Steelwork' })).toBeVisible();
-  await page.getByRole('button', { name: 'Open estimate details' }).click();
-  await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Steelwork' })).toBeVisible();
+  const pane = detail(page, testInfo);
+  await expect(pane.getByRole('heading', { name: 'Steelwork' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const paneBox = await pane.boundingBox();
+  const treeAfter = await tree(page).boundingBox();
+  expect(paneBox?.x ?? 0).toBeGreaterThanOrEqual((treeAfter?.x ?? 0) + (treeAfter?.width ?? 0) - 1);
+  await pane.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText('Select a WBS item')).toBeVisible();
 });
 
 test('mobile: tree is full width and the detail opens in a full-width drawer', async ({ page }, testInfo) => {
@@ -273,11 +279,32 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(blocking.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(' ') + ' :: ' + (n.any[0]?.message ?? '')) }))).toEqual([]);
 
     await item(page, /Steelwork/).click();
-    await expect(page.locator('.MuiDrawer-paper').getByRole('heading', { name: 'Steelwork' })).toBeVisible();
+    await expect(detail(page, testInfo).getByRole('heading', { name: 'Steelwork' })).toBeVisible();
     await page.waitForTimeout(500);
-    // The drawer is WBSDetailPanel (owned by the estimation work); its close button and dialog name are checked there.
-    const drawerResults = await new AxeBuilder({ page }).exclude('.MuiDrawer-paper').analyze();
-    const drawerBlocking = drawerResults.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-    expect(drawerBlocking.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(' ')) }))).toEqual([]);
+    const panelResults = await new AxeBuilder({ page }).analyze();
+    const panelBlocking = panelResults.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(panelBlocking.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(' ')) }))).toEqual([]);
   });
 }
+
+test('summary tab: no duplicated headline cards and the WBS Summary table is not clipped', async ({ page }, testInfo) => {
+  await page.goto('/projects/1?tab=summary');
+  await expect(page.getByRole('heading', { name: '80% Confidence Range' })).toBeVisible();
+  // The header band is the only place for the headline totals.
+  await expect(page.getByText('Total PERT estimate', { exact: false })).toHaveCount(1);
+  await expect(page.getByText('Risk-Adjusted Estimate')).toHaveCount(0);
+
+  const grid = page.getByRole('grid', { name: 'WBS cost summary' });
+  await expect(grid.getByRole('columnheader', { name: 'WBS Code' })).toBeVisible();
+  test.skip(isMobile(testInfo.project.name), 'the table legitimately scrolls inside its own container on phones');
+  // Nothing may overflow the grid, otherwise focus can scroll it sideways and clip the first column.
+  const overflow = await grid.locator('.MuiDataGrid-virtualScroller').evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, sl: el.scrollLeft }));
+  expect(overflow.sw).toBeLessThanOrEqual(overflow.cw);
+  await grid.getByRole('columnheader', { name: 'WBS Code' }).focus();
+  const after = await grid.locator('.MuiDataGrid-virtualScroller').evaluate((el) => el.scrollLeft);
+  expect(after).toBe(0);
+  const box = await grid.getByRole('columnheader', { name: 'WBS Code' }).boundingBox();
+  const gridBox = await grid.boundingBox();
+  expect(box?.x ?? -1).toBeGreaterThanOrEqual(gridBox?.x ?? 0);
+  await saveScreenshot(page, testInfo, 'phase-4', 'project-detail-summary-light');
+});

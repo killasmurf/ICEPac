@@ -39,9 +39,9 @@ const json = (body: unknown, status = 200) => ({
 });
 
 test.describe('estimation summary', () => {
-  test('renders stat cards, the 80% range and the WBS table', async ({ page }, testInfo) => {
+  test('renders the 80% range, the WBS table and the headline cards (unless hidden)', async ({ page }, testInfo) => {
     await openTab(page, 'summary');
-    await expect(page.getByText('Total PERT Estimate', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '80% Confidence Range' })).toBeVisible();
     await expect(page.getByText('$1,186,000.00 to $1,314,000.00')).toBeVisible();
     const wbs = page.getByRole('grid', { name: 'WBS cost summary' });
     await expect(wbs.getByText('Foundations')).toBeVisible();
@@ -69,7 +69,7 @@ test.describe('estimation summary', () => {
     await expect(page.getByText('Could not load the estimation summary')).toBeVisible({ timeout: 15_000 });
     fail = false;
     await page.getByRole('button', { name: 'Retry' }).click();
-    await expect(page.getByText('Total PERT Estimate', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '80% Confidence Range' })).toBeVisible();
   });
 });
 

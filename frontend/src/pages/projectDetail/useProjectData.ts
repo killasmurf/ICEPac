@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getProject } from '../../api/projects';
+import { projectQuery } from '../../api/queries';
 import { getProjectEstimation } from '../../api/estimation';
 import { configApi, resourcesApi, suppliersApi } from '../../api/admin';
 
@@ -9,12 +9,10 @@ export function isNotFound(error: unknown): boolean {
   return (error as { response?: { status?: number } } | null)?.response?.status === 404;
 }
 
-// NOTE: not ['projects', id]: the shell's breadcrumb hook caches only the project *name* under that key.
-// This key sits under the same prefix, so invalidating ['projects', id] still refreshes it.
+// Shares its key and fetch with the shell's breadcrumb lookup (api/queries.ts): one request per project.
 export function useProject(id: number) {
   return useQuery({
-    queryKey: ['projects', id, 'detail'],
-    queryFn: () => getProject(id),
+    ...projectQuery(id),
     enabled: isValid(id),
     // The page renders its own not-found / retry state, so skip the global toast.
     meta: { silent: true },
