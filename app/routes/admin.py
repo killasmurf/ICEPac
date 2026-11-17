@@ -357,7 +357,7 @@ async def delete_supplier(
 @router.get("/config")
 async def list_config_tables(current_user=Depends(get_current_user)):
     """List all available configuration tables."""
-    return {"tables": [{"name": k, **v} for k, v in CONFIG_TABLE_INFO.items()]}
+    return {"tables": [{"key": k, **v} for k, v in CONFIG_TABLE_INFO.items()]}
 
 
 @router.get("/config/{table_name}", response_model=ConfigItemListResponse)
