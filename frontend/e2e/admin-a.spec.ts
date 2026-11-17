@@ -15,6 +15,7 @@ const writes = {
   'POST /admin/users': savedUser,
   'PUT /admin/users/2': { ...savedUser, id: 2, username: 'user2' },
   'PUT /admin/users/2/password': { detail: 'Password updated' },
+  'PUT /admin/users/1/password': { detail: 'Password updated' },
   'DELETE /admin/users/2': {},
   'POST /admin/resources': savedResource,
   'PUT /admin/resources/1': { ...savedResource, id: 1, resource_code: 'RES-001' },
@@ -156,17 +157,37 @@ test.describe('users actions', () => {
     await expect(page.getByText('User "user2" updated')).toBeVisible();
   });
 
-  test('reset password sends the new password', async ({ page }) => {
+  test("resetting another user's password sends only new_password", async ({ page }) => {
     await page.goto('/admin/users');
     await revealActions(page);
     await page.getByRole('button', { name: 'Reset password for user2' }).click();
-    await page.getByRole('dialog').getByLabel('Current password').fill('oldpassword');
-    await page.getByRole('dialog').getByLabel(/^New password/).fill('brandnewpass1');
-    await page.getByRole('dialog').getByLabel('Confirm new password').fill('brandnewpass1');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Current password')).toHaveCount(0);
+    await dialog.getByLabel(/^New password/).fill('brandnewpass1');
+    await dialog.getByLabel('Confirm new password').fill('different1234');
+    await page.getByRole('button', { name: 'Update password' }).click();
+    await expect(dialog.getByText('Passwords do not match')).toBeVisible();
+    await dialog.getByLabel('Confirm new password').fill('brandnewpass1');
     const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/users/2/password'));
     await page.getByRole('button', { name: 'Update password' }).click();
-    expect((await req).postDataJSON()).toEqual({ current_password: 'oldpassword', new_password: 'brandnewpass1' });
+    expect((await req).postDataJSON()).toEqual({ new_password: 'brandnewpass1' });
     await expect(page.getByText('Password updated for "user2"')).toBeVisible();
+  });
+
+  test('changing your own password also sends current_password', async ({ page }) => {
+    await page.goto('/admin/users');
+    await revealActions(page);
+    await page.getByRole('button', { name: 'Reset password for jordan' }).click();
+    const dialog = page.getByRole('dialog');
+    await page.getByRole('button', { name: 'Update password' }).click();
+    await expect(dialog.getByText('Enter your current password')).toBeVisible();
+    await dialog.getByLabel('Current password').fill('oldpassword');
+    await dialog.getByLabel(/^New password/).fill('brandnewpass1');
+    await dialog.getByLabel('Confirm new password').fill('brandnewpass1');
+    const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/users/1/password'));
+    await page.getByRole('button', { name: 'Update password' }).click();
+    expect((await req).postDataJSON()).toEqual({ current_password: 'oldpassword', new_password: 'brandnewpass1' });
+    await expect(page.getByText('Password updated for "jordan"')).toBeVisible();
   });
 
   test('delete asks for confirmation then issues DELETE', async ({ page }) => {

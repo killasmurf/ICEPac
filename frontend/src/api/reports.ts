@@ -87,19 +87,28 @@ export interface ExportedFile {
   filename: string;
 }
 
-/** Extract the filename from a Content-Disposition header, or return the fallback. */
+/** Drop any directory part so a server-supplied name cannot point outside the downloads folder. */
+const baseName = (name: string) => name.split(/[\\/]/).pop()?.trim() ?? '';
+
+/**
+ * Extract the filename from a Content-Disposition header, or return the fallback.
+ * Handles `filename="x.pdf"`, `filename=x.pdf` and the RFC 5987 form `filename*=UTF-8''x%20y.pdf`
+ * (optionally with a language tag), which wins when both are present.
+ */
 export function filenameFromDisposition(header: string | undefined | null, fallback: string): string {
   if (!header) return fallback;
-  const encoded = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(header);
+  const encoded = /filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i.exec(header);
   if (encoded) {
     try {
-      return decodeURIComponent(encoded[1].trim().replace(/^"|"$/g, ''));
+      const name = baseName(decodeURIComponent(encoded[2].trim().replace(/^"|"$/g, '')));
+      if (name) return name;
     } catch {
-      /* fall through to the plain filename */
+      /* malformed percent-encoding: fall through to the plain filename */
     }
   }
-  const plain = /filename="?([^";]+)"?/i.exec(header);
-  return plain ? plain[1].trim() : fallback;
+  const plain = /(?:^|[;\s])filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header);
+  const name = plain ? baseName((plain[1] ?? plain[2]).trim()) : '';
+  return name || fallback;
 }
 
 /** Filename used when the browser cannot read Content-Disposition (cross-origin without expose headers). */

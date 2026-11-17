@@ -173,9 +173,16 @@ export const usersApi = {
   create: (data: UserCreate) => client.post<User>(`${API_BASE}/users`, data).then((r) => r.data),
   update: (id: number, data: UserUpdate) => client.put<User>(`${API_BASE}/users/${id}`, data).then((r) => r.data),
   delete: (id: number) => client.delete<void>(`${API_BASE}/users/${id}`).then((r) => r.data),
-  changePassword: (id: number, newPassword: string, currentPassword = '') =>
+  /**
+   * PUT /admin/users/{id}/password. An admin resetting another user's password sends only `new_password`;
+   * a user changing their own must also send `current_password`.
+   */
+  changePassword: (id: number, newPassword: string, currentPassword?: string) =>
     client
-      .put<void>(`${API_BASE}/users/${id}/password`, { current_password: currentPassword, new_password: newPassword })
+      .put<void>(`${API_BASE}/users/${id}/password`, {
+        new_password: newPassword,
+        ...(currentPassword ? { current_password: currentPassword } : {}),
+      })
       .then((r) => r.data),
 };
 
@@ -224,12 +231,15 @@ export const suppliersApi = {
 // ── Config Tables ────────────────────────────────────────────
 
 interface RawConfigTable {
+  /** Route key such as "cost-types". Older backends do not send it. */
+  key?: string;
+  /** Display label such as "Cost Types". */
   name: string;
   description: string;
   weighted: boolean;
 }
 
-/** Turn a display name ("Cost Types") into the route key ("cost-types"). */
+/** Fallback for an older backend that sends no `key`: turn the display name ("Cost Types") into the route key ("cost-types"). */
 export const configTableKey = (label: string) =>
   label
     .trim()
@@ -238,13 +248,13 @@ export const configTableKey = (label: string) =>
     .replace(/^-+|-+$/g, '');
 
 /**
- * GET /admin/config returns `{ tables: [{ name, description, weighted }] }` where `name` is the
- * display label (the route key is overwritten server-side), so the key is derived from the label.
+ * GET /admin/config returns `{ tables: [{ key, name, description, weighted }] }` where `key` is the route
+ * key and `name` the display label. Without `key` (older backend) the key is derived from the label.
  */
 export const normalizeConfigTables = (raw: { tables?: RawConfigTable[] } | RawConfigTable[] | null | undefined) => {
   const list = Array.isArray(raw) ? raw : (raw?.tables ?? []);
   return list.map<ConfigTableInfo>((t) => ({
-    key: configTableKey(t.name),
+    key: t.key || configTableKey(t.name),
     label: t.name,
     description: t.description,
     weighted: Boolean(t.weighted),

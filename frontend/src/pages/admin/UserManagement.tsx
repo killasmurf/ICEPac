@@ -140,7 +140,7 @@ export default function UserManagement() {
 
   const passwordMutation = useMutation({
     mutationFn: ({ user, form: f }: { user: User; form: PasswordForm }) =>
-      usersApi.changePassword(user.id, f.next, f.current),
+      usersApi.changePassword(user.id, f.next, isSelf(user) ? f.current : undefined),
     onSuccess: (_data, { user }) => {
       toast.success(`Password updated for "${user.username}"`);
       setResetting(null);
@@ -175,14 +175,14 @@ export default function UserManagement() {
 
   const passwordErrors: Partial<Record<keyof PasswordForm, string>> = {};
   if (passwordSubmitted) {
-    if (!passwordForm.current) passwordErrors.current = 'Enter the current password';
+    if (isSelf(resetting) && !passwordForm.current) passwordErrors.current = 'Enter your current password';
     if (passwordForm.next.length < 8 || passwordForm.next.length > 128) passwordErrors.next = 'Password must be 8 to 128 characters';
     if (passwordForm.confirm !== passwordForm.next) passwordErrors.confirm = 'Passwords do not match';
   }
   const submitPassword = () => {
     setPasswordSubmitted(true);
     if (!resetting) return;
-    if (passwordForm.current && passwordForm.next.length >= 8 && passwordForm.next.length <= 128 && passwordForm.confirm === passwordForm.next) {
+    if ((!isSelf(resetting) || passwordForm.current) && passwordForm.next.length >= 8 && passwordForm.next.length <= 128 && passwordForm.confirm === passwordForm.next) {
       passwordMutation.mutate({ user: resetting, form: passwordForm });
     }
   };
@@ -381,7 +381,9 @@ export default function UserManagement() {
         onSubmit={submitPassword}
         loading={passwordMutation.isPending}
       >
-        <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'The API verifies the existing password before changing it'} autoComplete="off" />
+        {isSelf(resetting) && (
+          <TextField label="Current password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} error={Boolean(passwordErrors.current)} helperText={passwordErrors.current ?? 'Required when changing your own password'} autoComplete="current-password" />
+        )}
         <TextField label="New password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} error={Boolean(passwordErrors.next)} helperText={passwordErrors.next ?? 'At least 8 characters'} autoComplete="new-password" />
         <TextField label="Confirm new password" type="password" slotProps={{ inputLabel: { required: true } }} value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} error={Boolean(passwordErrors.confirm)} helperText={passwordErrors.confirm} autoComplete="new-password" />
       </FormDialog>
