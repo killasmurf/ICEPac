@@ -2,12 +2,13 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { estimationRoutes } from './fixtures/estimationRoutes';
+import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
 
 test.beforeEach(async ({ page }) => {
-  api = await mockApi(page, estimationRoutes as Record<string, never>);
+  api = await mockApi(page, { ...projectDetailRoutes, ...(estimationRoutes as Record<string, never>) });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await loginAs(page, 'admin');
 });
@@ -26,9 +27,9 @@ async function scrollGridRight(grid: Locator) {
   });
 }
 
-async function openTab(page: Page, name: string | RegExp) {
-  await page.goto('/projects/1');
-  await page.getByRole('tab', { name }).click();
+/** The project page keeps its tab in the URL (?tab=summary|risks|wbs|imports). */
+async function openTab(page: Page, tab: 'summary' | 'risks') {
+  await page.goto(`/projects/1?tab=${tab}`);
 }
 
 const json = (body: unknown, status = 200) => ({
@@ -40,8 +41,8 @@ const json = (body: unknown, status = 200) => ({
 
 test.describe('estimation summary', () => {
   test('renders stat cards, the 80% range and the WBS table', async ({ page }, testInfo) => {
-    await openTab(page, 'Estimation');
-    await expect(page.getByText('Total PERT Estimate')).toBeVisible();
+    await openTab(page, 'summary');
+    await expect(page.getByText('Total PERT Estimate', { exact: true })).toBeVisible();
     await expect(page.getByText('$1,186,000.00 to $1,314,000.00')).toBeVisible();
     const wbs = page.getByRole('grid', { name: 'WBS cost summary' });
     await expect(wbs.getByText('Foundations')).toBeVisible();
@@ -56,7 +57,7 @@ test.describe('estimation summary', () => {
     await page.route('**/api/v1/projects/1/estimation', (r) =>
       r.fulfill(json({ ...(estimationRoutes['GET /projects/1/estimation'] as () => object)(), total_wbs_items: 0, total_assignments: 0, wbs_summaries: [] })),
     );
-    await openTab(page, 'Estimation');
+    await openTab(page, 'summary');
     await expect(page.getByText('No estimation data yet')).toBeVisible();
   });
 
@@ -65,17 +66,17 @@ test.describe('estimation summary', () => {
     await page.route('**/api/v1/projects/1/estimation', (r) =>
       fail ? r.fulfill(json({ detail: 'boom' }, 500)) : r.fulfill(json((estimationRoutes['GET /projects/1/estimation'] as () => object)())),
     );
-    await openTab(page, 'Estimation');
+    await openTab(page, 'summary');
     await expect(page.getByText('Could not load the estimation summary')).toBeVisible({ timeout: 15_000 });
     fail = false;
     await page.getByRole('button', { name: 'Retry' }).click();
-    await expect(page.getByText('Total PERT Estimate')).toBeVisible();
+    await expect(page.getByText('Total PERT Estimate', { exact: true })).toBeVisible();
   });
 });
 
 test.describe('project risk register', () => {
   test('renders rows from the API', async ({ page }, testInfo) => {
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await expect(page.getByText('Steel price escalation')).toBeVisible();
     await expect(page.getByRole('gridcell', { name: '$125,001' })).toBeVisible();
     await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
@@ -88,18 +89,18 @@ test.describe('project risk register', () => {
     await page.route('**/api/v1/projects/1/risks', (r) =>
       r.request().method() === 'GET' ? r.fulfill(json({ items: [], total: 0 })) : r.fallback(),
     );
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await expect(page.getByText('No project-level risks recorded yet')).toBeVisible();
   });
 
   test('shows an error state', async ({ page }) => {
     await page.route('**/api/v1/projects/1/risks', (r) => r.fulfill(json({ detail: 'boom' }, 500)));
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await expect(page.getByText('Could not load the risk register')).toBeVisible({ timeout: 15_000 });
   });
 
   test('create sends the expected request and toasts', async ({ page }) => {
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await page.getByRole('button', { name: 'Add Project Risk' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add Project Risk' });
     await dialog.getByRole('textbox', { name: /Title/ }).fill('Permit delay');
@@ -112,7 +113,7 @@ test.describe('project risk register', () => {
   });
 
   test('edit sends a PUT and toasts', async ({ page }) => {
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
     await page.getByRole('button', { name: 'Edit risk Steel price escalation' }).click();
     const dialog = page.getByRole('dialog', { name: 'Edit Project Risk' });
@@ -124,7 +125,7 @@ test.describe('project risk register', () => {
   });
 
   test('delete asks for confirmation, sends a DELETE and toasts', async ({ page }) => {
-    await openTab(page, 'Risk Register');
+    await openTab(page, 'risks');
     await scrollGridRight(page.getByRole('grid', { name: 'Project risk register' }));
     await page.getByRole('button', { name: 'Delete risk Steel price escalation' }).click();
     const request = page.waitForRequest((r) => r.method() === 'DELETE' && r.url().endsWith('/projects/1/risks/7'));
@@ -136,10 +137,7 @@ test.describe('project risk register', () => {
 
 test.describe('WBS detail panel', () => {
   async function openPanel(page: Page) {
-    await page.goto('/projects/1');
-    await page.getByRole('tab', { name: /^WBS/ }).click();
-    // click the row via its code cell: the title column is collapsed to nothing on narrow screens in the current tree
-    await page.getByText('1.1', { exact: true }).first().click();
+    await page.goto('/projects/1?tab=wbs&wbs=11');
     await expect(page.getByRole('grid', { name: 'Resource assignments' })).toBeVisible();
   }
 
@@ -205,7 +203,7 @@ test.describe('WBS detail panel', () => {
 });
 
 for (const scheme of ['light', 'dark'] as const) {
-  for (const [name, tab] of [['estimation', 'Estimation'], ['risk-register', 'Risk Register']] as const) {
+  for (const [name, tab] of [['estimation', 'summary'], ['risk-register', 'risks']] as const) {
     test(`no serious or critical axe violations: ${name} (${scheme})`, async ({ page }, testInfo) => {
       await page.addInitScript((m) => window.localStorage.setItem('mui-mode', m), scheme);
       await openTab(page, tab);

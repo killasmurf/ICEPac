@@ -82,6 +82,51 @@ beforeEach(() => {
   h.getWBSEstimation.mockResolvedValue(estimation);
 });
 
+describe('WBSDetailPanel accessibility, onChanged and variant', () => {
+  it('is a dialog named after the WBS item with a Close button', async () => {
+    const onClose = vi.fn();
+    renderWithProviders(<WBSDetailPanel open onClose={onClose} projectId={1} wbs={wbs} {...lookups} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Foundations' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('inline variant renders a labelled region without a dialog or drawer', async () => {
+    renderWithProviders(<WBSDetailPanel open variant="inline" onClose={vi.fn()} projectId={1} wbs={wbs} {...lookups} />);
+    expect(await screen.findByRole('region', { name: 'Foundations' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText('ENG')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('inline variant renders nothing when closed', () => {
+    renderWithProviders(<WBSDetailPanel open={false} variant="inline" onClose={vi.fn()} projectId={1} wbs={wbs} />);
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+  });
+
+  it('calls onChanged after a successful create, delete and approval, but not after a failure', async () => {
+    const onChanged = vi.fn();
+    h.getApprovalStatus.mockResolvedValue(approval('draft'));
+    h.deleteAssignment.mockRejectedValueOnce(new Error('500')).mockResolvedValue(undefined);
+    h.processApproval.mockResolvedValue(approval('submitted'));
+    renderWithProviders(<WBSDetailPanel open onClose={vi.fn()} projectId={1} wbs={wbs} onChanged={onChanged} {...lookups} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete assignment ENG' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete assignment?' })).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(h.deleteAssignment).toHaveBeenCalledTimes(1));
+    expect(onChanged).not.toHaveBeenCalled();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete assignment ENG' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Delete assignment?' })).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete assignment?' })).not.toBeInTheDocument());
+    await userEvent.click(await screen.findByRole('tab', { name: 'Approval' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Submit for Approval' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
+  });
+});
+
 describe('WBSDetailPanel', () => {
   it('loads assignments, risks, approval and estimation for the WBS item', async () => {
     renderPanel();

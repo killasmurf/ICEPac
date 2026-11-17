@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Box, Button, Divider, Drawer, Grid, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +47,8 @@ interface WBSDetailPanelProps {
   canApprove?: boolean;
   /** 'drawer' (default) slides in from the right; 'inline' renders the panel in place for split layouts. */
   variant?: 'drawer' | 'inline';
+  /** Called after any successful create, update, delete or approval action, so the parent can refresh its own data. */
+  onChanged?: () => void;
   // Lookup data for forms
   resources?: { code: string; description: string }[];
   suppliers?: { code: string; name: string }[];
@@ -90,6 +92,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   wbs,
   canApprove,
   variant = 'drawer',
+  onChanged,
   resources = [],
   suppliers = [],
   costTypes = [],
@@ -101,6 +104,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   severityLevels = [],
 }) => {
   const toast = useToast();
+  const titleId = useId();
   const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(0);
 
@@ -131,7 +135,10 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
   const isReadonly = approvalStatus?.approval_status === 'submitted' || approvalStatus?.approval_status === 'approved';
 
-  const refresh = () => (wbsId === undefined ? Promise.resolve([]) : invalidateEstimation(queryClient, projectId, wbsId));
+  const refresh = () => {
+    onChanged?.();
+    return wbsId === undefined ? Promise.resolve([]) : invalidateEstimation(queryClient, projectId, wbsId);
+  };
 
   const assignmentSave = useMutation({
     mutationFn: (vars: { data: AssignmentCreate | AssignmentUpdate; editing: Assignment | null }) =>
@@ -204,6 +211,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
   // The approval workflow invalidates the queries itself; this keeps the cached copy fresh immediately.
   const handleApprovalChange = (newStatus: WBSApprovalResponse) => {
+    onChanged?.();
     if (wbsId === undefined) return;
     queryClient.setQueryData(wbsDetailsKey(projectId, wbsId), (old: Awaited<ReturnType<typeof fetchDetails>> | undefined) =>
       old ? { ...old, approval: newStatus } : old,
@@ -217,7 +225,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
       {/* Header */}
       <Box sx={{ p: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" component="h2">
+          <Typography variant="h6" component="h2" id={titleId}>
             {wbs.wbs_title}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -228,7 +236,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
           </Box>
         </Box>
         <Tooltip title="Close">
-          <IconButton onClick={onClose} aria-label="Close details">
+          <IconButton onClick={onClose} aria-label="Close">
             <CloseIcon />
           </IconButton>
         </Tooltip>
@@ -379,7 +387,13 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
   if (variant === 'inline') {
     return open ? (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>{content}</Box>
+      <Box
+        component="section"
+        aria-labelledby={titleId}
+        sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
+      >
+        {content}
+      </Box>
     ) : null;
   }
 
@@ -388,6 +402,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
       anchor="right"
       open={open}
       onClose={onClose}
+      slotProps={{ paper: { role: 'dialog', 'aria-modal': true, 'aria-labelledby': titleId } }}
       sx={{
         '& .MuiDrawer-paper': {
           width: { xs: '100%', sm: 600, md: 800 },
