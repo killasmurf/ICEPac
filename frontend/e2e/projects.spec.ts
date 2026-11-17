@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
 import { projectsRoutes } from './fixtures/projectsRoutes';
+import { projectDetailRoutes } from './fixtures/projectDetailRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 const PHASE = 'phase-4';
@@ -12,7 +13,7 @@ test.afterEach(() => {
 });
 
 async function setup(page: Page, opts: { many?: boolean; scheme?: 'light' | 'dark'; view?: 'cards' | 'table' } = {}) {
-  api = await mockApi(page, projectsRoutes({ many: opts.many }));
+  api = await mockApi(page, { ...projectDetailRoutes, ...projectsRoutes({ many: opts.many }) });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(
     ([scheme, view]) => {
@@ -204,8 +205,7 @@ test.describe('projects list', () => {
 
 test.describe('project import (ProjectUpload on the project page)', () => {
   async function openImport(page: Page) {
-    await page.goto('/projects/1');
-    await page.getByRole('tab', { name: 'Import' }).click();
+    await page.goto('/projects/1?tab=imports');
     await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
   }
 
@@ -222,7 +222,6 @@ test.describe('project import (ProjectUpload on the project page)', () => {
 
     await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'dark'));
     await page.reload();
-    await page.getByRole('tab', { name: 'Import' }).click();
     await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
     await saveScreenshot(page, testInfo, PHASE, 'project-import-dark');
     expect(await axeBlocking(page)).toEqual([]);
@@ -250,9 +249,8 @@ test.describe('project import (ProjectUpload on the project page)', () => {
     const sent = await req;
     expect(sent.headers()['content-type']).toContain('multipart/form-data');
     expect(sent.postData()).toContain('filename="plan.mpp"');
-    // The job is polled until it is terminal, then a success toast is raised. The inline result summary is
-    // covered by unit tests: the current ProjectDetail reloads the project on completion and remounts this tab.
-    await expect(page.getByText('Import completed').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Import completed: 12 tasks, 3 resources, 20 assignments/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Import completed', { exact: true })).toBeVisible();
     await expect.poll(() => polls.length).toBeGreaterThanOrEqual(2);
     await saveScreenshot(page, testInfo, PHASE, 'project-import-done-light');
   });
