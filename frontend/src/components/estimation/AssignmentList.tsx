@@ -1,23 +1,14 @@
-import React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  IconButton,
-  Typography,
-  Box,
-  Button,
-  Tooltip,
-} from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, Button, IconButton, Tooltip, Typography } from '@mui/material';
+import type { GridColDef } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { Assignment } from '../../api/estimation';
 import { formatCurrency } from '../../utils/format';
+import { DataTable } from '../common/DataTable';
+import { PertRangeBar } from '../common/PertRangeBar';
+import TotalsStrip from './TotalsStrip';
 
 interface AssignmentListProps {
   assignments: Assignment[];
@@ -26,6 +17,8 @@ interface AssignmentListProps {
   onDelete: (assignment: Assignment) => void;
   readonly?: boolean;
 }
+
+const money = (value: number | null | undefined) => formatCurrency(value);
 
 const AssignmentList: React.FC<AssignmentListProps> = ({
   assignments,
@@ -47,90 +40,135 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
   );
   const combinedStdDev = Math.sqrt(totals.variance);
 
+  const columns = useMemo<GridColDef<Assignment>[]>(() => {
+    const amount = (field: keyof Assignment, headerName: string, extra: Partial<GridColDef<Assignment>> = {}): GridColDef<Assignment> => ({
+      field,
+      headerName,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      minWidth: 110,
+      flex: 0.8,
+      cellClassName: 'tabular-nums',
+      valueFormatter: (value: number) => money(value),
+      ...extra,
+    });
+
+    const cols: GridColDef<Assignment>[] = [
+      { field: 'resource_code', headerName: 'Resource', minWidth: 120, flex: 1 },
+      {
+        field: 'supplier_code',
+        headerName: 'Supplier',
+        minWidth: 100,
+        flex: 0.8,
+        valueFormatter: (value: string | null) => value || '-',
+      },
+      amount('best_estimate', 'Best'),
+      amount('likely_estimate', 'Likely'),
+      amount('worst_estimate', 'Worst'),
+      amount('pert_estimate', 'PERT', {
+        renderCell: ({ row }) => (
+          <Typography component="span" variant="body2" sx={{ fontWeight: 700 }}>
+            {money(row.pert_estimate)}
+          </Typography>
+        ),
+      }),
+      amount('std_deviation', 'Std Dev'),
+      {
+        field: 'range',
+        headerName: 'Range',
+        minWidth: 190,
+        flex: 1.2,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: ({ row }) => (
+          <Box sx={{ width: '100%' }}>
+            <PertRangeBar
+              best={row.best_estimate}
+              likely={row.likely_estimate}
+              worst={row.worst_estimate}
+              pert={row.pert_estimate}
+            />
+          </Box>
+        ),
+      },
+    ];
+
+    if (!readonly) {
+      cols.push({
+        field: 'actions',
+        headerName: 'Actions',
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        align: 'center',
+        headerAlign: 'center',
+        minWidth: 110,
+        renderCell: ({ row }) => (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Edit">
+              <IconButton size="small" aria-label={`Edit assignment ${row.resource_code}`} onClick={() => onEdit(row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton
+                size="small"
+                color="error"
+                aria-label={`Delete assignment ${row.resource_code}`}
+                onClick={() => onDelete(row)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      });
+    }
+    return cols;
+  }, [readonly, onEdit, onDelete]);
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Resource Assignments</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Typography variant="h6" component="h3">
+          Resource Assignments
+        </Typography>
         {!readonly && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={onAdd} size="small">
+          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={onAdd} size="small">
             Add Assignment
           </Button>
         )}
       </Box>
 
-      {assignments.length === 0 ? (
-        <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-          No assignments yet. Click "Add Assignment" to create one.
-        </Typography>
-      ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell>Resource</TableCell>
-                <TableCell>Supplier</TableCell>
-                <TableCell align="right">Best</TableCell>
-                <TableCell align="right">Likely</TableCell>
-                <TableCell align="right">Worst</TableCell>
-                <TableCell align="right">PERT</TableCell>
-                <TableCell align="right">Std Dev</TableCell>
-                {!readonly && <TableCell align="center">Actions</TableCell>}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {assignments.map((assignment) => (
-                <TableRow key={assignment.id} hover>
-                  <TableCell>{assignment.resource_code}</TableCell>
-                  <TableCell>{assignment.supplier_code || '-'}</TableCell>
-                  <TableCell align="right">{formatCurrency(assignment.best_estimate)}</TableCell>
-                  <TableCell align="right">{formatCurrency(assignment.likely_estimate)}</TableCell>
-                  <TableCell align="right">{formatCurrency(assignment.worst_estimate)}</TableCell>
-                  <TableCell align="right">
-                    <strong>{formatCurrency(assignment.pert_estimate)}</strong>
-                  </TableCell>
-                  <TableCell align="right">{formatCurrency(assignment.std_deviation)}</TableCell>
-                  {!readonly && (
-                    <TableCell align="center">
-                      <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => onEdit(assignment)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => onDelete(assignment)}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
+      <DataTable<Assignment>
+        rows={assignments}
+        columns={columns}
+        ariaLabel="Resource assignments"
+        emptyTitle="No assignments yet"
+        emptyDescription={readonly ? 'Nothing has been assigned to this item.' : 'Add a resource with a three-point estimate to start costing this item.'}
+        emptyAction={
+          readonly ? undefined : (
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={onAdd}>
+              Add Assignment
+            </Button>
+          )
+        }
+      />
 
-              {/* Totals Row */}
-              <TableRow sx={{ bgcolor: 'primary.50' }}>
-                <TableCell colSpan={2}>
-                  <strong>Totals ({assignments.length} assignments)</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(totals.best)}</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(totals.likely)}</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(totals.worst)}</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(totals.pert)}</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{formatCurrency(combinedStdDev)}</strong>
-                </TableCell>
-                {!readonly && <TableCell />}
-              </TableRow>
-            </TableBody>
-          </Table>
-        </TableContainer>
+      {assignments.length > 0 && (
+        <TotalsStrip
+          label={`Totals (${assignments.length} assignments)`}
+          ariaLabel="Assignment totals"
+          items={[
+            { label: 'Best', value: money(totals.best) },
+            { label: 'Likely', value: money(totals.likely) },
+            { label: 'Worst', value: money(totals.worst) },
+            { label: 'PERT', value: money(totals.pert), emphasis: true },
+            { label: 'Std Dev', value: money(combinedStdDev) },
+          ]}
+        />
       )}
     </Box>
   );

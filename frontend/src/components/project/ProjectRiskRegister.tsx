@@ -5,50 +5,46 @@
  *
  * Renders inside ProjectDetail's "Risk Register" tab.
  *
- * Data is loaded on mount and after every mutation. Lookup lists for
- * category / probability / severity codes are pulled from the generic
- * admin/config endpoint via the existing configApi.
+ * Data comes from React Query and is refreshed after every mutation.
+ * Lookup lists for category / probability / severity codes are pulled
+ * from the generic admin/config endpoint via the existing configApi.
+ * The API only lets admins and managers change risks, so everyone else
+ * gets a read-only register.
  */
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Box, Button, Chip, Grid, IconButton, InputAdornment, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import type { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   projectRiskApi,
   ProjectRisk,
   ProjectRiskCreate,
   ProjectRiskUpdate,
 } from '../../api/project-risks';
-import { configApi, ConfigItem } from '../../api/admin';
-import { formatCurrency } from '../../utils/format';
+import { configApi } from '../../api/admin';
+import { useAuth } from '../../auth/AuthContext';
+import { formatCurrency, formatDate } from '../../utils/format';
+import { DataTable } from '../common/DataTable';
+import { StatCard } from '../common/StatCard';
+import { StatusChip } from '../common/StatusChip';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { CardSkeleton } from '../common/CardSkeleton';
+import { TableSkeleton } from '../common/TableSkeleton';
+import ErrorState from '../common/ErrorState';
+import { useToast } from '../feedback/ToastProvider';
+import ValidatedFormDialog from '../estimation/ValidatedFormDialog';
+import { currencySymbol, validateMoney } from '../estimation/estimationUtils';
+import { invalidateEstimation, projectRiskRegisterKey } from '../estimation/queryKeys';
 
 interface Props {
   projectId: number;
 }
+
+/** Roles the API allows to create, change or delete project risks (app/routes/risk.py). */
+const EDITOR_ROLES = ['admin', 'manager'];
 
 const formatMoney = (raw: string | number) => {
   const n = typeof raw === 'string' ? parseFloat(raw) : raw;
@@ -65,384 +61,399 @@ const sevColor = (code: string | null | undefined): 'default' | 'success' | 'war
   return 'default';
 };
 
-const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info'> = {
-  open: 'warning',
-  mitigated: 'info',
-  closed: 'success',
-};
+interface FormState {
+  title: string;
+  risk_cost: string;
+  risk_category_code: string;
+  probability_code: string;
+  severity_code: string;
+  mitigation_plan: string;
+  status: string;
+}
 
-type LookupItem = ConfigItem;
+const STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'mitigated', label: 'Mitigated' },
+  { value: 'closed', label: 'Closed' },
+];
 
-const fetchRegister = async (projectId: number) => {
-  const [list, cost, cats, probs, sevs] = await Promise.all([
-    projectRiskApi.list(projectId),
-    projectRiskApi.totalCost(projectId),
+const fetchLookups = async () => {
+  const [cats, probs, sevs] = await Promise.all([
     configApi.listItems('risk-categories'),
     configApi.listItems('probability-levels'),
     configApi.listItems('severity-levels'),
   ]);
-  return { list, cost, cats, probs, sevs };
+  return { categories: cats.items, probabilities: probs.items, severities: sevs.items };
 };
 
-type RegisterData = Awaited<ReturnType<typeof fetchRegister>>;
+const fetchRegister = async (projectId: number) => {
+  const [list, cost] = await Promise.all([projectRiskApi.list(projectId), projectRiskApi.totalCost(projectId)]);
+  return { list, cost };
+};
 
 export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
-  const [risks, setRisks] = useState<ProjectRisk[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [totalCost, setTotalCost] = useState<number | null>(null);
+  const { role } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const canEdit = role !== null && EDITOR_ROLES.includes(role);
 
-  const [categories, setCategories] = useState<LookupItem[]>([]);
-  const [probabilities, setProbabilities] = useState<LookupItem[]>([]);
-  const [severities, setSeverities] = useState<LookupItem[]>([]);
+  const register = useQuery({
+    queryKey: projectRiskRegisterKey(projectId),
+    queryFn: () => fetchRegister(projectId),
+  });
+  const lookups = useQuery({
+    queryKey: ['config', 'project-risk-lookups'],
+    queryFn: fetchLookups,
+    staleTime: 5 * 60_000,
+  });
+
+  const risks = register.data?.list.items ?? [];
+  const totalCost = register.data?.cost.total_risk_cost ?? null;
+  const categories = lookups.data?.categories ?? [];
+  const probabilities = lookups.data?.probabilities ?? [];
+  const severities = lookups.data?.severities ?? [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectRisk | null>(null);
-  const [form, setForm] = useState<ProjectRiskCreate | ProjectRiskUpdate>({
+  const [form, setForm] = useState<FormState>({
     title: '',
-    risk_cost: 0,
+    risk_cost: '0',
     risk_category_code: '',
     probability_code: '',
     severity_code: '',
     mitigation_plan: '',
     status: 'open',
   });
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [deleting, setDeleting] = useState<ProjectRisk | null>(null);
 
-  const applyRegister = useCallback((data: RegisterData) => {
-    setRisks(data.list.items);
-    setTotalCost(data.cost.total_risk_cost);
-    setCategories(data.cats.items);
-    setProbabilities(data.probs.items);
-    setSeverities(data.sevs.items);
-    setError('');
-  }, []);
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: projectRiskRegisterKey(projectId) });
+    void invalidateEstimation(queryClient, projectId);
+  };
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      applyRegister(await fetchRegister(projectId));
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to load project risk register.');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, applyRegister]);
+  const save = useMutation({
+    mutationFn: (vars: { payload: ProjectRiskCreate | ProjectRiskUpdate; editing: ProjectRisk | null }) =>
+      vars.editing
+        ? projectRiskApi.update(projectId, vars.editing.id, vars.payload)
+        : projectRiskApi.create(projectId, vars.payload as ProjectRiskCreate),
+    onSuccess: (_result, vars) => {
+      toast.success(vars.editing ? 'Project risk updated' : 'Project risk created');
+      setDialogOpen(false);
+      refresh();
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchRegister(projectId)
-      .then((data) => {
-        if (!cancelled) applyRegister(data);
-      })
-      .catch((e: any) => {
-        if (!cancelled) setError(e?.response?.data?.detail ?? 'Failed to load project risk register.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, applyRegister]);
+  const remove = useMutation({
+    mutationFn: (risk: ProjectRisk) => projectRiskApi.delete(projectId, risk.id),
+    onSuccess: () => {
+      toast.success('Project risk deleted');
+      setDeleting(null);
+      refresh();
+    },
+    onError: () => setDeleting(null),
+  });
 
   const openCreate = () => {
     setEditing(null);
     setForm({
       title: '',
-      risk_cost: 0,
+      risk_cost: '0',
       risk_category_code: categories[0]?.code ?? '',
       probability_code: probabilities[0]?.code ?? '',
       severity_code: severities[0]?.code ?? '',
       mitigation_plan: '',
       status: 'open',
     });
-    setFormError('');
     setDialogOpen(true);
   };
 
-  const openEdit = (risk: ProjectRisk) => {
+  const openEdit = useCallback((risk: ProjectRisk) => {
     setEditing(risk);
     setForm({
       title: risk.title,
-      risk_cost: parseFloat(risk.risk_cost),
+      risk_cost: String(parseFloat(risk.risk_cost)),
       risk_category_code: risk.risk_category_code ?? '',
       probability_code: risk.probability_code ?? '',
       severity_code: risk.severity_code ?? '',
       mitigation_plan: risk.mitigation_plan ?? '',
       status: risk.status,
     });
-    setFormError('');
     setDialogOpen(true);
+  }, []);
+
+  const titleError = form.title.trim() ? undefined : 'Title is required';
+  const costError = validateMoney(form.risk_cost);
+  const invalid = !!titleError || !!costError;
+
+  const handleSave = () => {
+    if (invalid) return;
+    const payload: ProjectRiskCreate | ProjectRiskUpdate = {
+      title: form.title,
+      risk_cost: Number(form.risk_cost) || 0,
+      risk_category_code: form.risk_category_code || undefined,
+      probability_code: form.probability_code || undefined,
+      severity_code: form.severity_code || undefined,
+      mitigation_plan: form.mitigation_plan,
+      status: form.status,
+    };
+    save.mutate({ payload, editing });
   };
 
-  const handleSave = async () => {
-    if (!form.title?.trim()) {
-      setFormError('Title is required.');
-      return;
-    }
-    try {
-      setSaving(true);
-      setFormError('');
-      const payload: ProjectRiskCreate | ProjectRiskUpdate = {
-        ...form,
-        risk_cost: Number(form.risk_cost) || 0,
-      };
-      if (editing) {
-        await projectRiskApi.update(projectId, editing.id, payload);
-      } else {
-        await projectRiskApi.create(projectId, payload as ProjectRiskCreate);
-      }
-      setDialogOpen(false);
-      await load();
-    } catch (e: any) {
-      setFormError(
-        e?.response?.data?.detail ??
-          (editing ? 'Failed to update risk.' : 'Failed to create risk.')
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  const field = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
-  const handleDelete = async (risk: ProjectRisk) => {
-    if (!window.confirm(`Delete project-level risk "${risk.title}"?`)) return;
-    try {
-      await projectRiskApi.delete(projectId, risk.id);
-      await load();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to delete risk.');
+  const columns = useMemo<GridColDef<ProjectRisk>[]>(() => {
+    const cols: GridColDef<ProjectRisk>[] = [
+      {
+        field: 'title',
+        headerName: 'Title',
+        minWidth: 220,
+        flex: 2,
+        renderCell: ({ row }) => (
+          <Tooltip title={row.mitigation_plan || '(no mitigation plan)'} placement="top">
+            <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
+              <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                {row.title}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap component="div">
+                {formatDate(row.date_identified)}
+              </Typography>
+            </Box>
+          </Tooltip>
+        ),
+      },
+      {
+        field: 'risk_category_code',
+        headerName: 'Category',
+        minWidth: 110,
+        flex: 1,
+        valueFormatter: (value: string | null) => value ?? '—',
+      },
+      {
+        field: 'probability_code',
+        headerName: 'Prob × Sev',
+        sortable: false,
+        align: 'center',
+        headerAlign: 'center',
+        minWidth: 150,
+        flex: 1,
+        renderCell: ({ row }) => (
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Chip size="small" label={row.probability_code ?? '?'} color={sevColor(row.probability_code)} />
+            <Typography variant="caption" aria-hidden>
+              ×
+            </Typography>
+            <Chip size="small" label={row.severity_code ?? '?'} color={sevColor(row.severity_code)} />
+          </Stack>
+        ),
+      },
+      {
+        field: 'risk_cost',
+        headerName: 'Risk Cost',
+        type: 'number',
+        align: 'right',
+        headerAlign: 'right',
+        minWidth: 120,
+        flex: 1,
+        cellClassName: 'tabular-nums',
+        valueGetter: (value: string) => parseFloat(value),
+        valueFormatter: (value: number) => formatMoney(value),
+      },
+      {
+        field: 'status',
+        headerName: 'Status',
+        minWidth: 120,
+        flex: 0.8,
+        renderCell: ({ row }) => <StatusChip kind="risk" value={row.status} />,
+      },
+    ];
+    if (canEdit) {
+      cols.push({
+        field: 'actions',
+        headerName: 'Actions',
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        align: 'right',
+        headerAlign: 'right',
+        minWidth: 110,
+        renderCell: ({ row }) => (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Edit">
+              <IconButton size="small" aria-label={`Edit risk ${row.title}`} onClick={() => openEdit(row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" color="error" aria-label={`Delete risk ${row.title}`} onClick={() => setDeleting(row)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      });
     }
-  };
+    return cols;
+  }, [canEdit, openEdit]);
 
-  if (loading) {
+  if (register.isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-        <CircularProgress />
+      <Box role="status" aria-busy="true" aria-label="Loading risk register">
+        <Box sx={{ mb: 2 }}>
+          <CardSkeleton lines={2} />
+        </Box>
+        <TableSkeleton rows={4} columns={5} />
       </Box>
     );
   }
 
+  if (register.isError) {
+    return (
+      <ErrorState
+        title="Could not load the risk register"
+        description="Something went wrong while loading. Check your connection and try again."
+        action={
+          <Button variant="outlined" onClick={() => void register.refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
+  }
+
+  const addButton = canEdit ? (
+    <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openCreate}>
+      Add Project Risk
+    </Button>
+  ) : undefined;
+
   return (
     <Box>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
       {/* Aggregate header */}
-      <Paper sx={{ p: 2, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="overline" color="text.secondary">
-            Project-Level Risk Cost
-          </Typography>
-          <Typography variant="h5">
-            {totalCost === null ? '—' : formatMoney(totalCost)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {risks.length} project-level {risks.length === 1 ? 'risk' : 'risks'} (cross-cutting; excludes WBS-scoped item-level risks)
-          </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'stretch', mb: 2 }}>
+        <Box sx={{ flex: '1 1 320px', minWidth: 0 }}>
+          <StatCard
+            label="Project-Level Risk Cost"
+            value={totalCost === null ? '—' : formatMoney(totalCost)}
+            hint={`${risks.length} project-level ${risks.length === 1 ? 'risk' : 'risks'} (cross-cutting; excludes WBS-scoped item-level risks)`}
+          />
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          Add Project Risk
-        </Button>
-      </Paper>
+        {addButton && <Box sx={{ alignSelf: 'flex-start' }}>{addButton}</Box>}
+      </Box>
 
-      {risks.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">
-            No project-level risks recorded yet. Click "Add Project Risk" to record a
-            cross-cutting risk (material price escalation, regulatory approval slip,
-            key-person dependency, etc.).
-          </Typography>
-        </Paper>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell align="center">Prob × Sev</TableCell>
-                <TableCell align="right">Risk Cost</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {risks.map((risk) => (
-                <TableRow key={risk.id} hover>
-                  <TableCell sx={{ maxWidth: 360 }}>
-                    <Tooltip title={risk.mitigation_plan || '(no mitigation plan)'} placement="top">
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {risk.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {risk.date_identified?.slice(0, 10) ?? ''}
-                        </Typography>
-                      </Box>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>{risk.risk_category_code ?? '—'}</TableCell>
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={0.5} justifyContent="center">
-                      <Chip
-                        size="small"
-                        label={risk.probability_code ?? '?'}
-                        color={sevColor(risk.probability_code)}
-                      />
-                      <Typography variant="caption">×</Typography>
-                      <Chip
-                        size="small"
-                        label={risk.severity_code ?? '?'}
-                        color={sevColor(risk.severity_code)}
-                      />
-                    </Stack>
-                  </TableCell>
-                  <TableCell align="right">{formatMoney(risk.risk_cost)}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={risk.status}
-                      color={STATUS_COLORS[risk.status] ?? 'default'}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openEdit(risk)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleDelete(risk)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+      <DataTable<ProjectRisk>
+        rows={risks}
+        columns={columns}
+        ariaLabel="Project risk register"
+        emptyTitle="No project-level risks recorded yet"
+        emptyDescription="Record a cross-cutting risk such as material price escalation, a regulatory approval slip or a key-person dependency."
+        emptyAction={
+          canEdit ? (
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={openCreate}>
+              Add Project Risk
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Create / edit dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{editing ? 'Edit Project Risk' : 'Add Project Risk'}</DialogTitle>
-        <DialogContent>
-          {formError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {formError}
-            </Alert>
-          )}
-          <Stack spacing={2} sx={{ mt: 1 }}>
+      <ValidatedFormDialog
+        open={dialogOpen}
+        title={editing ? 'Edit Project Risk' : 'Add Project Risk'}
+        submitLabel={editing ? 'Save Changes' : 'Create Risk'}
+        loading={save.isPending}
+        submitDisabled={invalid}
+        maxWidth="md"
+        onClose={() => setDialogOpen(false)}
+        onSubmit={handleSave}
+      >
+        <TextField
+          label="Title"
+          value={form.title}
+          onChange={field('title')}
+          required
+          fullWidth
+          autoFocus
+          error={!!titleError}
+          helperText={titleError ?? "Concise risk name (e.g. 'Material Price Escalation from Steel Tariffs')."}
+        />
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField select fullWidth label="Category" value={form.risk_category_code} onChange={field('risk_category_code')}>
+              <MenuItem value="">—</MenuItem>
+              {categories.map((c) => (
+                <MenuItem key={c.code} value={c.code}>
+                  {c.code} — {c.description}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
-              label="Title"
-              value={(form as ProjectRiskCreate).title ?? ''}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
+              label="Risk Cost"
+              type="number"
               fullWidth
-              autoFocus
-              helperText="Concise risk name (e.g. 'Material Price Escalation from Steel Tariffs')."
+              value={form.risk_cost}
+              onChange={field('risk_cost')}
+              error={!!costError}
+              helperText={costError ?? 'Potential cost if the risk occurs'}
+              slotProps={{
+                input: { startAdornment: <InputAdornment position="start">{currencySymbol()}</InputAdornment> },
+                htmlInput: { min: 0, step: 1000 },
+              }}
             />
-            <Stack direction="row" spacing={2}>
-              <TextField
-                select
-                label="Category"
-                value={(form as ProjectRiskCreate).risk_category_code ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, risk_category_code: e.target.value || undefined })
-                }
-                sx={{ flex: 1 }}
-              >
-                <MenuItem value="">—</MenuItem>
-                {categories.map((c) => (
-                  <MenuItem key={c.code} value={c.code}>
-                    {c.code} — {c.description}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label="Risk Cost ($)"
-                type="number"
-                value={(form as ProjectRiskCreate).risk_cost ?? 0}
-                onChange={(e) => setForm({ ...form, risk_cost: Number(e.target.value) })}
-                sx={{ flex: 1 }}
-                inputProps={{ min: 0, step: 1000 }}
-              />
-            </Stack>
-            <Stack direction="row" spacing={2}>
-              <TextField
-                select
-                label="Probability"
-                value={(form as ProjectRiskCreate).probability_code ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, probability_code: e.target.value || undefined })
-                }
-                sx={{ flex: 1 }}
-              >
-                <MenuItem value="">—</MenuItem>
-                {probabilities.map((p) => (
-                  <MenuItem key={p.code} value={p.code}>
-                    {p.code} — {p.description}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Severity"
-                value={(form as ProjectRiskCreate).severity_code ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, severity_code: e.target.value || undefined })
-                }
-                sx={{ flex: 1 }}
-              >
-                <MenuItem value="">—</MenuItem>
-                {severities.map((s) => (
-                  <MenuItem key={s.code} value={s.code}>
-                    {s.code} — {s.description}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Status"
-                value={(form as ProjectRiskCreate).status ?? 'open'}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                sx={{ flex: 1 }}
-              >
-                <MenuItem value="open">Open</MenuItem>
-                <MenuItem value="mitigated">Mitigated</MenuItem>
-                <MenuItem value="closed">Closed</MenuItem>
-              </TextField>
-            </Stack>
-            <TextField
-              label="Mitigation Plan"
-              value={(form as ProjectRiskCreate).mitigation_plan ?? ''}
-              onChange={(e) => setForm({ ...form, mitigation_plan: e.target.value })}
-              multiline
-              rows={4}
-              fullWidth
-              helperText="Concrete actions, not platitudes ('monitor closely' is not a plan)."
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} variant="contained" disabled={saving}>
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Risk'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField select fullWidth label="Probability" value={form.probability_code} onChange={field('probability_code')}>
+              <MenuItem value="">—</MenuItem>
+              {probabilities.map((p) => (
+                <MenuItem key={p.code} value={p.code}>
+                  {p.code} — {p.description}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField select fullWidth label="Severity" value={form.severity_code} onChange={field('severity_code')}>
+              <MenuItem value="">—</MenuItem>
+              {severities.map((s) => (
+                <MenuItem key={s.code} value={s.code}>
+                  {s.code} — {s.description}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField select fullWidth label="Status" value={form.status} onChange={field('status')}>
+              {STATUS_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+        </Grid>
+        <TextField
+          label="Mitigation Plan"
+          value={form.mitigation_plan}
+          onChange={field('mitigation_plan')}
+          multiline
+          rows={4}
+          fullWidth
+          helperText="Concrete actions, not platitudes ('monitor closely' is not a plan)."
+        />
+      </ValidatedFormDialog>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete project risk?"
+        message={deleting ? `Delete project-level risk "${deleting.title}"? This cannot be undone.` : ''}
+        confirmLabel="Delete"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => deleting && remove.mutate(deleting)}
+        onClose={() => setDeleting(null)}
+      />
     </Box>
   );
 };

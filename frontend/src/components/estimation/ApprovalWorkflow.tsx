@@ -1,148 +1,170 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  CircularProgress,
+  Step,
+  StepLabel,
+  Stepper,
   TextField,
   Typography,
-  Alert,
-  CircularProgress,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SendIcon from '@mui/icons-material/Send';
 import CancelIcon from '@mui/icons-material/Cancel';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   WBSApprovalResponse,
   ApprovalActionType,
   processApproval,
 } from '../../api/estimation';
+import { useAuth } from '../../auth/AuthContext';
+import { formatDate } from '../../utils/format';
+import { StatusChip } from '../common/StatusChip';
+import { FormDialog } from '../common/FormDialog';
+import { useToast } from '../feedback/ToastProvider';
+import { invalidateEstimation } from './queryKeys';
 
 interface ApprovalWorkflowProps {
   projectId: number;
   wbsId: number;
   approvalStatus: WBSApprovalResponse;
   onStatusChange: (newStatus: WBSApprovalResponse) => void;
+  /** Overrides the role check. When omitted, admins and managers (the roles the API allows) can approve. */
   canApprove?: boolean;
 }
 
-const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'error' | 'warning' => {
-  switch (status) {
-    case 'draft':
-      return 'default';
-    case 'submitted':
-      return 'primary';
-    case 'approved':
-      return 'success';
-    case 'rejected':
-      return 'error';
-    default:
-      return 'default';
-  }
+const SUCCESS_MESSAGE: Record<ApprovalActionType, string> = {
+  submit: 'Submitted for approval',
+  approve: 'Estimate approved',
+  reject: 'Estimate rejected',
+  reset: 'Reset to draft',
 };
 
-const getStatusLabel = (status: string): string => {
+/** Roles the backend lets approve or reject (app/routes/estimation.py). */
+const APPROVER_ROLES = ['admin', 'manager'];
+
+const STEPS = ['Draft', 'Submitted', 'Approved'];
+
+/** Index of the active step; a finished flow passes the last index so every step shows complete. */
+function activeStepFor(status: string): number {
   switch (status) {
-    case 'draft':
-      return 'Draft';
     case 'submitted':
-      return 'Submitted for Approval';
+      return 1;
     case 'approved':
-      return 'Approved';
+      return STEPS.length;
     case 'rejected':
-      return 'Rejected';
+      return 2;
     default:
-      return status;
+      return 0;
   }
-};
+}
 
 const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
   projectId,
   wbsId,
   approvalStatus,
   onStatusChange,
-  canApprove = false,
+  canApprove: canApproveOverride,
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { role } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
 
-  const handleAction = async (action: ApprovalActionType, comment?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await processApproval(projectId, wbsId, { action, comment });
-      onStatusChange(result);
+  const canApprove = canApproveOverride ?? (role !== null && APPROVER_ROLES.includes(role));
+
+  const mutation = useMutation({
+    mutationFn: (vars: { action: ApprovalActionType; comment?: string }) =>
+      processApproval(projectId, wbsId, { action: vars.action, comment: vars.comment }),
+    onSuccess: (result, vars) => {
+      toast.success(SUCCESS_MESSAGE[vars.action]);
       setRejectDialogOpen(false);
       setRejectComment('');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || `Failed to ${action}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+      onStatusChange(result);
+      void invalidateEstimation(queryClient, projectId, wbsId);
+    },
+  });
+
+  const loading = mutation.isPending;
+  const act = (action: ApprovalActionType, comment?: string) => mutation.mutate({ action, comment });
 
   const status = approvalStatus.approval_status;
+  const rejected = status === 'rejected';
+  const spinner = <CircularProgress size={16} color="inherit" />;
 
   return (
     <Box>
-      {/* Status Display */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Typography variant="subtitle2">Status:</Typography>
-        <Chip
-          label={getStatusLabel(status)}
-          color={getStatusColor(status)}
-          variant={status === 'draft' ? 'outlined' : 'filled'}
-        />
+      {/* Status */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+        <Typography variant="subtitle2" component="span">
+          Status:
+        </Typography>
+        <StatusChip kind="approval" value={status} size="medium" />
         {approvalStatus.estimate_revision > 0 && (
           <Chip label={`Rev ${approvalStatus.estimate_revision}`} size="small" variant="outlined" />
         )}
       </Box>
 
+      <Stepper
+        activeStep={activeStepFor(status)}
+        alternativeLabel
+        aria-label="Approval progress"
+        sx={{ mb: 3 }}
+      >
+        {STEPS.map((label, index) => {
+          const isRejectedStep = rejected && index === 2;
+          return (
+            <Step key={label}>
+              <StepLabel
+                error={isRejectedStep}
+                optional={
+                  isRejectedStep ? (
+                    <Typography variant="caption" color="error">
+                      Needs changes
+                    </Typography>
+                  ) : undefined
+                }
+              >
+                {isRejectedStep ? 'Rejected' : label}
+              </StepLabel>
+            </Step>
+          );
+        })}
+      </Stepper>
+
       {/* Approver Info */}
       {approvalStatus.approver && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Approved by: {approvalStatus.approver}
-          {approvalStatus.approver_date && (
-            <> on {new Date(approvalStatus.approver_date).toLocaleDateString()}</>
-          )}
+          {approvalStatus.approver_date && <> on {formatDate(approvalStatus.approver_date)}</>}
         </Typography>
       )}
 
-      {/* Error Display */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Action Buttons */}
+      {/* Actions, by status and role */}
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        {/* Draft -> Submit */}
         {status === 'draft' && (
           <Button
             variant="contained"
-            startIcon={loading ? <CircularProgress size={16} /> : <SendIcon />}
-            onClick={() => handleAction('submit')}
+            startIcon={loading ? spinner : <SendIcon />}
+            onClick={() => act('submit')}
             disabled={loading}
           >
             Submit for Approval
           </Button>
         )}
 
-        {/* Submitted -> Approve/Reject (for approvers) */}
         {status === 'submitted' && canApprove && (
           <>
             <Button
               variant="contained"
               color="success"
-              startIcon={loading ? <CircularProgress size={16} /> : <CheckCircleIcon />}
-              onClick={() => handleAction('approve')}
+              startIcon={loading ? spinner : <CheckCircleIcon />}
+              onClick={() => act('approve')}
               disabled={loading}
             >
               Approve
@@ -159,26 +181,23 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
           </>
         )}
 
-        {/* Submitted -> Waiting message (for non-approvers) */}
         {status === 'submitted' && !canApprove && (
           <Alert severity="info" sx={{ flex: 1 }}>
             Awaiting approval from project manager
           </Alert>
         )}
 
-        {/* Rejected -> Reset to Draft */}
-        {status === 'rejected' && (
+        {rejected && (
           <Button
             variant="outlined"
-            startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />}
-            onClick={() => handleAction('reset')}
+            startIcon={loading ? spinner : <RefreshIcon />}
+            onClick={() => act('reset')}
             disabled={loading}
           >
             Reset to Draft
           </Button>
         )}
 
-        {/* Approved -> No actions */}
         {status === 'approved' && (
           <Alert severity="success" sx={{ flex: 1 }}>
             This estimate has been approved and is locked
@@ -186,33 +205,26 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
         )}
       </Box>
 
-      {/* Reject Dialog */}
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Reject Estimate</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Rejection Comment"
-            value={rejectComment}
-            onChange={(e) => setRejectComment(e.target.value)}
-            placeholder="Explain why this estimate is being rejected..."
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={() => handleAction('reject', rejectComment)}
-            variant="contained"
-            color="error"
-            disabled={loading}
-          >
-            {loading ? 'Rejecting...' : 'Reject'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <FormDialog
+        open={rejectDialogOpen}
+        title="Reject Estimate"
+        submitLabel="Reject"
+        loading={loading}
+        onClose={() => setRejectDialogOpen(false)}
+        onSubmit={() => act('reject', rejectComment)}
+      >
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          label="Rejection Comment"
+          value={rejectComment}
+          onChange={(e) => setRejectComment(e.target.value)}
+          placeholder="Explain why this estimate is being rejected..."
+          helperText="Recorded in the audit log. Optional."
+          autoFocus
+        />
+      </FormDialog>
     </Box>
   );
 };
