@@ -1,0 +1,127 @@
+{
+  "_comment": "Seed constants for scripts/seed_smoke.py and frontend/e2e-real/smoke.spec.ts. Keep both in sync via this file only.",
+  "users": [
+    {"username": "smoke_admin", "email": "smoke_admin@example.com", "full_name": "Ada Admin", "role": "admin", "password": "SmokeAdmin#2026"},
+    {"username": "smoke_manager", "email": "smoke_manager@example.com", "full_name": "Morgan Manager", "role": "manager", "password": "SmokeManager#2026"},
+    {"username": "smoke_user", "email": "smoke_user@example.com", "full_name": "Uma User", "role": "user", "password": "SmokeUser#2026"}
+  ],
+  "config": {
+    "cost-types": [["LAB", "Labour"], ["MAT", "Materials"], ["EQP", "Equipment hire"], ["SUB", "Subcontract"]],
+    "expense-types": [["CAPEX", "Capital expenditure"], ["OPEX", "Operating expenditure"]],
+    "regions": [["NSW", "New South Wales"], ["VIC", "Victoria"], ["QLD", "Queensland"]],
+    "business-areas": [["ENG", "Engineering"], ["OPS", "Operations"], ["IT", "Information Technology"]],
+    "estimating-techniques": [["ANA", "Analogous"], ["PAR", "Parametric"], ["EXP", "Expert judgement"]],
+    "risk-categories": [["TECH", "Technical"], ["SCHED", "Schedule"], ["COMM", "Commercial"], ["REG", "Regulatory"]],
+    "expenditure-indicators": [["F", "Fixed"], ["V", "Variable"]],
+    "probability-levels": [["LOW", "Low", 0.1], ["MED", "Medium", 0.3], ["HIGH", "High", 0.6]],
+    "severity-levels": [["MINOR", "Minor", 0.2], ["MOD", "Moderate", 0.5], ["MAJOR", "Major", 0.9]],
+    "pmb-weights": [["P1", "Early", 0.25], ["P2", "Mid", 0.5], ["P3", "Late", 1.0]]
+  },
+  "resources": [
+    {"code": "ENG-SR", "description": "Senior Engineer", "eoc": "LAB", "cost": 1800, "units": "day"},
+    {"code": "ENG-JR", "description": "Graduate Engineer", "eoc": "LAB", "cost": 900, "units": "day"},
+    {"code": "CON-EXT", "description": "External Contractor - Specialist Structural Inspection and Certification Services (long description to test table layout)", "eoc": "SUB", "cost": 2400, "units": "day"},
+    {"code": "EQP-CRN", "description": "Mobile Crane 200t", "eoc": "EQP", "cost": 5200, "units": "day"},
+    {"code": "MAT-STL", "description": "Structural Steel", "eoc": "MAT", "cost": 3100, "units": "tonne"},
+    {"code": "IT-DEV", "description": "Data Engineer", "eoc": "LAB", "cost": 1500, "units": "day"}
+  ],
+  "suppliers": [
+    {"code": "GEO-01", "name": "Geotech Partners Pty Ltd", "contact": "Sam Rock", "email": "sam@geotech.example.com", "phone": "03 5550 0101"},
+    {"code": "STL-02", "name": "Southern Steel Works", "contact": "Lee Forge", "email": "lee@steel.example.com", "phone": "03 5550 0102"},
+    {"code": "CRN-03", "name": "HighReach Cranes", "contact": null, "email": null, "phone": null}
+  ],
+  "projects": [
+    {
+      "key": "harbour",
+      "name": "Harbour Crossing Upgrade",
+      "manager": "Priya Nair",
+      "description": "Structural upgrade of the harbour crossing, including geotechnical works, detailed design and piling.",
+      "status": "active",
+      "wbs": [
+        {"code": "1", "title": "Design and Approvals", "approval": "draft", "children": [
+          {"code": "1.1", "title": "Concept Design", "approval": "draft", "children": [
+            {"code": "1.1.1", "title": "Geotechnical Survey", "approval": "approved", "assignments": [
+              {"resource": "ENG-SR", "supplier": "GEO-01", "cost_type": "LAB", "region": "NSW", "bus_area": "ENG", "technique": "EXP", "best": 12000, "likely": 15000, "worst": 24000},
+              {"resource": "CON-EXT", "supplier": "GEO-01", "cost_type": "SUB", "region": "NSW", "bus_area": "ENG", "technique": "ANA", "best": 40000, "likely": 52000, "worst": 80000}
+            ], "risks": [
+              {"title": "Unexpected rock strata", "category": "TECH", "cost": 60000, "probability": "MED", "severity": "MAJOR", "mitigation": "Extra borehole programme"}
+            ]},
+            {"code": "1.1.2", "title": "Environmental Impact Study", "approval": "submitted", "assignments": [
+              {"resource": "ENG-SR", "supplier": null, "cost_type": "LAB", "region": "NSW", "bus_area": "ENG", "technique": "EXP", "best": 8000, "likely": 10000, "worst": 16000}
+            ]}
+          ]},
+          {"code": "1.2", "title": "Detailed Design", "approval": "draft", "children": [
+            {"code": "1.2.1", "title": "Structural Design", "approval": "draft", "assignments": [
+              {"resource": "ENG-SR", "supplier": null, "cost_type": "LAB", "region": "VIC", "bus_area": "ENG", "technique": "PAR", "best": 30000, "likely": 36000, "worst": 54000}
+            ]},
+            {"code": "1.2.2", "title": "Utilities Relocation Design", "approval": "draft", "assignments": [
+              {"resource": "ENG-JR", "supplier": null, "cost_type": "LAB", "region": "VIC", "bus_area": "ENG", "technique": "PAR", "best": 9000, "likely": 12000, "worst": 21000},
+              {"resource": "CON-EXT", "supplier": null, "cost_type": "SUB", "region": "VIC", "bus_area": "ENG", "technique": "ANA", "best": 5000, "likely": 6000, "worst": 10000}
+            ]}
+          ]}
+        ]},
+        {"code": "2", "title": "Construction", "approval": "draft", "children": [
+          {"code": "2.1", "title": "Piling", "approval": "rejected", "assignments": [
+            {"resource": "EQP-CRN", "supplier": "CRN-03", "cost_type": "EQP", "region": "NSW", "bus_area": "OPS", "technique": "ANA", "best": 90000, "likely": 120000, "worst": 210000},
+            {"resource": "MAT-STL", "supplier": "STL-02", "cost_type": "MAT", "region": "NSW", "bus_area": "OPS", "technique": "PAR", "best": 150000, "likely": 180000, "worst": 270000}
+          ], "risks": [
+            {"title": "Crane availability slips", "category": "SCHED", "cost": 40000, "probability": "HIGH", "severity": "MOD", "mitigation": null}
+          ]},
+          {"code": "2.2", "title": "Deck Assembly", "approval": "draft", "assignments": []}
+        ]}
+      ],
+      "project_risks": [
+        {"title": "Steel price escalation", "category": "COMM", "cost": 100000, "probability": "MED", "severity": "MOD", "mitigation": "Fixed-price supply agreement"},
+        {"title": "Regulatory approval delay", "category": "REG", "cost": 50000, "probability": "LOW", "severity": "MAJOR", "mitigation": null}
+      ]
+    },
+    {
+      "key": "depot",
+      "name": "Regional Depot Fit-out",
+      "manager": "Jordan Blake",
+      "description": "Fit-out of the regional operations depot.",
+      "status": "active",
+      "wbs": [
+        {"code": "1", "title": "Site Works", "approval": "draft", "children": [
+          {"code": "1.1", "title": "Earthworks", "approval": "approved", "assignments": [
+            {"resource": "EQP-CRN", "supplier": "CRN-03", "cost_type": "EQP", "region": "QLD", "bus_area": "OPS", "technique": "ANA", "best": 20000, "likely": 25000, "worst": 38000}
+          ]},
+          {"code": "1.2", "title": "Drainage", "approval": "draft", "assignments": [
+            {"resource": "ENG-JR", "supplier": null, "cost_type": "LAB", "region": "QLD", "bus_area": "OPS", "technique": "EXP", "best": 6000, "likely": 7500, "worst": 12000}
+          ]}
+        ]},
+        {"code": "2", "title": "Building Fit-out", "approval": "draft", "children": [
+          {"code": "2.1", "title": "Electrical", "approval": "draft", "children": [
+            {"code": "2.1.1", "title": "Switchboards", "approval": "submitted", "assignments": [
+              {"resource": "MAT-STL", "supplier": "STL-02", "cost_type": "MAT", "region": "QLD", "bus_area": "OPS", "technique": "PAR", "best": 18000, "likely": 21000, "worst": 33000}
+            ]}
+          ]},
+          {"code": "2.2", "title": "Joinery", "approval": "draft", "assignments": [
+            {"resource": "CON-EXT", "supplier": null, "cost_type": "SUB", "region": "QLD", "bus_area": "OPS", "technique": "EXP", "best": 11000, "likely": 14000, "worst": 20000}
+          ]}
+        ]}
+      ],
+      "project_risks": [
+        {"title": "Switchgear lead time", "category": "SCHED", "cost": 30000, "probability": "HIGH", "severity": "MINOR", "mitigation": "Order early"}
+      ]
+    },
+    {
+      "key": "legacy",
+      "name": "Legacy Data Migration Programme - Phase 2 (Customer Records, Billing and Reporting Consolidation Across All Regional Business Units)",
+      "manager": null,
+      "description": null,
+      "status": "draft",
+      "wbs": [
+        {"code": "1", "title": "Customer Records Consolidation, De-duplication, Data Quality Remediation and Cut-over Rehearsal Activities for All Legacy Source Systems", "approval": "draft", "children": [
+          {"code": "1.1", "title": "Profiling", "approval": "draft", "children": [
+            {"code": "1.1.1", "title": "Source system inventory", "approval": "draft", "assignments": [
+              {"resource": "IT-DEV", "supplier": null, "cost_type": null, "region": null, "bus_area": null, "technique": null, "best": 0, "likely": 0, "worst": 0}
+            ]}
+          ]}
+        ]}
+      ],
+      "project_risks": []
+    }
+  ],
+  "audit_seed_marker": "seed-smoke"
+}
