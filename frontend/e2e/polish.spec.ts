@@ -202,3 +202,18 @@ test.describe('focus and keyboard', () => {
     await expect(del).toBeFocused();
   });
 });
+
+test.describe('icons and metadata', () => {
+  test('index.html references the generated icons and each one is served', async ({ page, request }) => {
+    await page.goto('/login');
+    const hrefs = await page.locator('link[rel~="icon"], link[rel="apple-touch-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+    expect(hrefs).toEqual(expect.arrayContaining(['/favicon.ico', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png']));
+    for (const href of hrefs) {
+      const res = await request.get(href as string);
+      expect(res.status(), href as string).toBe(200);
+      expect(res.headers()['content-type']).toMatch(/image\//);
+    }
+    const manifest = await (await request.get('/manifest.json')).json();
+    expect(manifest).toMatchObject({ name: 'ICEPac by Adalex Consulting', short_name: 'ICEPac', theme_color: '#153351', background_color: '#F5F7F9' });
+  });
+});
