@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { layout } from '../../theme/tokens';
 import Breadcrumbs from './Breadcrumbs';
 import ColorModeToggle from './ColorModeToggle';
+import GlobalProgress from './GlobalProgress';
 import UserMenu from './UserMenu';
 
 interface HeaderProps {
@@ -79,6 +80,7 @@ const Header: React.FC<HeaderProps> = ({ desktop, sidebarCollapsed, onMenuClick,
         <ColorModeToggle />
         <UserMenu />
       </Toolbar>
+      <GlobalProgress />
     </AppBar>
   );
 };

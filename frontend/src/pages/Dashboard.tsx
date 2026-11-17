@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
   const health = useQuery({
     queryKey: ['dashboard', 'health'],
     queryFn: getHealth,
-    meta: { silent: true },
+    meta: { silent: true, background: true },
     refetchInterval: 60_000,
     retry: false,
   });

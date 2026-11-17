@@ -4,7 +4,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { ProjectRisk } from '../../api/project-risks';
-import { ProjectRiskRegister } from './ProjectRiskRegister';
+import { ProjectRiskRegister, patchRisk } from './ProjectRiskRegister';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -167,5 +167,15 @@ describe('ProjectRiskRegister', () => {
     expect(screen.queryByRole('button', { name: 'Add Project Risk' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit risk/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Delete risk/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('patchRisk', () => {
+  it('applies only the fields present in the payload', () => {
+    const patched = patchRisk(risk(), { status: 'closed', risk_cost: 900 });
+    expect(patched.status).toBe('closed');
+    expect(patched.risk_cost).toBe('900');
+    expect(patched.title).toBe('Steel price escalation');
+    expect(patched.mitigation_plan).toBe('Fix price early');
   });
 });

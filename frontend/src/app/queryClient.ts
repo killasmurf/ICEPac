@@ -3,7 +3,7 @@ import { emitToast, errorMessage } from '../components/feedback/toastBus';
 
 declare module '@tanstack/react-query' {
   interface Register {
-    queryMeta: { silent?: boolean };
+    queryMeta: { silent?: boolean; /** Polling or other background refetch: not shown in the global loading bar. */ background?: boolean };
     mutationMeta: { silent?: boolean };
   }
 }

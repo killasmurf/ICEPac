@@ -133,6 +133,8 @@ React 18+ with TypeScript
 └── Vitest + React Testing Library (testing)
 ```
 
+> **As built (UI modernization, see `UI_MODERNIZATION_PLAN.md`):** React 19 + TypeScript on Vite, MUI 7 (Adalex theme), TanStack Query for data fetching, MUI X Charts and Data Grid, React Router 7, Vitest + React Testing Library, and Playwright (mocked API) with axe for end-to-end and accessibility checks. No Redux/Zustand, Recharts or Formik was needed. See `frontend/README.md`.
+
 **Infrastructure:**
 ```
 AWS Cloud Platform
@@ -409,10 +411,10 @@ frontend/
 - [ ] Document API (OpenAPI)
 
 **Week 7: Frontend & Testing**
-- [ ] Create React components (HelpPage, TopicList, SearchBar)
-- [ ] Implement help search UI
-- [ ] Add topic display with formatting
-- [ ] Write frontend tests
+- [x] Create React components (HelpPage, TopicList, SearchBar)
+- [x] Implement help search UI
+- [x] Add topic display with formatting
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Deploy to staging
 - [ ] Feature flag: toggle between old/new help
@@ -564,9 +566,9 @@ POST   /api/v1/admin/resources
 - [ ] Write integration tests
 
 **Weeks 12-13: Frontend & Testing**
-- [ ] Create upload UI component
-- [ ] Progress bar for upload/processing
-- [ ] Error handling and user feedback
+- [x] Create upload UI component
+- [x] Progress bar for upload/processing
+- [x] Error handling and user feedback
 - [ ] Display parsed project data
 - [ ] User acceptance testing
 - [ ] Deploy to staging
@@ -686,16 +688,16 @@ GET    /api/v1/projects/{id}/tasks
 
 **Week 27: Frontend & UAT**
 - [ ] Create estimation UI components:
-  - [ ] ProjectList, ProjectDetail
-  - [ ] WBSTree (hierarchical task view)
-  - [ ] TaskDetail
-  - [ ] ResourceAssignmentForm (three-point estimation)
-  - [ ] RiskAssessment
-  - [ ] ApprovalWorkflow
+  - [x] ProjectList, ProjectDetail
+  - [x] WBSTree (hierarchical task view)
+  - [x] TaskDetail
+  - [x] ResourceAssignmentForm (three-point estimation)
+  - [x] RiskAssessment
+  - [x] ApprovalWorkflow
 - [ ] Implement drag-and-drop for task hierarchy
-- [ ] Add calculation previews
+- [x] Add calculation previews
 - [ ] Implement approval notifications
-- [ ] Write frontend tests
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Deploy to staging
 - [ ] Feature flag: estimation circuit toggle
@@ -802,13 +804,13 @@ POST   /api/v1/projects/{id}/estimates/{id}/approve
 
 **Weeks 42-43: Frontend & UAT**
 - [ ] Create report UI components:
-  - [ ] ReportSelector
-  - [ ] FilterPanel
-  - [ ] ReportPreview
-  - [ ] ExportOptions
+  - [x] ReportSelector
+  - [x] FilterPanel
+  - [x] ReportPreview
+  - [x] ExportOptions
 - [ ] Implement report scheduling (optional)
 - [ ] Add report history/favorites
-- [ ] Write frontend tests
+- [x] Write frontend tests
 - [ ] User acceptance testing
 - [ ] Performance optimization
 - [ ] Deploy to staging

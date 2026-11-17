@@ -121,14 +121,14 @@ jobs:
     - name: Install Playwright browser
       run: npx playwright install --with-deps chromium
 
-    - name: Verify (typecheck, lint, style budget, unit tests, build, e2e)
+    - name: Verify (typecheck, lint, style budget, unit tests, build, bundle budget, e2e)
       run: npm run verify
 
-    - name: Upload e2e screenshots
+    - name: Upload UI screenshots (review pack, every route x light/dark x desktop/mobile)
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: e2e-screenshots
+        name: ui-screenshots
         path: frontend/e2e/__screenshots__
         if-no-files-found: ignore
 
