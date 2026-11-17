@@ -21,12 +21,14 @@ import {
   ApprovalActionType,
   processApproval,
 } from '../../api/estimation';
+import type { WBSTreeNode } from '../../api/projects';
+import { applyOptimistic, optimisticTarget, rollbackOptimistic } from '../../api/optimistic';
 import { useAuth } from '../../auth/AuthContext';
 import { formatDate } from '../../utils/format';
 import { StatusChip } from '../common/StatusChip';
 import { FormDialog } from '../common/FormDialog';
 import { useToast } from '../feedback/ToastProvider';
-import { invalidateEstimation } from './queryKeys';
+import { invalidateEstimation, wbsDetailsKey, wbsTreeKey } from './queryKeys';
 
 interface ApprovalWorkflowProps {
   projectId: number;
@@ -46,6 +48,21 @@ const SUCCESS_MESSAGE: Record<ApprovalActionType, string> = {
 
 /** Roles the backend lets approve or reject (app/routes/estimation.py). */
 const APPROVER_ROLES = ['admin', 'manager'];
+
+/** Status each action leads to; used for the optimistic update (the server's answer replaces it). */
+const NEXT_STATUS: Record<ApprovalActionType, string> = {
+  submit: 'submitted',
+  approve: 'approved',
+  reject: 'rejected',
+  reset: 'draft',
+};
+
+const setNodeStatus = (nodes: WBSTreeNode[], wbsId: number, status: string): WBSTreeNode[] =>
+  nodes.map((n) => ({
+    ...n,
+    approval_status: n.id === wbsId ? status : n.approval_status,
+    children: setNodeStatus(n.children, wbsId, status),
+  }));
 
 const STEPS = ['Draft', 'Submitted', 'Approved'];
 
@@ -81,13 +98,27 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
   const mutation = useMutation({
     mutationFn: (vars: { action: ApprovalActionType; comment?: string }) =>
       processApproval(projectId, wbsId, { action: vars.action, comment: vars.comment }),
+    // Optimistic: show the new status at once; roll back on error (the global handler raises the error toast).
+    onMutate: (vars) =>
+      applyOptimistic(
+        queryClient,
+        [
+          optimisticTarget<{ approval: WBSApprovalResponse }, typeof vars>(wbsDetailsKey(projectId, wbsId), (old, v) => ({
+            ...old,
+            approval: { ...old.approval, approval_status: NEXT_STATUS[v.action] },
+          })),
+          optimisticTarget<WBSTreeNode[], typeof vars>(wbsTreeKey(projectId), (old, v) => setNodeStatus(old, wbsId, NEXT_STATUS[v.action])),
+        ],
+        vars,
+      ),
+    onError: (_error, _vars, snapshot) => rollbackOptimistic(queryClient, snapshot),
     onSuccess: (result, vars) => {
       toast.success(SUCCESS_MESSAGE[vars.action]);
       setRejectDialogOpen(false);
       setRejectComment('');
       onStatusChange(result);
-      void invalidateEstimation(queryClient, projectId, wbsId);
     },
+    onSettled: () => invalidateEstimation(queryClient, projectId, wbsId),
   });
 
   const loading = mutation.isPending;

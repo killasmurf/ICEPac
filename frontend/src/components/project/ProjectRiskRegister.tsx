@@ -25,6 +25,7 @@ import {
   ProjectRiskUpdate,
 } from '../../api/project-risks';
 import { configApi } from '../../api/admin';
+import { applyOptimistic, optimisticTarget, rollbackOptimistic } from '../../api/optimistic';
 import { useAuth } from '../../auth/AuthContext';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { DataTable } from '../common/DataTable';
@@ -91,6 +92,20 @@ const fetchRegister = async (projectId: number) => {
   return { list, cost };
 };
 
+type RegisterData = Awaited<ReturnType<typeof fetchRegister>>;
+
+/** Apply an update payload to a cached risk (the server response replaces it once the request settles). */
+export const patchRisk = (risk: ProjectRisk, payload: ProjectRiskCreate | ProjectRiskUpdate): ProjectRisk => ({
+  ...risk,
+  ...(payload.title !== undefined && { title: payload.title }),
+  ...(payload.status !== undefined && { status: payload.status }),
+  ...(payload.risk_cost !== undefined && { risk_cost: String(payload.risk_cost) }),
+  ...(payload.risk_category_code !== undefined && { risk_category_code: payload.risk_category_code }),
+  ...(payload.probability_code !== undefined && { probability_code: payload.probability_code }),
+  ...(payload.severity_code !== undefined && { severity_code: payload.severity_code }),
+  ...(payload.mitigation_plan !== undefined && { mitigation_plan: payload.mitigation_plan }),
+});
+
 export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
   const { role } = useAuth();
   const toast = useToast();
@@ -136,11 +151,29 @@ export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
       vars.editing
         ? projectRiskApi.update(projectId, vars.editing.id, vars.payload)
         : projectRiskApi.create(projectId, vars.payload as ProjectRiskCreate),
+    // Optimistic only when editing an existing risk (status and other fields); creates wait for the server id.
+    onMutate: (vars) =>
+      vars.editing
+        ? applyOptimistic(
+            queryClient,
+            [
+              optimisticTarget<RegisterData, typeof vars>(projectRiskRegisterKey(projectId), (old, v) => ({
+                ...old,
+                list: {
+                  ...old.list,
+                  items: old.list.items.map((r) => (r.id === v.editing?.id ? patchRisk(r, v.payload) : r)),
+                },
+              })),
+            ],
+            vars,
+          )
+        : undefined,
+    onError: (_error, _vars, snapshot) => rollbackOptimistic(queryClient, snapshot),
     onSuccess: (_result, vars) => {
       toast.success(vars.editing ? 'Project risk updated' : 'Project risk created');
       setDialogOpen(false);
-      refresh();
     },
+    onSettled: () => refresh(),
   });
 
   const remove = useMutation({
