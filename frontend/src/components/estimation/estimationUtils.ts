@@ -89,3 +89,72 @@ export function summaryRangeBar(s: {
     high80: s.confidence_80_high,
   };
 }
+
+export interface BreakdownInput {
+  code: string;
+  name: string;
+  total_pert: number;
+  assignment_count: number;
+}
+
+export interface BreakdownShare extends BreakdownInput {
+  /** Percentage of the breakdown total, to one decimal place. Shares add up to exactly 100 (0 when the total is 0). */
+  share: number;
+  /** True for the row that groups everything beyond `maxRows`. */
+  isOther?: boolean;
+}
+
+export interface RankedBreakdown {
+  rows: BreakdownShare[];
+  total: number;
+  /** True when every item is 0 (or there are none): there is nothing to draw. */
+  empty: boolean;
+}
+
+/**
+ * Sort a cost breakdown from largest to smallest and attach each row's share of the total.
+ * Beyond `maxRows` rows the tail is grouped into one "Other" row so a chart keeps a readable number of slices.
+ * Shares use the largest-remainder method on tenths of a percent, so they sum to exactly 100.
+ */
+export function rankBreakdown(items: BreakdownInput[], maxRows = 7): RankedBreakdown {
+  const clean = items.map((i) => ({ ...i, total_pert: Math.max(0, Number.isFinite(i.total_pert) ? i.total_pert : 0) }));
+  clean.sort((a, b) => b.total_pert - a.total_pert || a.name.localeCompare(b.name));
+
+  let rows: Omit<BreakdownShare, 'share'>[] = clean;
+  if (clean.length > maxRows) {
+    const head = clean.slice(0, maxRows - 1);
+    const tail = clean.slice(maxRows - 1);
+    rows = [
+      ...head,
+      {
+        code: 'OTHER',
+        name: `Other (${tail.length})`,
+        total_pert: tail.reduce((s, r) => s + r.total_pert, 0),
+        assignment_count: tail.reduce((s, r) => s + r.assignment_count, 0),
+        isOther: true,
+      },
+    ];
+  }
+
+  const total = rows.reduce((s, r) => s + r.total_pert, 0);
+  if (total <= 0) return { rows: rows.map((r) => ({ ...r, share: 0 })), total: 0, empty: true };
+
+  const raw = rows.map((r) => (r.total_pert / total) * 1000);
+  const tenths = raw.map(Math.floor);
+  let left = 1000 - tenths.reduce((s, v) => s + v, 0);
+  raw
+    .map((v, i) => ({ i, rem: v - Math.floor(v) }))
+    .sort((a, b) => b.rem - a.rem)
+    .forEach(({ i }) => {
+      if (left > 0) {
+        tenths[i] += 1;
+        left -= 1;
+      }
+    });
+  return { rows: rows.map((r, i) => ({ ...r, share: tenths[i] / 10 })), total, empty: false };
+}
+
+/** The `n` WBS items with the largest PERT estimate. */
+export function topWbsByEstimate<T extends { total_pert_estimate: number }>(items: T[], n = 10): T[] {
+  return [...items].sort((a, b) => b.total_pert_estimate - a.total_pert_estimate).slice(0, n);
+}

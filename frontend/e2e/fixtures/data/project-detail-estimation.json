@@ -10,10 +10,134 @@
   "total_risks": 5,
   "total_risk_exposure": 86000.0,
   "risk_adjusted_estimate": 1336000.0,
-  "by_cost_type": [],
-  "by_region": [],
-  "by_resource": [],
-  "by_supplier": [],
+  "by_cost_type": [
+    {
+      "code": "LAB",
+      "description": "Labour",
+      "total_pert": 520000,
+      "assignment_count": 6
+    },
+    {
+      "code": "MAT",
+      "description": "Materials",
+      "total_pert": 310000,
+      "assignment_count": 3
+    },
+    {
+      "code": "PLT",
+      "description": "Plant and equipment",
+      "total_pert": 190000,
+      "assignment_count": 2
+    },
+    {
+      "code": "SUB",
+      "description": "Subcontractors",
+      "total_pert": 150000,
+      "assignment_count": 2
+    },
+    {
+      "code": "OTH",
+      "description": "Other costs",
+      "total_pert": 80000,
+      "assignment_count": 1
+    }
+  ],
+  "by_region": [
+    {
+      "code": "VIC",
+      "description": "Victoria",
+      "total_pert": 640000,
+      "assignment_count": 7
+    },
+    {
+      "code": "NSW",
+      "description": "New South Wales",
+      "total_pert": 410000,
+      "assignment_count": 4
+    },
+    {
+      "code": "QLD",
+      "description": "Queensland",
+      "total_pert": 200000,
+      "assignment_count": 3
+    }
+  ],
+  "by_resource": [
+    {
+      "code": "R1",
+      "description": "Resource 1",
+      "total_pert": 300000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R2",
+      "description": "Resource 2",
+      "total_pert": 220000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R3",
+      "description": "Resource 3",
+      "total_pert": 190000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R4",
+      "description": "Resource 4",
+      "total_pert": 160000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R5",
+      "description": "Resource 5",
+      "total_pert": 140000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R6",
+      "description": "Resource 6",
+      "total_pert": 100000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R7",
+      "description": "Resource 7",
+      "total_pert": 80000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R8",
+      "description": "Resource 8",
+      "total_pert": 40000,
+      "assignment_count": 1
+    },
+    {
+      "code": "R9",
+      "description": "Resource 9",
+      "total_pert": 20000,
+      "assignment_count": 1
+    }
+  ],
+  "by_supplier": [
+    {
+      "code": "ACME",
+      "name": "Acme Pty Ltd",
+      "total_pert": 600000,
+      "assignment_count": 8
+    },
+    {
+      "code": "BLD",
+      "name": "Bridgeworks Ltd",
+      "total_pert": 450000,
+      "assignment_count": 4
+    },
+    {
+      "code": "SGL",
+      "name": "Southern Gear",
+      "total_pert": 200000,
+      "assignment_count": 2
+    }
+  ],
   "wbs_summaries": [
     {
       "wbs_id": 1,

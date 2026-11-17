@@ -1,15 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Box, Button, Card, CardContent, Grid, Tab, Tabs, Typography } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, Button, Card, CardContent, Grid, Typography } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
 import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getProjectEstimation,
-  CostBreakdownItem,
-  SupplierBreakdownItem,
-  WBSCostSummary,
-} from '../../api/estimation';
-import { formatCurrency, formatNumber } from '../../utils/format';
+import { getProjectEstimation, WBSCostSummary } from '../../api/estimation';
+import { formatCurrency } from '../../utils/format';
 import { DataTable, useResponsiveColumns } from '../common/DataTable';
 import { StatCard } from '../common/StatCard';
 import { StatusChip } from '../common/StatusChip';
@@ -18,6 +13,8 @@ import { CardSkeleton } from '../common/CardSkeleton';
 import { TableSkeleton } from '../common/TableSkeleton';
 import { EmptyState } from '../common/EmptyState';
 import ErrorState from '../common/ErrorState';
+import { CostBreakdownCard } from './CostBreakdownCard';
+import { TopWbsChart } from './TopWbsChart';
 import { estimationKey } from './queryKeys';
 import { summaryRangeBar } from './estimationUtils';
 
@@ -27,84 +24,12 @@ interface EstimationSummaryProps {
   hideHeadline?: boolean;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-  idPrefix: string;
-}
-
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, idPrefix }) => (
-  <div role="tabpanel" id={`${idPrefix}-panel-${index}`} aria-labelledby={`${idPrefix}-tab-${index}`} hidden={value !== index}>
-    {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
-  </div>
-);
-
-interface BreakdownRow {
-  id: string;
-  code: string;
-  name: string;
-  total_pert: number;
-  assignment_count: number;
-}
-
-const toBreakdownRows = (
-  items: CostBreakdownItem[] | SupplierBreakdownItem[],
-  nameField: 'description' | 'name',
-): BreakdownRow[] =>
-  (items as Array<CostBreakdownItem & SupplierBreakdownItem>).map((item) => ({
-    id: item.code,
-    code: item.code,
-    name: (nameField === 'description' ? item.description : item.name) ?? '',
-    total_pert: item.total_pert,
-    assignment_count: item.assignment_count,
-  }));
-
-const BreakdownTable: React.FC<{
-  items: CostBreakdownItem[] | SupplierBreakdownItem[];
-  nameField: 'description' | 'name';
-  label: string;
-}> = ({ items, nameField, label }) => {
-  const rows = useMemo(() => toBreakdownRows(items, nameField), [items, nameField]);
-  const columns = useMemo<GridColDef<BreakdownRow>[]>(
-    () => [
-      { field: 'code', headerName: 'Code', minWidth: 110, flex: 0.7 },
-      { field: 'name', headerName: nameField === 'description' ? 'Description' : 'Name', minWidth: 160, flex: 1.5 },
-      {
-        field: 'total_pert',
-        headerName: 'Total PERT',
-        type: 'number',
-        align: 'right',
-        headerAlign: 'right',
-        minWidth: 130,
-        flex: 1,
-        cellClassName: 'tabular-nums',
-        valueFormatter: (value: number) => formatCurrency(value),
-      },
-      {
-        field: 'assignment_count',
-        headerName: 'Assignments',
-        type: 'number',
-        align: 'right',
-        headerAlign: 'right',
-        minWidth: 120,
-        flex: 0.7,
-        cellClassName: 'tabular-nums',
-        valueFormatter: (value: number) => formatNumber(value),
-      },
-    ],
-    [nameField],
-  );
-  return <DataTable<BreakdownRow> rows={rows} columns={columns} ariaLabel={label} emptyTitle="No data" />;
-};
-
 type WBSRow = WBSCostSummary & { id: number };
 
 /** Low-priority WBS summary columns, hidden below sm so the table keeps title, PERT and status on phones. */
 const WBS_LOW_PRIORITY = ['wbs_code', 'assignment_count', 'risk_count', 'total_risk_exposure'];
 
 const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHeadline = false }) => {
-  const [tabValue, setTabValue] = useState(0);
   const wbsColumnVisibility = useResponsiveColumns(WBS_LOW_PRIORITY);
   const { data: summary, isLoading, isError, refetch } = useQuery({
     queryKey: estimationKey(projectId),
@@ -278,6 +203,9 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
         </CardContent>
       </Card>
 
+      <CostBreakdownCard summary={summary} />
+      <TopWbsChart items={summary.wbs_summaries} />
+
       {/* WBS Items Summary */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -291,33 +219,6 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
             ariaLabel="WBS cost summary"
             emptyTitle="No WBS items"
           />
-        </CardContent>
-      </Card>
-
-      {/* Breakdowns */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" component="h3" gutterBottom>
-            Cost Breakdowns
-          </Typography>
-          <Tabs value={tabValue} onChange={(_, v: number) => setTabValue(v)} variant="scrollable" scrollButtons="auto" aria-label="Cost breakdowns">
-            {['By Cost Type', 'By Region', 'By Resource', 'By Supplier'].map((label, i) => (
-              <Tab key={label} label={label} id={`breakdown-tab-${i}`} aria-controls={`breakdown-panel-${i}`} />
-            ))}
-          </Tabs>
-
-          <TabPanel value={tabValue} index={0} idPrefix="breakdown">
-            <BreakdownTable items={summary.by_cost_type} nameField="description" label="Cost by cost type" />
-          </TabPanel>
-          <TabPanel value={tabValue} index={1} idPrefix="breakdown">
-            <BreakdownTable items={summary.by_region} nameField="description" label="Cost by region" />
-          </TabPanel>
-          <TabPanel value={tabValue} index={2} idPrefix="breakdown">
-            <BreakdownTable items={summary.by_resource} nameField="description" label="Cost by resource" />
-          </TabPanel>
-          <TabPanel value={tabValue} index={3} idPrefix="breakdown">
-            <BreakdownTable items={summary.by_supplier} nameField="name" label="Cost by supplier" />
-          </TabPanel>
         </CardContent>
       </Card>
     </Box>

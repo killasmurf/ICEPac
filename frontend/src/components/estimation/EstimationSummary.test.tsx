@@ -102,15 +102,32 @@ describe('EstimationSummary', () => {
     expect(screen.getByRole('grid', { name: 'WBS cost summary' })).toBeInTheDocument();
   });
 
-  it('switches breakdown tabs', async () => {
+  it('switches the cost breakdown, shows ranked shares and reveals the table on request', async () => {
     h.getProjectEstimation.mockResolvedValue(summary);
     renderWithProviders(<EstimationSummary projectId={1} />);
-    expect(await screen.findByText('Labour')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('tab', { name: 'By Region' }));
-    expect(await screen.findByText('No data')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('tab', { name: 'By Supplier' }));
-    expect(await screen.findByText('Acme Pty Ltd')).toBeInTheDocument();
-    expect(screen.getByText('$450,000.00')).toBeInTheDocument();
+    const list = await screen.findByTestId('breakdown-list');
+    expect(within(list).getByText('Labour')).toBeInTheDocument();
+    expect(within(list).getByText('100.0%')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Region' }));
+    expect(await screen.findByText('No cost by region')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Supplier' }));
+    expect(within(await screen.findByTestId('breakdown-list')).getByText('Acme Pty Ltd')).toBeInTheDocument();
+
+    expect(screen.queryByRole('grid', { name: 'Cost by supplier' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Show table' }));
+    const grid = await screen.findByRole('grid', { name: 'Cost by supplier' });
+    expect(within(grid).getByText('$450,000.00')).toBeInTheDocument();
+  });
+
+  it('lists the top WBS items with a Low/High range bar each', async () => {
+    h.getProjectEstimation.mockResolvedValue(summary);
+    renderWithProviders(<EstimationSummary projectId={1} />);
+    const ranges = await screen.findByTestId('wbs-ranges');
+    expect(within(ranges).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(ranges).getByText('1.1 Foundations')).toBeInTheDocument();
+    expect(within(ranges).getAllByRole('img', { name: /80% range/ })).toHaveLength(2);
   });
 
   it('shows a loading state then an empty state when there is nothing to estimate', async () => {

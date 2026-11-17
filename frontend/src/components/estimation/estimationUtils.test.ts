@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   currencySymbol,
   parseAmount,
+  rankBreakdown,
   summaryRangeBar,
+  topWbsByEstimate,
   validateMoney,
   validatePercent,
   validateThreePoint,
@@ -100,5 +102,52 @@ describe('summaryRangeBar', () => {
   it('collapses to a point when the deviation is zero', () => {
     const r = summaryRangeBar({ ...base, total_std_deviation: 0 });
     expect(r.best).toBe(r.worst);
+  });
+});
+
+describe('rankBreakdown', () => {
+  const item = (code: string, total_pert: number) => ({ code, name: code, total_pert, assignment_count: 1 });
+
+  it('sorts descending and the shares sum to 100', () => {
+    const { rows, total, empty } = rankBreakdown([item('B', 200), item('A', 500), item('C', 300)]);
+    expect(rows.map((r) => r.code)).toEqual(['A', 'C', 'B']);
+    expect(rows.map((r) => r.share)).toEqual([50, 30, 20]);
+    expect(total).toBe(1000);
+    expect(empty).toBe(false);
+  });
+
+  it('sums to 100 when the maths does not divide evenly', () => {
+    const { rows } = rankBreakdown([item('A', 1), item('B', 1), item('C', 1)]);
+    const sum = rows.reduce((s, r) => s + r.share, 0);
+    expect(Math.abs(sum - 100)).toBeLessThanOrEqual(1);
+    expect(sum).toBeCloseTo(100, 5);
+  });
+
+  it('groups the tail into Other beyond maxRows and keeps the total', () => {
+    const items = Array.from({ length: 10 }, (_, i) => item(`R${i}`, 100 - i));
+    const { rows, total } = rankBreakdown(items, 4);
+    expect(rows).toHaveLength(4);
+    expect(rows[3]).toMatchObject({ name: 'Other (7)', isOther: true });
+    expect(total).toBe(items.reduce((s, r) => s + r.total_pert, 0));
+    expect(rows.reduce((s, r) => s + r.share, 0)).toBeCloseTo(100, 5);
+  });
+
+  it('handles an all-zero or empty breakdown without dividing by zero', () => {
+    const zero = rankBreakdown([item('A', 0), item('B', 0)]);
+    expect(zero.empty).toBe(true);
+    expect(zero.rows.every((r) => r.share === 0)).toBe(true);
+    expect(rankBreakdown([]).empty).toBe(true);
+  });
+
+  it('treats negative and non-finite totals as zero', () => {
+    const { rows } = rankBreakdown([item('A', -50), item('B', Number.NaN), item('C', 10)]);
+    expect(rows[0]).toMatchObject({ code: 'C', share: 100 });
+  });
+});
+
+describe('topWbsByEstimate', () => {
+  it('returns the n largest', () => {
+    const items = [{ total_pert_estimate: 1 }, { total_pert_estimate: 9 }, { total_pert_estimate: 5 }];
+    expect(topWbsByEstimate(items, 2).map((i) => i.total_pert_estimate)).toEqual([9, 5]);
   });
 });
