@@ -21,13 +21,14 @@ import {
   ApprovalActionType,
   processApproval,
 } from '../../api/estimation';
-import type { WBSTreeNode } from '../../api/projects';
+import type { WBSTreeResponse } from '../../api/projects';
 import { applyOptimistic, optimisticTarget, rollbackOptimistic } from '../../api/optimistic';
 import { useAuth } from '../../auth/AuthContext';
 import { formatDate } from '../../utils/format';
 import { StatusChip } from '../common/StatusChip';
 import { FormDialog } from '../common/FormDialog';
 import { useToast } from '../feedback/ToastProvider';
+import { withNodeApprovalStatus } from './estimationUtils';
 import { invalidateEstimation, wbsDetailsKey, wbsTreeKey } from './queryKeys';
 
 interface ApprovalWorkflowProps {
@@ -56,13 +57,6 @@ const NEXT_STATUS: Record<ApprovalActionType, string> = {
   reject: 'rejected',
   reset: 'draft',
 };
-
-const setNodeStatus = (nodes: WBSTreeNode[], wbsId: number, status: string): WBSTreeNode[] =>
-  nodes.map((n) => ({
-    ...n,
-    approval_status: n.id === wbsId ? status : n.approval_status,
-    children: setNodeStatus(n.children, wbsId, status),
-  }));
 
 const STEPS = ['Draft', 'Submitted', 'Approved'];
 
@@ -107,7 +101,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
             ...old,
             approval: { ...old.approval, approval_status: NEXT_STATUS[v.action] },
           })),
-          optimisticTarget<WBSTreeNode[], typeof vars>(wbsTreeKey(projectId), (old, v) => setNodeStatus(old, wbsId, NEXT_STATUS[v.action])),
+          optimisticTarget<WBSTreeResponse, typeof vars>(wbsTreeKey(projectId), (old, v) => withNodeApprovalStatus(old, wbsId, NEXT_STATUS[v.action])),
         ],
         vars,
       ),
