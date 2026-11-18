@@ -23,7 +23,7 @@ function setup(route: string) {
             <Route path="/login" element={<Where />} />
             <Route element={<RequireAuth />}>
               <Route path="/projects" element={<p>Projects</p>} />
-              <Route path="/admin" element={<RequireRole role="admin" />}>
+              <Route path="/admin" element={<RequireRole role={['admin', 'manager']} />}>
                 <Route index element={<p>Admin</p>} />
               </Route>
             </Route>
@@ -48,10 +48,16 @@ describe('route guards', () => {
     expect(screen.getByText(/at \/login/)).toBeInTheDocument();
   });
 
-  it('shows Not authorised for a non-admin', () => {
+  it('shows Not authorised for a plain user', () => {
     localStorage.setItem('access_token', jwt({ role: 'user', exp: 4102444800 }));
     setup('/admin');
     expect(screen.getByRole('heading', { name: 'Not authorised' })).toBeInTheDocument();
+  });
+
+  it('lets a manager in', () => {
+    localStorage.setItem('access_token', jwt({ role: 'manager', exp: 4102444800 }));
+    setup('/admin');
+    expect(screen.getByText('Admin')).toBeInTheDocument();
   });
 
   it('lets an admin in', () => {

@@ -40,7 +40,7 @@ export const navSections: NavSection[] = [
   {
     id: 'admin',
     label: 'Administration',
-    roles: ['admin'],
+    roles: ['admin', 'manager'],
     items: [
       { label: 'Overview', path: '/admin', icon: <AdminPanelSettingsOutlinedIcon />, exact: true },
       { label: 'Users', path: '/admin/users', icon: <PeopleOutlineIcon /> },

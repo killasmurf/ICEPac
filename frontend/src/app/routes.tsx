@@ -34,7 +34,7 @@ export const AppRoutes: React.FC = () => (
           <Route path="/reports" element={<Reports />} />
           <Route path="/help" element={<Help />} />
           <Route path="/help/:id" element={<HelpTopic />} />
-          <Route path="/admin" element={<RequireRole role="admin" />}>
+          <Route path="/admin" element={<RequireRole role={['admin', 'manager']} />}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="resources" element={<ResourceLibrary />} />

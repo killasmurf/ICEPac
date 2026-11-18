@@ -4,8 +4,11 @@ import { getVisibleSections, isNavActive, navSections } from './navConfig';
 const item = (path: string) => navSections.flatMap((s) => s.items).find((i) => i.path === path)!;
 
 describe('navConfig', () => {
-  it('hides Administration for non-admins', () => {
+  it('shows Administration to admins and managers only', () => {
     expect(getVisibleSections('user').map((s) => s.id)).toEqual(['workspace', 'support']);
+    expect(getVisibleSections('viewer').map((s) => s.id)).toEqual(['workspace', 'support']);
+    expect(getVisibleSections(null).map((s) => s.id)).toEqual(['workspace', 'support']);
+    expect(getVisibleSections('manager').map((s) => s.id)).toEqual(['workspace', 'admin', 'support']);
     expect(getVisibleSections('admin').map((s) => s.id)).toEqual(['workspace', 'admin', 'support']);
   });
   it('matches nested paths except exact items', () => {

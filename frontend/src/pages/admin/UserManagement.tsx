@@ -26,9 +26,10 @@ import StatusChip from '../../components/common/StatusChip';
 import { useToast } from '../../components/feedback/ToastProvider';
 import { formatDateTime } from '../../utils/format';
 import RowActionButton from './RowActionButton';
+import { assignableRoles, manageBlockedReason, roleChangeBlockedReason } from './userPermissions';
 import { filterUsers, hasUserFilters, NO_USER_FILTERS, type UserFilters } from './userFilters';
 
-const ROLES: UserRole[] = ['admin', 'manager', 'user', 'viewer'];
+const ROLES: UserRole[] = ['admin', 'manager', 'user', 'viewer']; // role filter: every role can be filtered on
 const ROLE_LABEL: Record<UserRole, string> = { admin: 'Admin', manager: 'Manager', user: 'User', viewer: 'Viewer' };
 const FILTERED_FETCH_LIMIT = 1000; // the API maximum; used when client-side filters are active
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,7 +69,7 @@ const USER_LOW_PRIORITY = ['username', 'email', 'is_active', 'last_login'];
 
 export default function UserManagement() {
   const columnVisibilityModel = useResponsiveColumns(USER_LOW_PRIORITY);
-  const { user: me } = useAuth();
+  const { user: me, role: actorRole } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -229,14 +230,24 @@ export default function UserManagement() {
       filterable: false,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <RowActionButton label={`Edit ${row.username}`} icon={<EditOutlinedIcon fontSize="small" />} onClick={() => openEdit(row)} />
-          <RowActionButton label={`Reset password for ${row.username}`} icon={<LockResetIcon fontSize="small" />} onClick={() => openReset(row)} />
+          <RowActionButton
+            label={`Edit ${row.username}`}
+            icon={<EditOutlinedIcon fontSize="small" />}
+            onClick={() => openEdit(row)}
+            disabledReason={manageBlockedReason(actorRole, row)}
+          />
+          <RowActionButton
+            label={`Reset password for ${row.username}`}
+            icon={<LockResetIcon fontSize="small" />}
+            onClick={() => openReset(row)}
+            disabledReason={manageBlockedReason(actorRole, row)}
+          />
           <RowActionButton
             label={`Delete ${row.username}`}
             icon={<DeleteOutlineIcon fontSize="small" />}
             color="error"
             onClick={() => setDeleting(row)}
-            disabledReason={isSelf(row) ? 'You cannot delete your own account' : undefined}
+            disabledReason={isSelf(row) ? 'You cannot delete your own account' : manageBlockedReason(actorRole, row)}
           />
         </Box>
       ),
@@ -285,6 +296,9 @@ export default function UserManagement() {
 
   const failedFirstLoad = query.isError && !query.data;
   const editingSelf = isSelf(editing);
+  const roleBlocked = editing ? roleChangeBlockedReason(actorRole, editingSelf) : undefined;
+  // A manager's role list has no Admin; keep the current role listed if it is not assignable so the select stays valid.
+  const formRoles = assignableRoles(actorRole).includes(form.role) ? assignableRoles(actorRole) : [form.role, ...assignableRoles(actorRole)];
 
   return (
     <Box>
@@ -351,8 +365,15 @@ export default function UserManagement() {
         {!editing && (
           <TextField label="Password" type="password" slotProps={{ inputLabel: { required: true } }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={Boolean(errors.password)} helperText={errors.password ?? 'At least 8 characters'} autoComplete="new-password" />
         )}
-        <TextField select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
-          {ROLES.map((r) => (
+        <TextField
+          select
+          label="Role"
+          value={form.role}
+          onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+          disabled={Boolean(roleBlocked)}
+          helperText={roleBlocked}
+        >
+          {formRoles.map((r) => (
             <MenuItem key={r} value={r}>
               {ROLE_LABEL[r]}
             </MenuItem>
