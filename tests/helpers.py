@@ -130,3 +130,23 @@ def seed_project(db) -> dict:
         "root_b": root_b,
         "child": child,
     }
+
+
+def iter_api_routes(routes=None):
+    """Yield every concrete route (``.path`` and ``.methods``) of the app.
+
+    Newer FastAPI versions keep included routers as lazy ``_IncludedRouter``
+    nodes in ``app.routes``; older ones flatten them into ``APIRoute``s. Handle
+    both so the route walk keeps working across the supported version range.
+    """
+    if routes is None:
+        from app.main import app
+
+        routes = app.routes
+    for route in routes:
+        if hasattr(route, "effective_route_contexts"):
+            yield from route.effective_route_contexts()
+        elif hasattr(route, "methods") and hasattr(route, "path"):
+            yield route
+        elif hasattr(route, "routes"):
+            yield from iter_api_routes(route.routes)

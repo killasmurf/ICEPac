@@ -1,21 +1,30 @@
 """Admin circuit routes - user, resource, supplier, and config table management.
 
-All admin routes require authentication and appropriate role permissions.
+Access rules (enforced per route, not on the router, so a read route can be
+opened up without a write route silently losing its role check):
+
+* Reference data reads (``GET`` on resources, suppliers and config tables) are
+  open to any signed-in user: the estimation forms need them.
+* Every other route requires admin or manager, except the audit log (admin).
+* A manager may not create admins, assign the admin role, or modify, delete or
+  reset the password of an existing admin account.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_any_role
+from app.models.database.user import UserRole
 from app.models.schemas.audit_log import AuditLogListResponse, AuditLogResponse
 from app.models.schemas.config import (
     CONFIG_TABLE_INFO,
     ConfigItemListResponse,
     ConfigItemResponse,
+    WeightedConfigItemListResponse,
     WeightedConfigItemResponse,
 )
 from app.models.schemas.resource import (
@@ -41,11 +50,34 @@ from app.services.resource_service import ResourceService
 from app.services.supplier_service import SupplierService
 from app.services.user_service import UserService
 
-router = APIRouter(
-    prefix="/admin",
-    tags=["admin"],
-    dependencies=[Depends(require_any_role("admin", "manager"))],
-)
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Applied per route: admin or manager.
+STAFF = [Depends(require_any_role("admin", "manager"))]
+ADMIN_ONLY = [Depends(require_any_role("admin"))]
+
+
+def _is_admin(user) -> bool:
+    return user.role == UserRole.ADMIN
+
+
+def _forbid_admin_escalation(acting_user, target_user=None, new_role=None) -> None:
+    """Raise 403 if a non-admin touches admin privileges.
+
+    A non-admin may not assign the admin role (to anyone, themselves included)
+    and may not modify an existing admin account.
+    """
+    if _is_admin(acting_user):
+        return
+    if new_role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403, detail="Only administrators can assign the admin role"
+        )
+    if target_user is not None and target_user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can modify or delete an administrator account",
+        )
 
 
 # ============================================================
@@ -53,7 +85,7 @@ router = APIRouter(
 # ============================================================
 
 
-@router.get("/users", response_model=UserListResponse)
+@router.get("/users", response_model=UserListResponse, dependencies=STAFF)
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -67,7 +99,7 @@ async def list_users(
     return UserListResponse(items=users, total=total, skip=skip, limit=limit)
 
 
-@router.get("/users/{user_id}", response_model=UserResponse)
+@router.get("/users/{user_id}", response_model=UserResponse, dependencies=STAFF)
 async def get_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -78,14 +110,15 @@ async def get_user(
     return service.get_or_404(user_id)
 
 
-@router.post("/users", response_model=UserResponse, status_code=201)
+@router.post("/users", response_model=UserResponse, status_code=201, dependencies=STAFF)
 async def create_user(
     user_in: UserCreate,
     request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Create a new user."""
+    """Create a new user (managers cannot create admins)."""
+    _forbid_admin_escalation(current_user, new_role=user_in.role)
     service = UserService(db)
     user = service.create(user_in)
 
@@ -96,7 +129,7 @@ async def create_user(
     return user
 
 
-@router.put("/users/{user_id}", response_model=UserResponse)
+@router.put("/users/{user_id}", response_model=UserResponse, dependencies=STAFF)
 async def update_user(
     user_id: int,
     user_in: UserUpdate,
@@ -104,9 +137,10 @@ async def update_user(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Update an existing user."""
+    """Update an existing user (managers cannot touch admins or grant admin)."""
     service = UserService(db)
     old_user = service.get_or_404(user_id)
+    _forbid_admin_escalation(current_user, old_user, user_in.role)
     old_values = serialize_for_audit(old_user)
     user = service.update(user_id, user_in)
 
@@ -117,7 +151,7 @@ async def update_user(
     return user
 
 
-@router.put("/users/{user_id}/password")
+@router.put("/users/{user_id}/password", dependencies=STAFF)
 async def update_password(
     user_id: int,
     password_in: UserPasswordUpdate,
@@ -127,6 +161,13 @@ async def update_password(
 ):
     """Change a user's password (self: needs current password; admin: reset)."""
     service = UserService(db)
+    target = service.get_or_404(user_id)
+    if target.id != current_user.id and not _is_admin(current_user):
+        # Managers may never reset another account's password (admin or not).
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can reset another user's password",
+        )
     service.update_password(user_id, password_in, current_user)
 
     audit = AuditService(db)
@@ -134,16 +175,17 @@ async def update_password(
     return {"detail": "Password updated"}
 
 
-@router.delete("/users/{user_id}", status_code=204)
+@router.delete("/users/{user_id}", status_code=204, dependencies=STAFF)
 async def delete_user(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Delete a user."""
+    """Delete a user (managers cannot delete admins)."""
     service = UserService(db)
     user = service.get_or_404(user_id)
+    _forbid_admin_escalation(current_user, user)
     old_values = serialize_for_audit(user)
     service.delete(user_id)
 
@@ -189,7 +231,9 @@ async def get_resource(
     return ResourceService(db).get_or_404(resource_id)
 
 
-@router.post("/resources", response_model=ResourceResponse, status_code=201)
+@router.post(
+    "/resources", response_model=ResourceResponse, status_code=201, dependencies=STAFF
+)
 async def create_resource(
     resource_in: ResourceCreate,
     request: Request,
@@ -207,7 +251,9 @@ async def create_resource(
     return resource
 
 
-@router.put("/resources/{resource_id}", response_model=ResourceResponse)
+@router.put(
+    "/resources/{resource_id}", response_model=ResourceResponse, dependencies=STAFF
+)
 async def update_resource(
     resource_id: int,
     resource_in: ResourceUpdate,
@@ -233,7 +279,7 @@ async def update_resource(
     return resource
 
 
-@router.delete("/resources/{resource_id}", status_code=204)
+@router.delete("/resources/{resource_id}", status_code=204, dependencies=STAFF)
 async def delete_resource(
     resource_id: int,
     request: Request,
@@ -288,7 +334,9 @@ async def get_supplier(
     return SupplierService(db).get_or_404(supplier_id)
 
 
-@router.post("/suppliers", response_model=SupplierResponse, status_code=201)
+@router.post(
+    "/suppliers", response_model=SupplierResponse, status_code=201, dependencies=STAFF
+)
 async def create_supplier(
     supplier_in: SupplierCreate,
     request: Request,
@@ -306,7 +354,9 @@ async def create_supplier(
     return supplier
 
 
-@router.put("/suppliers/{supplier_id}", response_model=SupplierResponse)
+@router.put(
+    "/suppliers/{supplier_id}", response_model=SupplierResponse, dependencies=STAFF
+)
 async def update_supplier(
     supplier_id: int,
     supplier_in: SupplierUpdate,
@@ -332,7 +382,7 @@ async def update_supplier(
     return supplier
 
 
-@router.delete("/suppliers/{supplier_id}", status_code=204)
+@router.delete("/suppliers/{supplier_id}", status_code=204, dependencies=STAFF)
 async def delete_supplier(
     supplier_id: int,
     request: Request,
@@ -360,7 +410,10 @@ async def list_config_tables(current_user=Depends(get_current_user)):
     return {"tables": [{"key": k, **v} for k, v in CONFIG_TABLE_INFO.items()]}
 
 
-@router.get("/config/{table_name}", response_model=ConfigItemListResponse)
+@router.get(
+    "/config/{table_name}",
+    response_model=Union[WeightedConfigItemListResponse, ConfigItemListResponse],
+)
 async def list_config_items(
     table_name: str,
     active_only: bool = Query(False),
@@ -370,7 +423,14 @@ async def list_config_items(
     """List all items in a configuration table."""
     service = get_config_service(table_name, db)
     items = service.get_active() if active_only else service.get_all()
-    return ConfigItemListResponse(items=items, total=len(items))
+    if is_weighted_table(table_name):
+        return WeightedConfigItemListResponse(
+            items=[WeightedConfigItemResponse.model_validate(i) for i in items],
+            total=len(items),
+        )
+    return ConfigItemListResponse(
+        items=[ConfigItemResponse.model_validate(i) for i in items], total=len(items)
+    )
 
 
 @router.get("/config/{table_name}/{item_id}")
@@ -388,7 +448,7 @@ async def get_config_item(
     return ConfigItemResponse.model_validate(item)
 
 
-@router.post("/config/{table_name}", status_code=201)
+@router.post("/config/{table_name}", status_code=201, dependencies=STAFF)
 async def create_config_item(
     table_name: str,
     request: Request,
@@ -410,7 +470,7 @@ async def create_config_item(
     return ConfigItemResponse.model_validate(item)
 
 
-@router.put("/config/{table_name}/{item_id}")
+@router.put("/config/{table_name}/{item_id}", dependencies=STAFF)
 async def update_config_item(
     table_name: str,
     item_id: int,
@@ -440,7 +500,7 @@ async def update_config_item(
     return ConfigItemResponse.model_validate(item)
 
 
-@router.delete("/config/{table_name}/{item_id}", status_code=204)
+@router.delete("/config/{table_name}/{item_id}", status_code=204, dependencies=STAFF)
 async def delete_config_item(
     table_name: str,
     item_id: int,
@@ -463,7 +523,7 @@ async def delete_config_item(
 # ============================================================
 
 
-@router.get("/audit-logs", response_model=AuditLogListResponse)
+@router.get("/audit-logs", response_model=AuditLogListResponse, dependencies=ADMIN_ONLY)
 async def list_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -474,7 +534,7 @@ async def list_audit_logs(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    current_user=Depends(require_any_role("admin")),
+    current_user=Depends(get_current_user),
 ):
     """List audit logs with filtering (admin only)."""
     service = AuditService(db)
@@ -504,11 +564,13 @@ async def list_audit_logs(
     return AuditLogListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.get("/audit-logs/{audit_id}", response_model=AuditLogResponse)
+@router.get(
+    "/audit-logs/{audit_id}", response_model=AuditLogResponse, dependencies=ADMIN_ONLY
+)
 async def get_audit_log(
     audit_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_any_role("admin")),
+    current_user=Depends(get_current_user),
 ):
     """Get a single audit log entry (admin only)."""
     service = AuditService(db)

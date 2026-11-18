@@ -108,6 +108,8 @@ class WeightedConfigItemUpdate(BaseModel):
 class WeightedConfigItemResponse(WeightedConfigItemBase):
     """Schema for weighted config item API response."""
 
+    # Serialised as a JSON number (a Decimal would come out as a string).
+    weight: float  # type: ignore[assignment]
     id: int
     is_active: bool
     created_at: datetime
