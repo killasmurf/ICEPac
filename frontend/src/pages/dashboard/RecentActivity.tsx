@@ -25,7 +25,7 @@ export function RecentActivity({ items, children }: { items?: Activity[]; childr
         (items && items.length > 0 ? (
           <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column' }}>
             {items.map((a) => {
-              const { verb, icon } = describeAction(a.action);
+              const { verb, icon, noTarget } = describeAction(a.action);
               const Icon = ICONS[icon];
               return (
                 <Box
@@ -37,7 +37,8 @@ export function RecentActivity({ items, children }: { items?: Activity[]; childr
                     <Icon fontSize="small" />
                   </Box>
                   <Typography variant="body2" sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
-                    <strong>{a.username || 'System'}</strong> {verb} {activityTarget(a)}
+                    {a.username ? <strong>{a.username}</strong> : noTarget ? 'Someone' : <strong>System</strong>} {verb}
+                    {noTarget ? '' : ` ${activityTarget(a)}`}
                   </Typography>
                   <Tooltip title={formatDateTime(a.created_at)} describeChild>
                     <Typography

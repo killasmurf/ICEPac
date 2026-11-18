@@ -40,7 +40,7 @@ const risk = (over: Partial<ProjectRisk> = {}): ProjectRisk => ({
   probability_code: 'H',
   severity_code: 'M',
   mitigation_plan: 'Fix price early',
-  date_identified: '2026-02-03T00:00:00Z',
+  date_identified: '2026-02-03T00:00:00',
   risk_exposure: null,
   created_at: '2026-02-03T00:00:00Z',
   updated_at: '2026-02-03T00:00:00Z',

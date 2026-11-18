@@ -1,4 +1,5 @@
 import type { ApprovalTotals, HealthStatus, PortfolioProject, RecentActivity } from '../../api/dashboard';
+import { parseApiDate } from '../../utils/format';
 
 const LOCALE = import.meta.env.VITE_LOCALE ?? 'en-AU';
 
@@ -45,9 +46,9 @@ const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
 
 /** "3 hours ago", "yesterday", "just now". Returns an em dash for a missing or invalid date. */
 export function relativeTime(iso: string | null | undefined, now: Date = new Date()): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
+  const parsed = parseApiDate(iso);
+  if (!parsed) return '—';
+  const then = parsed.getTime();
   const seconds = Math.round((then - now.getTime()) / 1000);
   const abs = Math.abs(seconds);
   if (abs < 45) return 'just now';
@@ -142,6 +143,8 @@ export function healthRows(health: HealthStatus): HealthRow[] {
 export interface ActivityDescription {
   verb: string;
   icon: 'create' | 'update' | 'delete' | 'other';
+  /** Sign-in events read as a sentence on their own ("Ada signed in"), without the "User #1" target. */
+  noTarget?: boolean;
 }
 
 /** Map an audit-log action to a sentence verb and an icon family. Unknown actions are shown as written. */
@@ -153,6 +156,14 @@ export function describeAction(action: string): ActivityDescription {
       return { verb: 'updated', icon: 'update' };
     case 'DELETE':
       return { verb: 'deleted', icon: 'delete' };
+    case 'LOGIN':
+      return { verb: 'signed in', icon: 'other', noTarget: true };
+    case 'LOGOUT':
+      return { verb: 'signed out', icon: 'other', noTarget: true };
+    case 'FAILED_LOGIN':
+      return { verb: 'failed to sign in', icon: 'other', noTarget: true };
+    case 'PASSWORD_CHANGE':
+      return { verb: 'changed the password of', icon: 'update' };
     default:
       return { verb: action.replace(/[_-]+/g, ' ').toLowerCase(), icon: 'other' };
   }
