@@ -315,7 +315,8 @@ test('summary tab: no duplicated headline cards and the WBS Summary table is not
 test.describe('WBS tree keeps its expansion', () => {
   const treeTab = (page: Page) => page.getByRole('tab', { name: /^WBS/ });
 
-  test('survives switching tabs and back', async ({ page }) => {
+  test('survives switching tabs and back', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo.project.name), 'the drawer covers the tree on phones; the resize test covers remounting');
     await page.goto('/projects/1?tab=wbs');
     await expect(item(page, /Earthworks/)).toBeVisible();
     await expect(item(page, /Excavation/)).toHaveCount(0);
@@ -328,8 +329,10 @@ test.describe('WBS tree keeps its expansion', () => {
     await expect(item(page, /Excavation/)).toBeVisible();
   });
 
-  test('a ?wbs= link to a deep item reveals and selects it in the tree', async ({ page }) => {
+  test('a ?wbs= link to a deep item reveals and selects it in the tree', async ({ page }, testInfo) => {
     await page.goto('/projects/1?tab=wbs&wbs=4');
+    // on phones the editor opens in a drawer over the tree
+    if (isMobile(testInfo.project.name)) await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
     await expect(item(page, /Excavation/)).toBeVisible();
     await expect(item(page, /Excavation/)).toHaveAttribute('aria-selected', 'true');
   });

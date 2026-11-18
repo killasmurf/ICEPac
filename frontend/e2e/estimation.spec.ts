@@ -192,10 +192,10 @@ test.describe('WBS detail panel', () => {
     await expect(totals).not.toContainText('NaN');
   });
 
-  test('a plain user gets populated dropdowns and can add a WBS risk with a title (F-05, F-07)', async ({ page }) => {
+  test('a plain user gets populated dropdowns and can add a WBS risk with a title (F-05, F-07)', async ({ page }, testInfo) => {
     await loginAs(page, 'user');
     await openPanel(page);
-    await page.getByTestId('wbs-detail').getByRole('tab', { name: 'Risks' }).click();
+    await (testInfo.project.name === 'mobile' ? page.getByRole('dialog') : page.getByTestId('wbs-detail')).getByRole('tab', { name: 'Risks' }).click();
     await expect(page.getByText('Integration slips')).toBeVisible();
     await page.getByRole('button', { name: 'Add Risk' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'New Risk' });
