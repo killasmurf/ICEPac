@@ -4,7 +4,7 @@ import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, literal
 from sqlalchemy.orm import Session
 
 from app.models.database.assignment import ResourceAssignment
@@ -20,7 +20,11 @@ Z_80 = 1.28  # z-score for 80% confidence
 
 
 class ReportRepository:
-    """Complex aggregation queries for report generation."""
+    """Complex aggregation queries for report generation.
+
+    Monetary values are returned unrounded; ``ReportEngine`` sums totals from
+    the unrounded values and rounds everything once for display.
+    """
 
     def __init__(self, db: Session):
         self.db = db
@@ -85,13 +89,13 @@ class ReportRepository:
                 {
                     "group_key": row.group_key or "Unassigned",
                     "group_label": row.group_label or "Unassigned",
-                    "best_total": round(best, 2),
-                    "likely_total": round(likely, 2),
-                    "worst_total": round(worst, 2),
-                    "pert_total": round(pert, 2),
-                    "std_dev": round(std_dev, 2),
-                    "confidence_80_low": round(pert - Z_80 * std_dev, 2),
-                    "confidence_80_high": round(pert + Z_80 * std_dev, 2),
+                    "best_total": best,
+                    "likely_total": likely,
+                    "worst_total": worst,
+                    "pert_total": pert,
+                    "std_dev": std_dev,
+                    "confidence_80_low": pert - Z_80 * std_dev,
+                    "confidence_80_high": pert + Z_80 * std_dev,
                     "assignment_count": row.assignment_count,
                 }
             )
@@ -104,7 +108,7 @@ class ReportRepository:
         rows = (
             q.with_entities(
                 WBS.id.label("group_key"),
-                WBS.title.label("group_label"),
+                WBS.wbs_title.label("group_label"),
                 WBS.wbs_code,
                 WBS.approval_status,
                 func.sum(ResourceAssignment.best_estimate).label("best_total"),
@@ -112,7 +116,7 @@ class ReportRepository:
                 func.sum(ResourceAssignment.worst_estimate).label("worst_total"),
                 func.count(ResourceAssignment.id).label("assignment_count"),
             )
-            .group_by(WBS.id, WBS.title, WBS.wbs_code, WBS.approval_status)
+            .group_by(WBS.id, WBS.wbs_title, WBS.wbs_code, WBS.approval_status)
             .order_by(WBS.wbs_code)
             .all()
         )
@@ -126,16 +130,20 @@ class ReportRepository:
             results.append(
                 {
                     "group_key": str(row.group_key),
-                    "group_label": f"{row.wbs_code} - {row.group_label}",
+                    "group_label": (
+                        f"{row.wbs_code} - {row.group_label}"
+                        if row.wbs_code
+                        else row.group_label
+                    ),
                     "wbs_code": row.wbs_code,
                     "approval_status": row.approval_status,
-                    "best_total": round(best, 2),
-                    "likely_total": round(likely, 2),
-                    "worst_total": round(worst, 2),
-                    "pert_total": round(pert, 2),
-                    "std_dev": round(std_dev, 2),
-                    "confidence_80_low": round(pert - Z_80 * std_dev, 2),
-                    "confidence_80_high": round(pert + Z_80 * std_dev, 2),
+                    "best_total": best,
+                    "likely_total": likely,
+                    "worst_total": worst,
+                    "pert_total": pert,
+                    "std_dev": std_dev,
+                    "confidence_80_low": pert - Z_80 * std_dev,
+                    "confidence_80_high": pert + Z_80 * std_dev,
                     "assignment_count": row.assignment_count,
                 }
             )
@@ -165,7 +173,7 @@ class ReportRepository:
         rows = (
             q.with_entities(
                 WBS.wbs_code,
-                WBS.title.label("wbs_title"),
+                WBS.wbs_title.label("wbs_title"),
                 WBS.approval_status,
                 WBS.assumptions,
                 ResourceAssignment.resource_code,
@@ -188,15 +196,14 @@ class ReportRepository:
                 "best_estimate": float(r.best_estimate or 0),
                 "likely_estimate": float(r.likely_estimate or 0),
                 "worst_estimate": float(r.worst_estimate or 0),
-                "pert_estimate": round(
-                    float(
-                        (r.best_estimate or 0)
-                        + 4 * float(r.likely_estimate or 0)
-                        + float(r.worst_estimate or 0)
-                    )
-                    / 6,
-                    2,
-                ),
+                # Numeric columns come back as Decimal on PostgreSQL; mixing
+                # Decimal with float raises TypeError, so cast every term.
+                "pert_estimate": (
+                    float(r.best_estimate or 0)
+                    + 4 * float(r.likely_estimate or 0)
+                    + float(r.worst_estimate or 0)
+                )
+                / 6,
                 "assumptions": r.assumptions or "",
                 "approval_status": r.approval_status or "draft",
             }
@@ -209,6 +216,16 @@ class ReportRepository:
     # ── Risk Reports ──────────────────────────────────────────
 
     def risk_assessment(self, filters: ReportFilter) -> List[Dict[str, Any]]:
+        """Risk register for a project: WBS-level risks, then project-level."""
+        columns = (
+            Risk.title.label("risk_title"),
+            Risk.risk_category_code,
+            Risk.probability_code,
+            Risk.severity_code,
+            Risk.risk_cost,
+            Risk.mitigation_plan,
+            Risk.status,
+        )
         q = (
             self.db.query(Risk)
             .join(WBS, Risk.wbs_id == WBS.id)
@@ -216,37 +233,41 @@ class ReportRepository:
         )
         if filters.wbs_ids:
             q = q.filter(WBS.id.in_(filters.wbs_ids))
-
-        rows = (
-            q.with_entities(
-                WBS.wbs_code,
-                WBS.title.label("wbs_title"),
-                Risk.title.label("risk_title"),
-                Risk.category_code,
-                Risk.probability_code,
-                Risk.severity_code,
-                Risk.estimated_cost,
-                Risk.mitigation_plan,
-                Risk.status,
-            )
-            .order_by(WBS.wbs_code)
+        wbs_rows = (
+            q.with_entities(WBS.wbs_code, WBS.wbs_title.label("wbs_title"), *columns)
+            .order_by(WBS.wbs_code, Risk.id)
             .all()
         )
 
+        # Project-level risks have no WBS item; a WBS filter excludes them.
+        project_rows = []
+        if not filters.wbs_ids:
+            project_rows = (
+                self.db.query(Risk)
+                .filter(Risk.project_id == filters.project_id)
+                .with_entities(
+                    literal("").label("wbs_code"),
+                    literal("(Project level)").label("wbs_title"),
+                    *columns,
+                )
+                .order_by(Risk.id)
+                .all()
+            )
+
         results = []
-        for r in rows:
+        for r in [*wbs_rows, *project_rows]:
             prob_weight = self._get_weight(ProbabilityLevel, r.probability_code)
             sev_weight = self._get_weight(SeverityLevel, r.severity_code)
-            exposure = float(r.estimated_cost or 0) * prob_weight * sev_weight
+            exposure = float(r.risk_cost or 0) * prob_weight * sev_weight
             results.append(
                 {
                     "wbs_code": r.wbs_code or "",
                     "wbs_title": r.wbs_title or "",
                     "risk_title": r.risk_title or "",
-                    "category": r.category_code or "",
+                    "category": r.risk_category_code or "",
                     "probability": r.probability_code or "",
                     "severity": r.severity_code or "",
-                    "exposure": round(exposure, 2),
+                    "exposure": exposure,
                     "mitigation": r.mitigation_plan or "",
                     "status": r.status or "open",
                 }
@@ -328,7 +349,7 @@ class ReportRepository:
                 "group_label": r.resource_code,
                 "assignment_count": r.assignment_count,
                 "wbs_count": r.wbs_count,
-                "total_likely": round(float(r.total_likely or 0), 2),
+                "total_likely": float(r.total_likely or 0),
             }
             for r in rows
         ]
@@ -355,13 +376,20 @@ class ReportRepository:
             .scalar()
             or 0
         )
-        risk_count = (
+        wbs_risk_count = (
             self.db.query(func.count(Risk.id))
             .join(WBS, Risk.wbs_id == WBS.id)
             .filter(WBS.project_id == filters.project_id)
             .scalar()
             or 0
         )
+        project_risk_count = (
+            self.db.query(func.count(Risk.id))
+            .filter(Risk.project_id == filters.project_id)
+            .scalar()
+            or 0
+        )
+        risk_count = wbs_risk_count + project_risk_count
 
         cost_data = self.cost_by_wbs(filters)
         total_pert = sum(r["pert_total"] for r in cost_data)
@@ -374,14 +402,14 @@ class ReportRepository:
                 "group_key": "summary",
                 "group_label": project.project_name,
                 "project_manager": project.project_manager or "",
-                "status": project.status or "",
+                "status": getattr(project.status, "value", project.status) or "",
                 "wbs_count": wbs_count,
                 "assignment_count": assignment_count,
                 "risk_count": risk_count,
-                "total_pert": round(total_pert, 2),
-                "combined_std_dev": round(total_std, 2),
-                "confidence_80_low": round(total_pert - Z_80 * total_std, 2),
-                "confidence_80_high": round(total_pert + Z_80 * total_std, 2),
+                "total_pert": total_pert,
+                "combined_std_dev": total_std,
+                "confidence_80_low": total_pert - Z_80 * total_std,
+                "confidence_80_high": total_pert + Z_80 * total_std,
             }
         ]
 

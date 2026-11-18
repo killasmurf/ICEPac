@@ -1,7 +1,7 @@
 """Dashboard API — aggregates stats from all circuits for the main dashboard."""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -184,11 +184,16 @@ async def dashboard_portfolio(
 
 
 @router.get("/health-detailed")
-async def health_detailed(
+def health_detailed(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Detailed health check for all system components."""
+    """Detailed health check for all system components.
+
+    Deliberately a plain ``def``: FastAPI runs it in the threadpool, so the
+    blocking database, Redis and S3 probes cannot freeze the event loop (and
+    with it every other request) while a dependency is slow or unreachable.
+    """
     from app.core.config import settings
     from app.services.cache_service import cache
 
@@ -225,7 +230,8 @@ def _recent_activity(db: Session, limit: int = 5) -> list:
             "action": log.action,
             "entity_type": log.entity_type,
             "entity_id": log.entity_id,
-            "username": getattr(log, "username", ""),
+            # AuditLog.user is joined-loaded, so this is not an N+1.
+            "username": log.user.username if log.user else None,
             "created_at": log.created_at.isoformat() if log.created_at else None,
         }
         for log in logs
@@ -234,7 +240,7 @@ def _recent_activity(db: Session, limit: int = 5) -> list:
 
 def _check_db(db: Session) -> dict:
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return {"status": "healthy"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
@@ -250,9 +256,19 @@ def _check_cache(cache) -> dict:
 
 def _check_s3() -> dict:
     try:
+        from botocore.config import Config
+
         from app.services.s3_service import S3Service
 
-        s3 = S3Service()
+        # Short timeouts and no retries: an unreachable endpoint must fail in
+        # ~2 s, not the botocore default of minutes.
+        s3 = S3Service(
+            client_config=Config(
+                connect_timeout=2,
+                read_timeout=2,
+                retries={"max_attempts": 1},
+            )
+        )
         s3.s3_client.head_bucket(Bucket=s3.bucket_name)
         return {"status": "healthy"}
     except Exception:

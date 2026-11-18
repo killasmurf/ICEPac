@@ -140,7 +140,8 @@ class TestReportSchemas:
             filters=ReportFilter(project_id=1),
         )
         assert req.export_format == ExportFormat.JSON
-        assert req.include_charts is False
+        # include_charts was an unimplemented placeholder and is gone
+        assert "include_charts" not in ReportRequest.model_fields
         assert req.title is None
 
     def test_cost_breakdown_row(self):

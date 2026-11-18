@@ -1,7 +1,7 @@
 """Report generation engine - orchestrates query, formatting, and export."""
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
@@ -74,18 +74,23 @@ REPORT_COLUMNS = {
     ],
 }
 
-# Default cost columns for generic cost reports
+# Generic cost columns, with the first column labelled per report type
+# (a resource-grouped report must not say "WBS Item").
 _COST_COLUMNS = REPORT_COLUMNS[ReportType.COST_BY_WBS]
-for rt in [
-    ReportType.COST_BY_RESOURCE,
-    ReportType.COST_BY_SUPPLIER,
-    ReportType.COST_BY_EOC,
-    ReportType.COST_BY_TECHNIQUE,
-    ReportType.COST_BY_REGION,
-    ReportType.BOE_SUMMARY,
-    ReportType.BOE_BY_WBS,
-]:
-    REPORT_COLUMNS[rt] = _COST_COLUMNS
+_COST_FIRST_COLUMN_LABEL = {
+    ReportType.COST_BY_RESOURCE: "Resource",
+    ReportType.COST_BY_SUPPLIER: "Supplier",
+    ReportType.COST_BY_EOC: "Element of Cost",
+    ReportType.COST_BY_TECHNIQUE: "Technique",
+    ReportType.COST_BY_REGION: "Region",
+    ReportType.BOE_SUMMARY: "WBS Item",
+    ReportType.BOE_BY_WBS: "WBS Item",
+}
+for rt, first_label in _COST_FIRST_COLUMN_LABEL.items():
+    REPORT_COLUMNS[rt] = [
+        {**col, "label": first_label} if i == 0 else dict(col)
+        for i, col in enumerate(_COST_COLUMNS)
+    ]
 
 for rt in [ReportType.RISK_SUMMARY]:
     REPORT_COLUMNS[rt] = [
@@ -97,6 +102,27 @@ for rt in [ReportType.RISK_SUMMARY]:
 for rt in [ReportType.ESTIMATOR_ACTIVITY, ReportType.APPROVER_ACTIVITY]:
     REPORT_COLUMNS[rt] = REPORT_COLUMNS[ReportType.CHANGE_HISTORY]
 
+
+# Columns that are summed into the totals row
+NUMERIC_TOTAL_KEYS = {
+    "best_total",
+    "likely_total",
+    "worst_total",
+    "pert_total",
+    "std_dev",
+    "confidence_80_low",
+    "confidence_80_high",
+    "assignment_count",
+    "total_exposure",
+    "risk_count",
+    "exposure",
+    "total_likely",
+    "wbs_count",
+    "best_estimate",
+    "likely_estimate",
+    "worst_estimate",
+    "pert_estimate",
+}
 
 # Report type → repository method mapping
 REPORT_HANDLERS = {
@@ -159,43 +185,40 @@ class ReportEngine:
         else:
             rows = []
 
-        # Compute totals for cost reports
-        totals = None
-        numeric_keys = {
-            "best_total",
-            "likely_total",
-            "worst_total",
-            "pert_total",
-            "std_dev",
-            "confidence_80_low",
-            "confidence_80_high",
-            "assignment_count",
-            "total_exposure",
-            "risk_count",
-            "exposure",
-            "total_likely",
-            "wbs_count",
-        }
-        if rows:
-            totals = {}
-            for key in rows[0]:
-                if key in numeric_keys:
-                    totals[key] = round(sum(r.get(key, 0) for r in rows), 2)
-
         columns = REPORT_COLUMNS.get(rt, [{"key": "group_label", "label": "Item"}])
+        rows, totals = self._totals_and_rounding(rows, columns)
 
         return ReportResult(
             report_type=rt.value,
             title=title,
             generated_at=datetime.utcnow(),
             project_name=project_name,
-            filters_applied=filters.dict(exclude_none=True),
+            filters_applied=filters.model_dump(exclude_none=True),
             columns=columns,
             rows=rows,
             totals=totals,
             row_count=len(rows),
             metadata={"report_catalog_category": self._get_category(rt)},
         )
+
+    @staticmethod
+    def _totals_and_rounding(rows: List[Dict[str, Any]], columns: List[Dict[str, str]]):
+        """Sum totals from the unrounded rows, then round everything once.
+
+        ``totals`` is always a dict (never None): every summable column of the
+        report starts at 0, so an empty report still has the keys the UI and
+        exporters read. Summing already-rounded rows drifts by a cent or two.
+        """
+        totals: Dict[str, Any] = {
+            col["key"]: 0 for col in columns if col["key"] in NUMERIC_TOTAL_KEYS
+        }
+        for key in totals:
+            totals[key] = round(sum(r.get(key) or 0 for r in rows), 2)
+        rounded = [
+            {k: round(v, 2) if isinstance(v, float) else v for k, v in r.items()}
+            for r in rows
+        ]
+        return rounded, totals
 
     def get_catalog(self) -> Dict[str, Any]:
         """Return the full report catalog."""
