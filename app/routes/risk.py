@@ -12,7 +12,7 @@ The service layer filters explicitly by the appropriate parent column
 so the two scopes never accidentally mix.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,6 +23,7 @@ from app.models.schemas.risk import (
     ProjectRiskResponse,
     ProjectRiskUpdate,
 )
+from app.services.audit_service import AuditService, serialize_for_audit
 from app.services.project_service import ProjectService
 from app.services.risk_service import RiskService
 
@@ -79,7 +80,9 @@ async def get_project_total_risk_cost(
 async def create_project_risk(
     project_id: int,
     risk_in: ProjectRiskCreate,
+    request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
     _=Depends(require_any_role("admin", "manager")),
 ):
     """Create a project-level risk.
@@ -92,7 +95,11 @@ async def create_project_risk(
     ProjectService(db).get_or_404(project_id)
 
     risk_service = RiskService(db)
-    return risk_service.create_for_project(project_id, risk_in)
+    risk = risk_service.create_for_project(project_id, risk_in)
+    AuditService(db).log_create(
+        "Risk", risk.id, serialize_for_audit(risk), current_user.id, request
+    )
+    return risk
 
 
 @project_risk_router.get("/{risk_id}", response_model=ProjectRiskResponse)
@@ -120,7 +127,9 @@ async def update_project_risk(
     project_id: int,
     risk_id: int,
     risk_in: ProjectRiskUpdate,
+    request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
     _=Depends(require_any_role("admin", "manager")),
 ):
     """Update a project-level risk.
@@ -138,14 +147,26 @@ async def update_project_risk(
             detail="Risk not found in this project",
         )
 
-    return risk_service.update_project_risk(risk_id, risk_in)
+    old_values = serialize_for_audit(risk)
+    updated = risk_service.update_project_risk(risk_id, risk_in)
+    AuditService(db).log_update(
+        "Risk",
+        updated.id,
+        old_values,
+        serialize_for_audit(updated),
+        current_user.id,
+        request,
+    )
+    return updated
 
 
 @project_risk_router.delete("/{risk_id}", status_code=204)
 async def delete_project_risk(
     project_id: int,
     risk_id: int,
+    request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
     _=Depends(require_any_role("admin", "manager")),
 ):
     """Delete a project-level risk."""
@@ -159,4 +180,6 @@ async def delete_project_risk(
             detail="Risk not found in this project",
         )
 
+    old_values = serialize_for_audit(risk)
     risk_service.delete_project_risk(risk_id)
+    AuditService(db).log_delete("Risk", risk_id, old_values, current_user.id, request)
