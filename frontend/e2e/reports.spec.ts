@@ -109,6 +109,37 @@ test('generate sends the expected request and renders the preview with totals', 
   await saveScreenshot(page, testInfo, 'phase-4', 'reports-preview-light');
 });
 
+test('the first column header is the label the API returns, not a hardcoded "WBS Item" (F-15)', async ({ page }) => {
+  await page.route('**/api/v1/reports/generate', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: JSON.stringify({
+        report_type: 'cost_by_resource',
+        title: 'Cost by Resource',
+        generated_at: '2026-03-04T10:30:00',
+        project_name: 'Harbour Bridge Refurbishment',
+        filters_applied: { project_id: 1 },
+        columns: [
+          { key: 'group_label', label: 'Resource' },
+          { key: 'pert_total', label: 'PERT ($)' },
+        ],
+        rows: [{ group_key: 'ENG', group_label: 'Engineer', pert_total: 1234.5 }],
+        totals: { pert_total: 1234.5 },
+        row_count: 1,
+      }),
+    }),
+  );
+  await openReport(page);
+  await page.getByRole('radio', { name: /Cost by WBS/ }).click();
+  await chooseProject(page);
+  await page.getByRole('button', { name: 'Generate' }).click();
+  const grid = page.getByRole('grid', { name: /report data/ });
+  await expect(grid.getByRole('columnheader', { name: 'Resource' })).toBeVisible();
+  await expect(grid.getByRole('columnheader', { name: 'WBS Item' })).toHaveCount(0);
+});
+
 test('changing filters after generating shows a stale notice and disables export', async ({ page }) => {
   await openReport(page);
   await page.getByRole('radio', { name: /Cost by WBS/ }).click();

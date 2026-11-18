@@ -8,6 +8,7 @@ import { Risk } from '../../api/estimation';
 import { formatCurrency } from '../../utils/format';
 import { DataTable } from '../common/DataTable';
 import TotalsStrip from './TotalsStrip';
+import { pluralise } from '../../utils/number';
 
 interface RiskListProps {
   risks: Risk[];
@@ -166,7 +167,7 @@ const RiskList: React.FC<RiskListProps> = ({
         footer={
           risks.length > 0 ? (
             <TotalsStrip
-              label={`Total Risk Exposure (${risks.length} risks)`}
+              label={`Total Risk Exposure (${pluralise(risks.length, 'risk')})`}
               ariaLabel="Risk totals"
               items={[{ label: 'Exposure', value: formatCurrency(totalExposure), emphasis: true }]}
             />

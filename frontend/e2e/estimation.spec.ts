@@ -149,6 +149,32 @@ test.describe('WBS detail panel', () => {
     await saveScreenshot(page, testInfo, 'phase-4', 'wbs-panel-light');
   });
 
+  test('the inline panel at desktop width shows PERT and Range without scrolling and singularises counts (F-16)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the inline panel is desktop only');
+    await openPanel(page);
+    const grid = page.getByRole('grid', { name: 'Resource assignments' });
+    await expect(grid.getByText('ENG')).toBeVisible();
+    await expect(grid.getByRole('columnheader', { name: 'PERT' })).toBeInViewport({ ratio: 1 });
+    await expect(grid.getByRole('columnheader', { name: 'Range' })).toBeInViewport({ ratio: 1 });
+    await expect(grid.getByRole('columnheader', { name: 'Std Dev' })).toHaveCount(0);
+    await expect(grid.getByRole('columnheader', { name: 'Supplier' })).toHaveCount(0);
+    const overflow = await grid.locator('.MuiDataGrid-virtualScroller').evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    await expect(page.getByRole('group', { name: 'Assignment totals' })).toContainText('Totals (1 assignment)');
+    await expect(page.getByText('1 assignments')).toHaveCount(0);
+    await saveScreenshot(page, testInfo, 'phase-4', 'wbs-inline-panel-light');
+  });
+
+  test('inline panel in dark mode (screenshot review)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the inline panel is desktop only');
+    await page.addInitScript(() => window.localStorage.setItem('mui-mode', 'dark'));
+    await openPanel(page);
+    const grid = page.getByRole('grid', { name: 'Resource assignments' });
+    await expect(grid.getByText('ENG')).toBeVisible();
+    await expect(grid.getByRole('columnheader', { name: 'PERT' })).toBeInViewport({ ratio: 1 });
+    await saveScreenshot(page, testInfo, 'phase-4', 'wbs-inline-panel-dark');
+  });
+
   test('totals strip sums Decimal strings instead of showing NaN (F-14)', async ({ page }) => {
     const two = [
       { ...assignment, id: 1, best_estimate: '12000.00', likely_estimate: '15000.00', worst_estimate: '24000.00', pert_estimate: 15999.99, std_deviation: 2000 },

@@ -1,3 +1,5 @@
+import { formatNumber } from './format';
+
 /**
  * The API serialises Decimal fields as JSON strings ("12000.00"). Convert such a value to a finite number.
  * Returns null for null/undefined, empty or non-numeric input, so callers decide the fallback.
@@ -18,5 +20,5 @@ export function toNumberOr0(v: string | number | null | undefined): number {
 
 /** "1 assignment", "2 assignments". Pass `plural` for irregular nouns. */
 export function pluralise(n: number, singular: string, plural = `${singular}s`): string {
-  return `${n} ${n === 1 ? singular : plural}`;
+  return `${formatNumber(n)} ${n === 1 ? singular : plural}`;
 }

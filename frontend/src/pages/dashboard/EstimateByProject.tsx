@@ -25,48 +25,54 @@ export function EstimateByProject({ projects }: { projects: PortfolioProject[] }
 
   return (
     <Panel title="Estimate by project" subtitle={`Top ${top.length} of ${projects.length} by PERT estimate`}>
+      {/* The card is as tall as its neighbour (the donut), so the chart fills it: its height comes from this
+          box, never less than the rows need. Few projects get thinner bars rather than a stretched card. */}
       <Box
         sx={{
           position: 'relative',
           minWidth: 0,
+          flex: 1,
+          minHeight: top.length * ROW_HEIGHT + 56,
           '& .MuiBarChart-element': { cursor: 'pointer' },
         }}
       >
-        <BarChart
-          layout="horizontal"
-          height={top.length * ROW_HEIGHT + 56}
-          hideLegend
-          grid={{ vertical: true }}
-          margin={{ top: 8, right: 28, bottom: 8, left: 8 }}
-          series={[
-            {
-              id: 'estimate',
-              label: 'PERT estimate',
-              data: top.map((p) => p.total_pert),
-              color: palette[0],
-              valueFormatter: (v) => formatCurrency(v),
-            },
-          ]}
-          yAxis={[
-            {
-              id: 'project',
-              scaleType: 'band',
-              // Ids, not names: two long names can truncate to the same text, and a band scale needs unique values.
-              data: top.map((p) => p.project_id),
-              width: narrow ? 104 : 176,
-              categoryGapRatio: 0.3,
-              valueFormatter: (id: number, ctx) => {
-                const name = byId.get(id)?.name ?? '';
-                return ctx.location === 'tooltip' ? name : truncate(name, maxChars);
+        {/* Absolutely positioned so the chart takes its size from the box and never feeds back into it. */}
+        <Box sx={{ position: 'absolute', inset: 0 }}>
+          <BarChart
+            layout="horizontal"
+            hideLegend
+            grid={{ vertical: true }}
+            margin={{ top: 8, right: 28, bottom: 8, left: 8 }}
+            series={[
+              {
+                id: 'estimate',
+                label: 'PERT estimate',
+                data: top.map((p) => p.total_pert),
+                color: palette[0],
+                valueFormatter: (v) => formatCurrency(v),
               },
-            },
-          ]}
-          xAxis={[{ id: 'amount', tickNumber: narrow ? 3 : 5, valueFormatter: (v: number) => formatCurrency(v, { compact: true }) }]}
-          onItemClick={(_event, item) => {
-            const project = top[item.dataIndex ?? -1];
-            if (project) navigate(`/projects/${project.project_id}`);
-          }}
-        />
+            ]}
+            yAxis={[
+              {
+                id: 'project',
+                scaleType: 'band',
+                // Ids, not names: two long names can truncate to the same text, and a band scale needs unique values.
+                data: top.map((p) => p.project_id),
+                width: narrow ? 104 : 176,
+                categoryGapRatio: top.length < 6 ? 0.6 : 0.3,
+                valueFormatter: (id: number, ctx) => {
+                  const name = byId.get(id)?.name ?? '';
+                  return ctx.location === 'tooltip' ? name : truncate(name, maxChars);
+                },
+              },
+            ]}
+            xAxis={[{ id: 'amount', tickNumber: narrow ? 3 : 5, valueFormatter: (v: number) => formatCurrency(v, { compact: true }) }]}
+            onItemClick={(_event, item) => {
+              const project = top[item.dataIndex ?? -1];
+              if (project) navigate(`/projects/${project.project_id}`);
+            }}
+          />
+        </Box>
         <ChartDataTable
           caption="Estimate by project"
           headers={['Project', 'PERT estimate', 'WBS items', 'Risks']}

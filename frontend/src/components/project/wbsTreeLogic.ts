@@ -96,6 +96,16 @@ export function initialExpanded(nodes: WBSTreeNode[]): Set<number> {
   return new Set(nodes.filter((n) => n.children?.length).map((n) => n.id));
 }
 
+/** Ids of the ancestors of `id`, outermost first; empty when `id` is a root or not in the tree. */
+export function ancestorIds(nodes: WBSTreeNode[], id: number, trail: number[] = []): number[] {
+  for (const n of nodes) {
+    if (n.id === id) return trail;
+    const found = ancestorIds(n.children ?? [], id, [...trail, n.id]);
+    if (found.length > 0 || (n.children ?? []).some((c) => c.id === id)) return found;
+  }
+  return [];
+}
+
 /** Depth-first lookup of a node by id. */
 export function findNode(nodes: WBSTreeNode[], id: number): WBSTreeNode | undefined {
   for (const n of nodes) {

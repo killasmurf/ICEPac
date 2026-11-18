@@ -9,6 +9,7 @@ import { formatCurrency } from '../../utils/format';
 import { DataTable } from '../common/DataTable';
 import { PertRangeBar } from '../common/PertRangeBar';
 import TotalsStrip from './TotalsStrip';
+import { pluralise } from '../../utils/number';
 
 interface AssignmentListProps {
   assignments: Assignment[];
@@ -16,6 +17,8 @@ interface AssignmentListProps {
   onEdit: (assignment: Assignment) => void;
   onDelete: (assignment: Assignment) => void;
   readonly?: boolean;
+  /** Narrow host (the inline detail pane): hides the low-priority Supplier and Std Dev columns and tightens widths. */
+  compact?: boolean;
 }
 
 const money = (value: number | null | undefined) => formatCurrency(value);
@@ -26,6 +29,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
   onEdit,
   onDelete,
   readonly = false,
+  compact = false,
 }) => {
   // Calculate totals
   const totals = assignments.reduce(
@@ -47,7 +51,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
       type: 'number',
       align: 'right',
       headerAlign: 'right',
-      minWidth: 110,
+      minWidth: compact ? 92 : 110,
       flex: 0.8,
       cellClassName: 'tabular-nums',
       valueFormatter: (value: number) => money(value),
@@ -55,7 +59,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
     });
 
     const cols: GridColDef<Assignment>[] = [
-      { field: 'resource_code', headerName: 'Resource', minWidth: 120, flex: 1 },
+      { field: 'resource_code', headerName: 'Resource', minWidth: compact ? 96 : 120, flex: 1 },
       {
         field: 'supplier_code',
         headerName: 'Supplier',
@@ -77,7 +81,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
       {
         field: 'range',
         headerName: 'Range',
-        minWidth: 190,
+        minWidth: compact ? 140 : 190,
         flex: 1.2,
         sortable: false,
         filterable: false,
@@ -104,7 +108,7 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
         disableColumnMenu: true,
         align: 'center',
         headerAlign: 'center',
-        minWidth: 110,
+        minWidth: compact ? 88 : 110,
         renderCell: ({ row }) => (
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Tooltip title="Edit">
@@ -127,7 +131,12 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
       });
     }
     return cols;
-  }, [readonly, onEdit, onDelete]);
+  }, [readonly, compact, onEdit, onDelete]);
+
+  const columnVisibilityModel = useMemo(
+    () => (compact ? { supplier_code: false, std_deviation: false } : undefined),
+    [compact],
+  );
 
   return (
     <Box>
@@ -146,10 +155,11 @@ const AssignmentList: React.FC<AssignmentListProps> = ({
         rows={assignments}
         columns={columns}
         ariaLabel="Resource assignments"
+        columnVisibilityModel={columnVisibilityModel}
         footer={
           assignments.length > 0 ? (
             <TotalsStrip
-              label={`Totals (${assignments.length} assignments)`}
+              label={`Totals (${pluralise(assignments.length, 'assignment')})`}
               ariaLabel="Assignment totals"
               items={[
                 { label: 'Best', value: money(totals.best) },

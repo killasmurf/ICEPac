@@ -29,5 +29,6 @@ describe('pluralise', () => {
     expect(pluralise(0, 'assignment')).toBe('0 assignments');
     expect(pluralise(2, 'risk')).toBe('2 risks');
     expect(pluralise(2, 'category', 'categories')).toBe('2 categories');
+    expect(pluralise(1234, 'item')).toBe('1,234 items');
   });
 });

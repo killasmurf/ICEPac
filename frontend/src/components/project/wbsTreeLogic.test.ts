@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WBSTreeNode } from '../../api/projects';
 import {
+  ancestorIds,
   expandableIds,
   filterTree,
   findNode,
@@ -123,5 +124,16 @@ describe('navigate', () => {
 
   it('ignores an unknown current row', () => {
     expect(navigate(rows, 99, 'ArrowDown')).toBeNull();
+  });
+});
+
+describe('ancestorIds', () => {
+  it('lists ancestors outermost first, and nothing for roots or unknown ids', () => {
+    expect(ancestorIds(tree, 6)).toEqual([1, 3]);
+    expect(ancestorIds(tree, 5)).toEqual([4]);
+    expect(ancestorIds(tree, 2)).toEqual([1]);
+    expect(ancestorIds(tree, 1)).toEqual([]);
+    expect(ancestorIds(tree, 7)).toEqual([]);
+    expect(ancestorIds(tree, 99)).toEqual([]);
   });
 });
