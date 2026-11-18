@@ -103,7 +103,11 @@ class EstimationService:
 
         # Get all assignments and risks
         assignments = self.assignment_repo.get_by_project(project_id)
-        risks = self.risk_repo.get_by_project(project_id)
+        # Risks live at two scopes (XOR per row, so the union has no overlap):
+        # WBS-level risks (via their WBS) and project-level risks (direct).
+        wbs_scoped_risks = self.risk_repo.get_all_wbs_scoped_by_project(project_id)
+        project_risks = self.risk_repo.get_by_project(project_id)
+        risks = list(wbs_scoped_risks) + list(project_risks)
 
         # Compute totals
         total_pert = sum(a.pert_estimate for a in assignments)
@@ -124,7 +128,7 @@ class EstimationService:
         wbs_summaries = []
         for wbs in wbs_items:
             wbs_assignments = [a for a in assignments if a.wbs_id == wbs.id]
-            wbs_risks = [r for r in risks if r.wbs_id == wbs.id]
+            wbs_risks = [r for r in wbs_scoped_risks if r.wbs_id == wbs.id]
 
             wbs_pert = sum(a.pert_estimate for a in wbs_assignments)
             wbs_variances = [a.std_deviation**2 for a in wbs_assignments]

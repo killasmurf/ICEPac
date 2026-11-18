@@ -15,7 +15,9 @@ class RiskBase(BaseModel):
     constraint is satisfied for all current data.
 
     risk_exposure (probability × severity × cost) is computed in the service
-    layer, not a model property.
+    layer, not a model property. It is a response-only field (see
+    RiskResponse / ProjectRiskResponse) so that it can never reach the ORM
+    constructor through ``model_dump()`` on a create schema.
     """
 
     title: str = Field(..., max_length=255)
@@ -26,7 +28,6 @@ class RiskBase(BaseModel):
     severity_code: Optional[str] = Field(default=None, max_length=50)
     mitigation_plan: Optional[str] = None
     date_identified: datetime = Field(default_factory=datetime.utcnow)
-    risk_exposure: Optional[float] = None
 
 
 class RiskCreate(RiskBase):
@@ -57,6 +58,7 @@ class RiskResponse(RiskBase):
     project_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    risk_exposure: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -99,6 +101,7 @@ class ProjectRiskResponse(RiskBase):
     project_id: int
     created_at: datetime
     updated_at: datetime
+    risk_exposure: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
