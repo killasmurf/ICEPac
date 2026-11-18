@@ -112,7 +112,7 @@ const WBSWorkspace: React.FC<WBSWorkspaceProps> = ({
       {isDesktop ? (
         <Box sx={{ height: 'clamp(480px, calc(100vh - 220px), 800px)' }}>
           <SplitGroup orientation="horizontal" id="wbs-split">
-            <Panel id="wbs-tree" minSize={280} defaultSize="42%">
+            <Panel id="wbs-tree" minSize={280} defaultSize="32%">
               {tree}
             </Panel>
             <Handle id="wbs-handle" aria-label="Resize tree and detail panes" />

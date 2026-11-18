@@ -8,6 +8,7 @@ import { Risk } from '../../api/estimation';
 import { formatCurrency } from '../../utils/format';
 import { DataTable } from '../common/DataTable';
 import TotalsStrip from './TotalsStrip';
+import { pluralise } from '../../utils/number';
 
 interface RiskListProps {
   risks: Risk[];
@@ -44,10 +45,11 @@ const RiskList: React.FC<RiskListProps> = ({
   readonly = false,
 }) => {
   // Calculate total exposure
-  const totalExposure = risks.reduce((sum, r) => sum + r.risk_exposure, 0);
+  const totalExposure = risks.reduce((sum, r) => sum + (r.risk_exposure ?? 0), 0);
 
   const columns = useMemo<GridColDef<Risk>[]>(() => {
     const cols: GridColDef<Risk>[] = [
+      { field: 'title', headerName: 'Title', minWidth: 160, flex: 1.5 },
       { field: 'risk_category_code', headerName: 'Category', minWidth: 120, flex: 1 },
       {
         field: 'risk_cost',
@@ -92,7 +94,7 @@ const RiskList: React.FC<RiskListProps> = ({
         flex: 0.8,
         renderCell: ({ row }) => (
           <Typography component="span" variant="body2" className="tabular-nums" sx={{ fontWeight: 700 }}>
-            {formatCurrency(row.risk_exposure)}
+            {formatCurrency(row.risk_exposure ?? 0)}
           </Typography>
         ),
       },
@@ -124,7 +126,7 @@ const RiskList: React.FC<RiskListProps> = ({
         renderCell: ({ row }) => (
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Tooltip title="Edit">
-              <IconButton size="small" aria-label={`Edit risk ${row.risk_category_code}`} onClick={() => onEdit(row)}>
+              <IconButton size="small" aria-label={`Edit risk ${row.title}`} onClick={() => onEdit(row)}>
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -132,7 +134,7 @@ const RiskList: React.FC<RiskListProps> = ({
               <IconButton
                 size="small"
                 color="error"
-                aria-label={`Delete risk ${row.risk_category_code}`}
+                aria-label={`Delete risk ${row.title}`}
                 onClick={() => onDelete(row)}
               >
                 <DeleteIcon fontSize="small" />
@@ -165,7 +167,7 @@ const RiskList: React.FC<RiskListProps> = ({
         footer={
           risks.length > 0 ? (
             <TotalsStrip
-              label={`Total Risk Exposure (${risks.length} risks)`}
+              label={`Total Risk Exposure (${pluralise(risks.length, 'risk')})`}
               ariaLabel="Risk totals"
               items={[{ label: 'Exposure', value: formatCurrency(totalExposure), emphasis: true }]}
             />

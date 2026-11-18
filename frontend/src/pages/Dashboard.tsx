@@ -27,6 +27,7 @@ import Panel from './dashboard/Panel';
 import { RecentActivity } from './dashboard/RecentActivity';
 import { SystemHealth } from './dashboard/SystemHealth';
 import { firstName, greetingFor } from './dashboard/dashboardUtils';
+import { pluralise } from '../utils/number';
 
 const PORTFOLIO_LIMIT = 20;
 const compactCurrency = (v: number) => formatCurrency(v, { compact: true });
@@ -87,28 +88,28 @@ const Dashboard: React.FC = () => {
       {
         label: 'Active projects',
         value: s ? formatNumber(s.projects.active) : null,
-        hint: s ? `of ${formatNumber(s.projects.total)} projects` : undefined,
+        hint: s ? `of ${pluralise(s.projects.total, 'project')}` : undefined,
         icon: <FolderOpenOutlined />,
         to: '/projects',
       },
       {
         label: 'Total estimate',
         value: s ? <AnimatedNumber value={s.estimation.total_pert} format={compactCurrency} /> : null,
-        hint: s ? `across ${formatNumber(s.estimation.assignments)} assignments` : undefined,
+        hint: s ? `across ${pluralise(s.estimation.assignments, 'assignment')}` : undefined,
         icon: <PaidOutlined />,
         to: '/reports',
       },
       {
         label: 'WBS awaiting approval',
         value: s ? formatNumber(s.wbs.pending) : null,
-        hint: s ? `of ${formatNumber(s.wbs.total)} WBS items` : undefined,
+        hint: s ? `of ${pluralise(s.wbs.total, 'WBS item')}` : undefined,
         icon: <AssignmentTurnedInOutlined />,
       },
       {
         // The stats endpoint counts every risk, not only open ones, so the label says "Risks".
         label: 'Risks',
         value: s ? formatNumber(s.estimation.risks) : null,
-        hint: s ? `across ${formatNumber(s.projects.total)} projects` : undefined,
+        hint: s ? `across ${pluralise(s.projects.total, 'project')}` : undefined,
         icon: <WarningAmberOutlined />,
       },
     ];

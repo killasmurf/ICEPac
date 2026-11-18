@@ -25,6 +25,10 @@ export const makeAssignment = (over: Partial<Assignment> = {}): Assignment => ({
 export const makeRisk = (over: Partial<Risk> = {}): Risk => ({
   id: 5,
   wbs_id: 10,
+  project_id: null,
+  title: 'Integration slips',
+  status: 'open',
+  date_identified: '2026-01-01T00:00:00Z',
   risk_category_code: 'TECH',
   risk_cost: 10000,
   probability_code: 'M',

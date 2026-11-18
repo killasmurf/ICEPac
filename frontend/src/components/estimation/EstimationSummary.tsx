@@ -17,6 +17,7 @@ import { CostBreakdownCard } from './CostBreakdownCard';
 import { TopWbsChart } from './TopWbsChart';
 import { estimationKey } from './queryKeys';
 import { summaryRangeBar } from './estimationUtils';
+import { pluralise } from '../../utils/number';
 
 interface EstimationSummaryProps {
   projectId: number;
@@ -159,7 +160,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
             <StatCard
               label="Total PERT Estimate"
               value={compact(summary.total_pert_estimate)}
-              hint={`${formatCurrency(summary.total_pert_estimate)} across ${summary.total_assignments} assignments`}
+              hint={`${formatCurrency(summary.total_pert_estimate)} across ${pluralise(summary.total_assignments, 'assignment')}`}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
@@ -173,7 +174,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
             <StatCard
               label="Risk Exposure"
               value={compact(summary.total_risk_exposure)}
-              hint={`${formatCurrency(summary.total_risk_exposure)} from ${summary.total_risks} risks`}
+              hint={`${formatCurrency(summary.total_risk_exposure)} from ${pluralise(summary.total_risks, 'risk')}`}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
@@ -210,7 +211,7 @@ const EstimationSummary: React.FC<EstimationSummaryProps> = ({ projectId, hideHe
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" component="h3" gutterBottom>
-            WBS Summary ({summary.total_wbs_items} items)
+            WBS Summary ({pluralise(summary.total_wbs_items, 'item')})
           </Typography>
           <DataTable<WBSRow>
             rows={wbsRows}

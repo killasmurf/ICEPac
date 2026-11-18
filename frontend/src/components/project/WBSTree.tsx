@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -29,6 +30,7 @@ import { useWbsTree } from './useWbsTree';
 import {
   FlatRow,
   NAV_KEYS,
+  ancestorIds,
   NavKey,
   expandableIds,
   filterTree,
@@ -36,6 +38,7 @@ import {
   initialExpanded,
   navigate as navigateRows,
 } from './wbsTreeLogic';
+import { pluralise } from '../../utils/number';
 
 export interface WBSTreeProps {
   projectId: number;
@@ -157,11 +160,36 @@ const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick, selectedId, p
   const tree = useMemo(() => data?.items ?? [], [data]);
 
   const [query, setQuery] = useState('');
-  // Expansion is stored as "user choice since the tree last loaded"; null means the default (first level open).
-  const [expandedOverride, setExpandedOverride] = useState<Set<number> | null>(null);
+  // Expansion is the user's choice (null = the default, first level open). It is kept in the query cache, not in
+  // this component, so it survives the tree remounting (switching tabs, crossing the md breakpoint).
+  const queryClient = useQueryClient();
+  const expandedKey = useMemo(() => ['ui', 'wbs-expanded', projectId] as const, [projectId]);
+  const [expandedOverride, setExpandedState] = useState<Set<number> | null>(() => {
+    const saved = queryClient.getQueryData<number[]>(expandedKey);
+    return saved ? new Set(saved) : null;
+  });
+  const setExpandedOverride = useCallback(
+    (update: Set<number> | ((prev: Set<number> | null) => Set<number>)) =>
+      setExpandedState((prev) => {
+        const next = typeof update === 'function' ? update(prev) : update;
+        queryClient.setQueryData(expandedKey, [...next]);
+        return next;
+      }),
+    [queryClient, expandedKey],
+  );
   const [localSelected, setLocalSelected] = useState<number | null>(null);
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const rowEls = useRef(new Map<number, HTMLElement>());
+
+  // Reveal the selected row (e.g. a ?wbs= deep link) once the tree is loaded: open its ancestors.
+  const [revealedFor, setRevealedFor] = useState<number | null>(null);
+  if (selectedId != null && tree.length > 0 && revealedFor !== selectedId) {
+    setRevealedFor(selectedId);
+    const parents = ancestorIds(tree, selectedId);
+    if (parents.length > 0) {
+      setExpandedOverride((prev) => new Set([...(prev ?? initialExpanded(tree)), ...parents]));
+    }
+  }
 
   const expanded = useMemo(() => expandedOverride ?? initialExpanded(tree), [expandedOverride, tree]);
   const filter = useMemo(() => filterTree(tree, query), [tree, query]);
@@ -191,7 +219,7 @@ const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick, selectedId, p
         return next;
       });
     },
-    [tree],
+    [tree, setExpandedOverride],
   );
 
   const select = useCallback(
@@ -265,8 +293,8 @@ const WBSTree: React.FC<WBSTreeProps> = ({ projectId, onNodeClick, selectedId, p
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography variant="caption" color="text.secondary" role="status" className="tabular-nums">
             {filtering
-              ? `${formatNumber(filter.matches.size)} of ${formatNumber(data?.total ?? 0)} items match`
-              : `${formatNumber(data?.total ?? 0)} items`}
+              ? `${formatNumber(filter.matches.size)} of ${pluralise(data?.total ?? 0, 'item')} match`
+              : pluralise(data?.total ?? 0, 'item')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Button size="small" onClick={() => setExpandedOverride(expandableIds(tree))}>

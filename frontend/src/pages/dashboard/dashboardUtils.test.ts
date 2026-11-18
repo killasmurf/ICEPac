@@ -100,7 +100,7 @@ describe('describeAction', () => {
   it('maps known actions and keeps unknown ones readable', () => {
     expect(describeAction('CREATE')).toEqual({ verb: 'created', icon: 'create' });
     expect(describeAction('update').icon).toBe('update');
-    expect(describeAction('LOGIN_FAILED')).toEqual({ verb: 'login failed', icon: 'other' });
+    expect(describeAction('FAILED_LOGIN')).toEqual({ verb: 'failed login', icon: 'other' });
     expect(activityTarget({ entity_type: 'Resource', entity_id: 45 })).toBe('Resource #45');
     expect(activityTarget({ entity_type: 'Resource', entity_id: null })).toBe('Resource');
   });

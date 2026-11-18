@@ -38,6 +38,7 @@ import {
   uploadErrorMessage,
   validateUploadFile,
 } from './projectUploadUtils';
+import { pluralise } from '../../utils/number';
 
 interface ProjectUploadProps {
   projectId: number;
@@ -321,8 +322,8 @@ const ProjectUpload: React.FC<ProjectUploadProps> = ({ projectId, onImportComple
 
       {currentJob?.status === 'completed' && (
         <Alert severity="success">
-          Import completed: {formatNumber(currentJob.task_count)} tasks, {formatNumber(currentJob.resource_count)} resources,{' '}
-          {formatNumber(currentJob.assignment_count)} assignments created.
+          Import completed: {pluralise(currentJob.task_count, 'task')}, {pluralise(currentJob.resource_count, 'resource')},{' '}
+          {pluralise(currentJob.assignment_count, 'assignment')} created.
         </Alert>
       )}
       {currentJob?.status === 'failed' && (

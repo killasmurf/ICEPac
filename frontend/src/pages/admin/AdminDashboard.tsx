@@ -28,18 +28,20 @@ import ErrorState from '../../components/common/ErrorState';
 import PageHeader from '../../components/common/PageHeader';
 import StatCard from '../../components/common/StatCard';
 import { formatDateTime, formatNumber } from '../../utils/format';
+import { useAuth } from '../../auth/AuthContext';
 import { formatActionLabel } from './auditFormat';
 
-const quickLinks = [
+const quickLinks: { label: string; description: string; path: string; icon: React.ReactElement; adminOnly?: boolean }[] = [
   { label: 'Users', description: 'Accounts, roles and passwords', path: '/admin/users', icon: <PeopleOutlineIcon /> },
   { label: 'Resources', description: 'Resource library and rates', path: '/admin/resources', icon: <Inventory2OutlinedIcon /> },
   { label: 'Suppliers', description: 'Supplier contacts', path: '/admin/suppliers', icon: <BusinessOutlinedIcon /> },
   { label: 'Config Tables', description: 'Lookup values for forms', path: '/admin/config', icon: <TuneIcon /> },
-  { label: 'Audit Logs', description: 'Who changed what, and when', path: '/admin/audit-logs', icon: <HistoryIcon /> },
+  { label: 'Audit Logs', description: 'Who changed what, and when', path: '/admin/audit-logs', icon: <HistoryIcon />, adminOnly: true },
 ];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { role } = useAuth();
   const query = useQuery({ queryKey: ['dashboard', 'stats'], queryFn: getDashboardStats });
   const admin = query.data?.admin;
   const activity = query.data?.recent_activity ?? [];
@@ -143,7 +145,7 @@ export default function AdminDashboard() {
           <Box
             sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}
           >
-            {quickLinks.map((l) => (
+            {quickLinks.filter((l) => !l.adminOnly || role === 'admin').map((l) => (
               <Card key={l.path}>
                 <CardActionArea component={RouterLink} to={l.path}>
                   <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

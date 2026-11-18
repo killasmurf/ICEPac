@@ -281,6 +281,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
                 onEdit={handleEditAssignment}
                 onDelete={(assignment) => setDeleteTarget({ kind: 'assignment', item: assignment })}
                 readonly={isReadonly}
+                compact={variant === 'inline'}
               />
             </TabPanel>
 

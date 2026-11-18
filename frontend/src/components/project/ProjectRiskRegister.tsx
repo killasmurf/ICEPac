@@ -99,7 +99,7 @@ export const patchRisk = (risk: ProjectRisk, payload: ProjectRiskCreate | Projec
   ...risk,
   ...(payload.title !== undefined && { title: payload.title }),
   ...(payload.status !== undefined && { status: payload.status }),
-  ...(payload.risk_cost !== undefined && { risk_cost: String(payload.risk_cost) }),
+  ...(payload.risk_cost !== undefined && { risk_cost: Number(payload.risk_cost) }),
   ...(payload.risk_category_code !== undefined && { risk_category_code: payload.risk_category_code }),
   ...(payload.probability_code !== undefined && { probability_code: payload.probability_code }),
   ...(payload.severity_code !== undefined && { severity_code: payload.severity_code }),
@@ -204,7 +204,7 @@ export const ProjectRiskRegister: React.FC<Props> = ({ projectId }) => {
     setEditing(risk);
     setForm({
       title: risk.title,
-      risk_cost: String(parseFloat(risk.risk_cost)),
+      risk_cost: String(risk.risk_cost),
       risk_category_code: risk.risk_category_code ?? '',
       probability_code: risk.probability_code ?? '',
       severity_code: risk.severity_code ?? '',

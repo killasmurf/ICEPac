@@ -16,8 +16,8 @@ vi.mock('../common/DataTable', async () => {
 });
 
 const risks = [
-  makeRisk({ id: 1, risk_category_code: 'TECH', risk_cost: 10000, risk_exposure: 2500 }),
-  makeRisk({ id: 2, risk_category_code: 'SCHED', risk_cost: 5000, risk_exposure: 500, probability_code: null, severity_code: null, mitigation_plan: null }),
+  makeRisk({ id: 1, title: 'Tech debt', risk_category_code: 'TECH', risk_cost: 10000, risk_exposure: 2500 }),
+  makeRisk({ id: 2, title: 'Late delivery', risk_category_code: 'SCHED', risk_cost: 5000, risk_exposure: 500, probability_code: null, severity_code: null, mitigation_plan: null }),
 ];
 const noop = () => undefined;
 
@@ -47,9 +47,9 @@ describe('RiskList', () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
     const { unmount } = renderWithProviders(<RiskList risks={risks} onAdd={noop} onEdit={onEdit} onDelete={onDelete} />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit risk SCHED' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit risk Late delivery' }));
     expect(onEdit).toHaveBeenCalledWith(risks[1]);
-    await userEvent.click(screen.getByRole('button', { name: 'Delete risk TECH' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete risk Tech debt' }));
     expect(onDelete).toHaveBeenCalledWith(risks[0]);
     unmount();
 

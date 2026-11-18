@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { configTableKey, normalizeConfigItem, normalizeConfigTables } from './admin';
+import { configTableKey, normalizeConfigItem, normalizeConfigTables, normalizeResource } from './admin';
 
 describe('config table helpers', () => {
   it('derives route keys from labels', () => {
@@ -31,5 +31,20 @@ describe('config table helpers', () => {
     expect(normalizeConfigItem({ ...base, weight: '75.50' }).weight).toBe(75.5);
     expect('weight' in normalizeConfigItem(base)).toBe(false);
     expect('weight' in normalizeConfigItem({ ...base, weight: null })).toBe(false);
+  });
+});
+
+describe('normalizeResource', () => {
+  it('converts the Decimal cost string to a number', () => {
+    const r = normalizeResource({
+      id: 1, resource_code: 'ENG', description: 'Engineer', eoc: null, cost: '125.50', units: 'h',
+      is_active: true, created_at: 'x', updated_at: 'y',
+    });
+    expect(r.cost).toBe(125.5);
+  });
+  it('normalizeConfigItem converts string weights and drops unparsable ones', () => {
+    const base = { id: 1, code: 'H', description: 'High', is_active: true, created_at: 'x' };
+    expect(normalizeConfigItem({ ...base, weight: '0.75' }).weight).toBe(0.75);
+    expect(normalizeConfigItem({ ...base, weight: 'oops' }).weight).toBeUndefined();
   });
 });

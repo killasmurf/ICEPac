@@ -112,6 +112,27 @@ test('approval status shows a dash when there are no WBS items', async ({ page }
   await expect(page.getByTestId('approved-percent')).toHaveText('—');
 });
 
+test('with few projects the Estimate by project chart fills its card instead of leaving a blank block', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'cards stack on phones');
+  const project = (id: number, name: string, pert: number) => ({ project_id: id, name, status: 'draft', wbs_total: 4, wbs_approved: 1, wbs_submitted: 1, total_pert: pert, risk_count: 1 });
+  await mockApi(page, {
+    'GET /dashboard/portfolio': () => ({
+      projects: [project(1, 'Harbour Bridge', 458833), project(2, 'Rail Depot', 120000), project(3, 'Legacy', 5000)],
+      approval_totals: { draft: 5, submitted: 3, approved: 2, rejected: 1 },
+    }),
+  });
+  await page.goto('/');
+  await ready(page);
+  const estimate = page.getByRole('region', { name: 'Estimate by project' });
+  const approval = page.getByRole('region', { name: 'Approval status' });
+  const [e, a] = [await estimate.boundingBox(), await approval.boundingBox()];
+  expect(Math.abs(e!.height - a!.height)).toBeLessThan(2);
+  const chart = await estimate.locator('.MuiChartsSurface-root, svg').first().boundingBox();
+  // header + padding take well under 140px, so the chart owns the rest of the card
+  expect(chart!.height).toBeGreaterThan(e!.height - 140);
+  await saveScreenshot(page, testInfo, 'phase-6', 'dashboard-few-projects');
+});
+
 test('recent activity shows relative time with the absolute time in a tooltip', async ({ page }) => {
   await page.goto('/');
   await ready(page);

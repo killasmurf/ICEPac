@@ -29,6 +29,13 @@ describe('RiskForm', () => {
     const create = screen.getByRole('button', { name: 'Create' });
     expect(create).toBeDisabled();
 
+    // Title is required: touching and leaving it empty shows the message
+    const title = screen.getByLabelText(/^Title/);
+    await userEvent.click(title);
+    await userEvent.tab();
+    expect(screen.getByText('Title is required')).toBeInTheDocument();
+    setValue(/^Title/, '  Integration slips ');
+
     await userEvent.click(screen.getByRole('combobox', { name: /Risk Category/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'TECH - Technical' }));
     setValue('Risk Cost', '10000');
@@ -41,12 +48,24 @@ describe('RiskForm', () => {
     expect(create).toBeEnabled();
     await userEvent.click(create);
     expect(onSubmit).toHaveBeenCalledWith({
+      title: 'Integration slips',
+      status: 'open',
       risk_category_code: 'TECH',
       risk_cost: 10000,
       probability_code: 'M',
       severity_code: 'H',
       mitigation_plan: '',
     });
+  });
+
+  it('keeps Create disabled while the title is blank, then submits the chosen status', async () => {
+    const { onSubmit } = setup({ risk: makeRisk({ title: '' }) });
+    expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
+    setValue(/^Title/, 'Vendor delay');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Mitigated' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: 'Vendor delay', status: 'mitigated' }));
   });
 
   it('rejects a negative cost with helper text', async () => {

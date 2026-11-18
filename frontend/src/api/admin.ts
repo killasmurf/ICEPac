@@ -4,6 +4,7 @@
  */
 
 import client from './client';
+import { toNumber, toNumberOr0 } from '../utils/number';
 
 const API_BASE = '/admin';
 
@@ -47,8 +48,8 @@ export interface Resource {
   resource_code: string;
   description: string;
   eoc: string | null;
-  /** Pydantic serialises Decimal as a JSON string, so accept both. */
-  cost: number | string;
+  /** Pydantic serialises Decimal as a JSON string; normalised to a number in this API layer. */
+  cost: number;
   units: string | null;
   is_active: boolean;
   created_at: string;
@@ -188,10 +189,15 @@ export const usersApi = {
 
 // ── Resources ────────────────────────────────────────────────
 
+type RawResource = Omit<Resource, 'cost'> & { cost: number | string | null | undefined };
+
+/** The API serialises Decimal cost as a string; convert to a number. */
+export const normalizeResource = (raw: RawResource): Resource => ({ ...raw, cost: toNumberOr0(raw.cost) });
+
 export const resourcesApi = {
   list: (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean }) =>
     client
-      .get<PaginatedResponse<Resource>>(`${API_BASE}/resources`, {
+      .get<PaginatedResponse<RawResource>>(`${API_BASE}/resources`, {
         params: {
           skip: params?.skip,
           limit: params?.limit,
@@ -199,11 +205,12 @@ export const resourcesApi = {
           active_only: params?.is_active ? true : undefined,
         },
       })
-      .then((r) => r.data),
-  get: (id: number) => client.get<Resource>(`${API_BASE}/resources/${id}`).then((r) => r.data),
-  create: (data: ResourceCreate) => client.post<Resource>(`${API_BASE}/resources`, data).then((r) => r.data),
+      .then((r) => ({ ...r.data, items: r.data.items.map(normalizeResource) })),
+  get: (id: number) => client.get<RawResource>(`${API_BASE}/resources/${id}`).then((r) => normalizeResource(r.data)),
+  create: (data: ResourceCreate) =>
+    client.post<RawResource>(`${API_BASE}/resources`, data).then((r) => normalizeResource(r.data)),
   update: (id: number, data: ResourceUpdate) =>
-    client.put<Resource>(`${API_BASE}/resources/${id}`, data).then((r) => r.data),
+    client.put<RawResource>(`${API_BASE}/resources/${id}`, data).then((r) => normalizeResource(r.data)),
   delete: (id: number) => client.delete<void>(`${API_BASE}/resources/${id}`).then((r) => r.data),
 };
 
@@ -265,8 +272,8 @@ export const normalizeConfigTables = (raw: { tables?: RawConfigTable[] } | RawCo
 export const normalizeConfigItem = (item: Omit<ConfigItem, 'weight'> & { weight?: number | string | null }): ConfigItem => {
   const { weight, ...rest } = item;
   if (weight === undefined || weight === null) return rest;
-  const n = Number(weight);
-  return Number.isNaN(n) ? rest : { ...rest, weight: n };
+  const n = toNumber(weight);
+  return n === null ? rest : { ...rest, weight: n };
 };
 
 export const configApi = {

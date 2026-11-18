@@ -18,6 +18,7 @@ import StatCard from '../../components/common/StatCard';
 import StatusChip from '../../components/common/StatusChip';
 import { useToast } from '../../components/feedback/ToastProvider';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../../utils/format';
+import { pluralise } from '../../utils/number';
 
 const figure = (text: string) => (
   <Box component="span" sx={{ fontSize: { xs: '1.25rem', sm: 'inherit' }, overflowWrap: 'anywhere' }}>
@@ -160,7 +161,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project, estimation, esti
           icon={<AccountTreeOutlinedIcon />}
           loading={estimationLoading}
           value={figure(estimation ? formatNumber(estimation.total_wbs_items) : dash)}
-          hint={estimation ? `${formatNumber(estimation.total_assignments)} assignments` : undefined}
+          hint={estimation ? pluralise(estimation.total_assignments, 'assignment') : undefined}
         />
         <StatCard
           label="Risks"

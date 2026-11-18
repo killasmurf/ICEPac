@@ -308,3 +308,44 @@ test('summary tab: no duplicated headline cards and the WBS Summary table is not
   expect(box?.x ?? -1).toBeGreaterThanOrEqual(gridBox?.x ?? 0);
   await saveScreenshot(page, testInfo, 'phase-4', 'project-detail-summary-light');
 });
+
+// F-16(d): the smoke run once saw the tree fall back to first-level-only. Expansion lived in the tree's own
+// state, so anything that remounted the tree (tab switch, crossing the md breakpoint) reset it, and a deep
+// ?wbs= link showed a detail pane for a row the tree did not show.
+test.describe('WBS tree keeps its expansion', () => {
+  const treeTab = (page: Page) => page.getByRole('tab', { name: /^WBS/ });
+
+  test('survives switching tabs and back', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo.project.name), 'the drawer covers the tree on phones; the resize test covers remounting');
+    await page.goto('/projects/1?tab=wbs');
+    await expect(item(page, /Earthworks/)).toBeVisible();
+    await expect(item(page, /Excavation/)).toHaveCount(0);
+    await item(page, /Earthworks/).click();
+    await page.keyboard.press('ArrowRight');
+    await expect(item(page, /Excavation/)).toBeVisible();
+    await page.getByRole('tablist', { name: 'Project sections' }).getByRole('tab', { name: 'Summary' }).click();
+    await expect(page.getByRole('heading', { name: '80% Confidence Range' })).toBeVisible();
+    await treeTab(page).click();
+    await expect(item(page, /Excavation/)).toBeVisible();
+  });
+
+  test('a ?wbs= link to a deep item reveals and selects it in the tree', async ({ page }, testInfo) => {
+    await page.goto('/projects/1?tab=wbs&wbs=4');
+    // on phones the editor opens in a drawer over the tree
+    if (isMobile(testInfo.project.name)) await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+    await expect(item(page, /Excavation/)).toBeVisible();
+    await expect(item(page, /Excavation/)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('survives resizing across the md breakpoint', async ({ page }, testInfo) => {
+    test.skip(isMobile(testInfo.project.name), 'starts desktop');
+    await page.goto('/projects/1?tab=wbs&wbs=4');
+    await expect(item(page, /Excavation/)).toBeVisible();
+    await page.setViewportSize({ width: 600, height: 900 });
+    // below md the selected item's editor opens in a drawer over the tree; close it to see the tree again
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+    await expect(item(page, /Excavation/)).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(item(page, /Excavation/)).toBeVisible();
+  });
+});
