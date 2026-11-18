@@ -42,7 +42,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware (order matters - last added is first executed)
+# Middleware. add_middleware() puts the LAST one added OUTERMOST, so the stack
+# reads (outside in): CORS > rate limit > request logging > error handler > app.
+# CORS must wrap everything that can build a response (including the 500 from
+# the error handler and the 429 from the rate limiter); otherwise the browser
+# reports "blocked by CORS policy" instead of the real status.
+app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -51,9 +58,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(ErrorHandlerMiddleware)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -62,21 +66,30 @@ app.add_middleware(ErrorHandlerMiddleware)
 
 
 @app.get("/health", tags=["System"])
-async def health_check():
-    """Comprehensive health check — reports status of all dependencies."""
+def health_check():
+    """Comprehensive health check — reports status of all dependencies.
+
+    A plain ``def`` so FastAPI runs it in the threadpool: the database and
+    Redis calls block and must not stall the event loop.
+    """
+    from sqlalchemy import text
+
     from app.core.database import SessionLocal
     from app.services.cache_service import cache
 
     checks = {"app": "healthy", "version": settings.APP_VERSION}
 
     # Database
+    db = None
     try:
         db = SessionLocal()
-        db.execute("SELECT 1")
-        db.close()
+        db.execute(text("SELECT 1"))
         checks["database"] = "healthy"
     except Exception as e:
         checks["database"] = f"unhealthy: {type(e).__name__}"
+    finally:
+        if db is not None:
+            db.close()
 
     # Redis/Cache
     checks["cache"] = "healthy" if cache.ping() else "unavailable"

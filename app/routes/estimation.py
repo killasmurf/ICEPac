@@ -1,6 +1,6 @@
 """Estimation routes - assignments, risks, cost summaries, and approval workflow."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -26,6 +26,7 @@ from app.models.schemas.risk import (
 from app.repositories.wbs_repository import WBSRepository
 from app.services.approval_service import ApprovalService
 from app.services.assignment_service import AssignmentService
+from app.services.audit_service import AuditService, serialize_for_audit
 from app.services.estimation_service import EstimationService
 from app.services.project_service import ProjectService
 from app.services.risk_service import RiskService
@@ -84,13 +85,22 @@ async def create_assignment(
     project_id: int,
     wbs_id: int,
     assignment_in: AssignmentCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """Create a new assignment for a WBS item."""
     _validate_project_wbs(db, project_id, wbs_id)
     service = AssignmentService(db)
-    return service.create(wbs_id, assignment_in)
+    assignment = service.create(wbs_id, assignment_in)
+    AuditService(db).log_create(
+        "ResourceAssignment",
+        assignment.id,
+        serialize_for_audit(assignment),
+        current_user.id,
+        request,
+    )
+    return assignment
 
 
 @router.get(
@@ -124,6 +134,7 @@ async def update_assignment(
     wbs_id: int,
     assignment_id: int,
     assignment_in: AssignmentUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -133,7 +144,17 @@ async def update_assignment(
     assignment = service.get_or_404(assignment_id)
     if assignment.wbs_id != wbs_id:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    return service.update(assignment_id, assignment_in)
+    old_values = serialize_for_audit(assignment)
+    updated = service.update(assignment_id, assignment_in)
+    AuditService(db).log_update(
+        "ResourceAssignment",
+        updated.id,
+        old_values,
+        serialize_for_audit(updated),
+        current_user.id,
+        request,
+    )
+    return updated
 
 
 @router.delete(
@@ -145,6 +166,7 @@ async def delete_assignment(
     project_id: int,
     wbs_id: int,
     assignment_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -154,7 +176,11 @@ async def delete_assignment(
     assignment = service.get_or_404(assignment_id)
     if assignment.wbs_id != wbs_id:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    old_values = serialize_for_audit(assignment)
     service.delete(assignment_id)
+    AuditService(db).log_delete(
+        "ResourceAssignment", assignment_id, old_values, current_user.id, request
+    )
 
 
 # =============================================================================
@@ -199,6 +225,7 @@ async def create_risk(
     project_id: int,
     wbs_id: int,
     risk_in: RiskCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -206,6 +233,9 @@ async def create_risk(
     _validate_project_wbs(db, project_id, wbs_id)
     service = RiskService(db)
     risk = service.create(wbs_id, risk_in)
+    AuditService(db).log_create(
+        "Risk", risk.id, serialize_for_audit(risk), current_user.id, request
+    )
     response = RiskResponse.model_validate(risk)
     response.risk_exposure = service.compute_risk_exposure(risk)
     return response
@@ -244,6 +274,7 @@ async def update_risk(
     wbs_id: int,
     risk_id: int,
     risk_in: RiskUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -253,7 +284,16 @@ async def update_risk(
     risk = service.get_or_404(risk_id)
     if risk.wbs_id != wbs_id:
         raise HTTPException(status_code=404, detail="Risk not found")
+    old_values = serialize_for_audit(risk)
     updated = service.update(risk_id, risk_in)
+    AuditService(db).log_update(
+        "Risk",
+        updated.id,
+        old_values,
+        serialize_for_audit(updated),
+        current_user.id,
+        request,
+    )
     response = RiskResponse.model_validate(updated)
     response.risk_exposure = service.compute_risk_exposure(updated)
     return response
@@ -268,6 +308,7 @@ async def delete_risk(
     project_id: int,
     wbs_id: int,
     risk_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -277,7 +318,9 @@ async def delete_risk(
     risk = service.get_or_404(risk_id)
     if risk.wbs_id != wbs_id:
         raise HTTPException(status_code=404, detail="Risk not found")
+    old_values = serialize_for_audit(risk)
     service.delete(risk_id)
+    AuditService(db).log_delete("Risk", risk_id, old_values, current_user.id, request)
 
 
 # =============================================================================

@@ -1,6 +1,8 @@
 """Authentication routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -13,26 +15,42 @@ from app.core.security import (
 )
 from app.models.schemas.auth import TokenRefreshRequest, TokenResponse
 from app.models.schemas.user import UserResponse
+from app.services.audit_service import AuditService
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/auth")
+logger = logging.getLogger(__name__)
+
+
+def _audit_login(db: Session, write, *args) -> None:
+    """Record a login event without ever failing the login itself."""
+    try:
+        write(*args)
+    except Exception:  # noqa: BLE001 - auditing is best effort here
+        db.rollback()
+        logger.warning("Could not write login audit row", exc_info=True)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
     """Authenticate user and return JWT tokens."""
     service = UserService(db)
     user = service.authenticate(form_data.username, form_data.password)
+    audit = AuditService(db)
     if not user:
+        # Only the attempted username is recorded, never the password.
+        _audit_login(db, audit.log_failed_login, form_data.username, request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _audit_login(db, audit.log_login, user.id, request)
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role.value}
     )

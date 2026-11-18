@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class WBSCostSummary(BaseModel):
@@ -92,7 +92,8 @@ class ApprovalAction(BaseModel):
 class WBSApprovalResponse(BaseModel):
     """Schema for WBS approval status response."""
 
-    wbs_id: int
+    # The ORM row calls it ``id``; accept either on input, always emit ``wbs_id``.
+    wbs_id: int = Field(validation_alias=AliasChoices("wbs_id", "id"))
     approval_status: str
     approver: Optional[str] = None
     approver_date: Optional[datetime] = None

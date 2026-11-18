@@ -169,7 +169,6 @@ class ReportRequest(BaseModel):
     filters: ReportFilter
     export_format: ExportFormat = ExportFormat.JSON
     title: Optional[str] = None
-    include_charts: bool = False
 
 
 # ── Response Schemas ──────────────────────────────────────────
