@@ -40,7 +40,9 @@ export const AppRoutes: React.FC = () => (
             <Route path="resources" element={<ResourceLibrary />} />
             <Route path="suppliers" element={<SupplierManagement />} />
             <Route path="config" element={<ConfigTables />} />
-            <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="audit-logs" element={<RequireRole role="admin" />}>
+              <Route index element={<AuditLogs />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Route>

@@ -48,9 +48,11 @@ for (const [role, sees] of [['admin', true], ['manager', true], ['user', false],
     await expect(nav).toBeVisible();
     if (sees) {
       await expect(nav.getByText('Administration', { exact: true })).toBeVisible();
-      for (const label of ['Overview', 'Users', 'Resources', 'Suppliers', 'Config Tables', 'Audit Logs']) {
+      for (const label of ['Overview', 'Users', 'Resources', 'Suppliers', 'Config Tables']) {
         await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
       }
+      // Audit logs are admin-only on the server
+      await expect(nav.getByRole('link', { name: 'Audit Logs', exact: true })).toHaveCount(role === 'admin' ? 1 : 0);
     } else {
       await expect(nav.getByText('Administration', { exact: true })).toHaveCount(0);
       await expect(nav.getByRole('link', { name: 'Users', exact: true })).toHaveCount(0);
@@ -137,6 +139,15 @@ test.describe('user management as manager', () => {
     await page.getByRole('dialog').getByRole('combobox', { name: 'Role' }).click();
     await expect(page.getByRole('option', { name: 'Manager' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Admin' })).toHaveCount(0);
+  });
+
+  test('Audit Logs is hidden on the overview and the route says not authorised', async ({ page }) => {
+    await setup(page, 'manager');
+    await page.goto('/admin');
+    await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible();
+    await expect(page.getByText('Who changed what, and when')).toHaveCount(0);
+    await page.goto('/admin/audit-logs');
+    await expect(page.getByRole('heading', { name: 'Not authorised' })).toBeVisible();
   });
 
   test('the other Administration pages load', async ({ page }) => {

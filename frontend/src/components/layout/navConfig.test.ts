@@ -11,6 +11,11 @@ describe('navConfig', () => {
     expect(getVisibleSections('manager').map((s) => s.id)).toEqual(['workspace', 'admin', 'support']);
     expect(getVisibleSections('admin').map((s) => s.id)).toEqual(['workspace', 'admin', 'support']);
   });
+  it('hides Audit Logs from managers', () => {
+    const labels = (r: 'admin' | 'manager') => getVisibleSections(r).find((s) => s.id === 'admin')!.items.map((i) => i.label);
+    expect(labels('admin')).toContain('Audit Logs');
+    expect(labels('manager')).toEqual(['Overview', 'Users', 'Resources', 'Suppliers', 'Config Tables']);
+  });
   it('matches nested paths except exact items', () => {
     expect(isNavActive(item('/projects'), '/projects/1')).toBe(true);
     expect(isNavActive(item('/projects'), '/projectsx')).toBe(false);

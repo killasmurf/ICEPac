@@ -17,6 +17,8 @@ export interface NavItem {
   icon: React.ReactElement;
   /** Active only on an exact path match (used for `/` and `/admin`). */
   exact?: boolean;
+  /** When set, only these roles see the item (on top of the section's roles). */
+  roles?: Role[];
 }
 
 export interface NavSection {
@@ -47,7 +49,7 @@ export const navSections: NavSection[] = [
       { label: 'Resources', path: '/admin/resources', icon: <Inventory2OutlinedIcon /> },
       { label: 'Suppliers', path: '/admin/suppliers', icon: <BusinessOutlinedIcon /> },
       { label: 'Config Tables', path: '/admin/config', icon: <TuneIcon /> },
-      { label: 'Audit Logs', path: '/admin/audit-logs', icon: <HistoryIcon /> },
+      { label: 'Audit Logs', path: '/admin/audit-logs', icon: <HistoryIcon />, roles: ['admin'] },
     ],
   },
   {
@@ -59,7 +61,9 @@ export const navSections: NavSection[] = [
 
 /** Sections the given role may see. */
 export function getVisibleSections(role: Role | null): NavSection[] {
-  return navSections.filter((s) => !s.roles || (role !== null && s.roles.includes(role)));
+  return navSections
+    .filter((s) => !s.roles || (role !== null && s.roles.includes(role)))
+    .map((s) => ({ ...s, items: s.items.filter((i) => !i.roles || (role !== null && i.roles.includes(role))) }));
 }
 
 /** An item is active on its own path and on nested paths (except `exact` items). */

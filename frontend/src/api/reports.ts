@@ -34,7 +34,6 @@ export interface ReportRequest {
   filters: ReportFilter;
   export_format?: ExportFormat;
   title?: string;
-  include_charts?: boolean;
 }
 
 export interface ReportColumn {
