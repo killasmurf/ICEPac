@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockApi, loginAs, type MockApiHandle } from './fixtures/mockApi';
-import { estimationRoutes } from './fixtures/estimationRoutes';
+import { assignment, estimationRoutes, wbsRisk } from './fixtures/estimationRoutes';
 import { saveScreenshot } from './fixtures/screenshot';
 
 let api: MockApiHandle;
@@ -147,6 +147,59 @@ test.describe('WBS detail panel', () => {
     await scrollGridRight(grid);
     await expect(grid.getByRole('img', { name: /Best case \$100\.00/ })).toBeVisible();
     await saveScreenshot(page, testInfo, 'phase-4', 'wbs-panel-light');
+  });
+
+  test('totals strip sums Decimal strings instead of showing NaN (F-14)', async ({ page }) => {
+    const two = [
+      { ...assignment, id: 1, best_estimate: '12000.00', likely_estimate: '15000.00', worst_estimate: '24000.00', pert_estimate: 15999.99, std_deviation: 2000 },
+      { ...assignment, id: 2, resource_code: 'PMO', best_estimate: '1000.50', likely_estimate: '2000.25', worst_estimate: '3000.00', pert_estimate: 2000.25, std_deviation: 333.33 },
+    ];
+    await page.route('**/api/v1/projects/1/wbs/11/assignments', (r) =>
+      r.request().method() === 'GET' ? r.fulfill(json({ items: two, total: 2 })) : r.fallback(),
+    );
+    await openPanel(page);
+    const totals = page.getByRole('group', { name: 'Assignment totals' });
+    await expect(totals).toContainText('Totals (2 assignments)');
+    await expect(totals).toContainText('$13,000.50');
+    await expect(totals).toContainText('$17,000.25');
+    await expect(totals).toContainText('$27,000.00');
+    await expect(totals).not.toContainText('NaN');
+  });
+
+  test('a plain user gets populated dropdowns and can add a WBS risk with a title (F-05, F-07)', async ({ page }) => {
+    await loginAs(page, 'user');
+    await openPanel(page);
+    await page.getByTestId('wbs-detail').getByRole('tab', { name: 'Risks' }).click();
+    await expect(page.getByText('Integration slips')).toBeVisible();
+    await page.getByRole('button', { name: 'Add Risk' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'New Risk' });
+    await dialog.getByLabel(/^Title/).focus();
+    await dialog.getByLabel('Risk Cost').focus();
+    await expect(dialog.getByText('Title is required')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Create' })).toBeDisabled();
+    await dialog.getByLabel(/^Title/).fill('Vendor slips');
+    await dialog.getByRole('combobox', { name: /Risk Category/ }).click();
+    await page.getByRole('option', { name: 'TECH - Technical' }).click();
+    await dialog.getByRole('combobox', { name: 'Probability' }).click();
+    await expect(page.getByRole('option', { name: 'Medium (50%)' })).toBeVisible();
+    await page.getByRole('option', { name: 'Medium (50%)' }).click();
+    await dialog.screenshot({ path: `e2e/__screenshots__/phase-4/risk-form-${test.info().project.name}.png` });
+    await page.route('**/api/v1/projects/1/wbs/11/risks', (r) =>
+      r.request().method() === 'POST' ? r.fulfill(json({ ...wbsRisk, id: 6, title: 'Vendor slips' }, 201)) : r.fallback(),
+    );
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/wbs/11/risks'));
+    await dialog.getByRole('button', { name: 'Create' }).click();
+    expect((await request).postDataJSON()).toMatchObject({ title: 'Vendor slips', status: 'open', risk_category_code: 'TECH', probability_code: 'M' });
+    await expect(page.getByText('Risk created')).toBeVisible();
+  });
+
+  test('the resource dropdown is populated for a plain user (F-07)', async ({ page }) => {
+    await loginAs(page, 'user');
+    await openPanel(page);
+    await page.getByRole('button', { name: 'Add Assignment' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'New Assignment' });
+    await dialog.getByRole('combobox', { name: /Resource/ }).click();
+    await expect(page.getByRole('option', { name: 'ENG - Engineer' })).toBeVisible();
   });
 
   test('creating an assignment sends the expected request and toasts', async ({ page }) => {

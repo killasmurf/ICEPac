@@ -36,7 +36,7 @@ const risk = (over: Partial<ProjectRisk> = {}): ProjectRisk => ({
   title: 'Steel price escalation',
   status: 'open',
   risk_category_code: 'MKT',
-  risk_cost: '125000.50',
+  risk_cost: 125000.5,
   probability_code: 'H',
   severity_code: 'M',
   mitigation_plan: 'Fix price early',
@@ -52,7 +52,7 @@ const config = (code: string, description: string) => ({ id: 1, code, descriptio
 beforeEach(() => {
   [h.list, h.totalCost, h.create, h.update, h.del, h.listItems].forEach((m) => m.mockReset());
   h.role = 'manager';
-  h.list.mockResolvedValue({ items: [risk(), risk({ id: 8, title: 'Permit delay', status: 'mitigated', risk_cost: '5000' })], total: 2 });
+  h.list.mockResolvedValue({ items: [risk(), risk({ id: 8, title: 'Permit delay', status: 'mitigated', risk_cost: 5000 })], total: 2 });
   h.totalCost.mockResolvedValue({ total_risk_cost: 130000.5 });
   h.listItems.mockImplementation((table: string) =>
     Promise.resolve({
@@ -174,7 +174,7 @@ describe('patchRisk', () => {
   it('applies only the fields present in the payload', () => {
     const patched = patchRisk(risk(), { status: 'closed', risk_cost: 900 });
     expect(patched.status).toBe('closed');
-    expect(patched.risk_cost).toBe('900');
+    expect(patched.risk_cost).toBe(900);
     expect(patched.title).toBe('Steel price escalation');
     expect(patched.mitigation_plan).toBe('Fix price early');
   });

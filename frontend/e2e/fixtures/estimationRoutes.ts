@@ -3,7 +3,8 @@ import { loadFixture } from './load';
 const now = '2026-03-01T00:00:00Z';
 
 const item = (id: number, code: string, description: string, weight?: number) => ({
-  id, code, name: description, description, weight, is_active: true, sort_order: id, created_at: now, updated_at: now,
+  // weight is a Decimal on the server, so it arrives as a string
+  id, code, name: description, description, weight: weight === undefined ? undefined : weight.toFixed(2), is_active: true, sort_order: id, created_at: now, updated_at: now,
 });
 
 const configList = (table: string, items: unknown[]) => ({ items, total: items.length, table_name: table });
@@ -18,13 +19,16 @@ const wbsNode = {
 
 export const assignment = {
   id: 1, wbs_id: 11, resource_code: 'ENG', supplier_code: 'ACME', cost_type_code: null, region_code: null, bus_area_code: null,
-  estimating_technique_code: null, best_estimate: 100, likely_estimate: 200, worst_estimate: 400, duty_pct: 0,
-  import_content_pct: 0, aii_pct: 0, pert_estimate: 216.67, std_deviation: 50, created_at: now, updated_at: now,
+  estimating_technique_code: null,
+  // Pydantic serialises Decimal fields as strings; pert_estimate and std_deviation are plain floats.
+  best_estimate: '100.00', likely_estimate: '200.00', worst_estimate: '400.00', duty_pct: '0.00',
+  import_content_pct: '0.00', aii_pct: '0.00', pert_estimate: 216.67, std_deviation: 50, created_at: now, updated_at: now,
 };
 
 export const wbsRisk = {
-  id: 5, wbs_id: 11, risk_category_code: 'TECH', risk_cost: 10000, probability_code: 'M', severity_code: 'H',
-  mitigation_plan: 'Add a spike', risk_exposure: 2500, created_at: now, updated_at: now,
+  id: 5, wbs_id: 11, project_id: null, title: 'Integration slips', status: 'open', risk_category_code: 'TECH',
+  risk_cost: '10000.00', probability_code: 'M', severity_code: 'H', mitigation_plan: 'Add a spike',
+  date_identified: now, risk_exposure: 2500, created_at: now, updated_at: now,
 };
 
 export const projectRisk = {
@@ -53,7 +57,7 @@ export const estimationRoutes: Record<string, unknown> = {
     confidence_80_low: 152.67, confidence_80_high: 280.67, risk_count: 1, total_risk_exposure: 2500, risk_adjusted_estimate: 2716.67,
     approval_status: 'draft',
   },
-  'GET /admin/resources': { items: [{ id: 1, resource_code: 'ENG', description: 'Engineer', cost: 100, is_active: true, created_at: now, updated_at: now }], total: 1, skip: 0, limit: 1000 },
+  'GET /admin/resources': { items: [{ id: 1, resource_code: 'ENG', description: 'Engineer', cost: '100.00', is_active: true, created_at: now, updated_at: now }], total: 1, skip: 0, limit: 1000 },
   'GET /admin/suppliers': { items: [{ id: 1, supplier_code: 'ACME', name: 'Acme Pty Ltd', is_active: true, created_at: now, updated_at: now }], total: 1, skip: 0, limit: 1000 },
   'GET /admin/config/cost-types': configList('cost-types', [item(1, 'LAB', 'Labour')]),
   'GET /admin/config/regions': configList('regions', [item(2, 'VIC', 'Victoria')]),

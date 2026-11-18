@@ -1,4 +1,5 @@
 import client from './client';
+import { toNumber, toNumberOr0 } from '../utils/number';
 
 // ============================================================
 // Assignment types
@@ -181,22 +182,127 @@ export interface WBSApprovalResponse {
 }
 
 // ============================================================
+// Decimal normalisation
+// ============================================================
+// FastAPI serialises Decimal fields as strings ("12000.00"). The API layer converts them to numbers so
+// components only ever see numbers.
+
+type Raw<T, K extends keyof T> = Omit<T, K> & { [P in K]: number | string | null | undefined };
+
+const ASSIGNMENT_NUMERIC = [
+  'best_estimate',
+  'likely_estimate',
+  'worst_estimate',
+  'duty_pct',
+  'import_content_pct',
+  'aii_pct',
+  'pert_estimate',
+  'std_deviation',
+] as const;
+
+export type RawAssignment = Raw<Assignment, (typeof ASSIGNMENT_NUMERIC)[number]>;
+
+export function normalizeAssignment(raw: RawAssignment): Assignment {
+  const out = { ...raw } as Record<string, unknown>;
+  for (const key of ASSIGNMENT_NUMERIC) out[key] = toNumberOr0(raw[key]);
+  return out as unknown as Assignment;
+}
+
+export type RawRisk = Omit<Risk, 'risk_cost' | 'risk_exposure'> & {
+  risk_cost: number | string | null | undefined;
+  risk_exposure: number | string | null | undefined;
+};
+
+export function normalizeRisk(raw: RawRisk): Risk {
+  return { ...raw, risk_cost: toNumberOr0(raw.risk_cost), risk_exposure: toNumber(raw.risk_exposure) };
+}
+
+const WBS_SUMMARY_NUMERIC = [
+  'assignment_count',
+  'total_pert_estimate',
+  'total_std_deviation',
+  'confidence_80_low',
+  'confidence_80_high',
+  'risk_count',
+  'total_risk_exposure',
+  'risk_adjusted_estimate',
+] as const;
+
+export type RawWBSCostSummary = Raw<WBSCostSummary, (typeof WBS_SUMMARY_NUMERIC)[number]>;
+
+export function normalizeWBSCostSummary(raw: RawWBSCostSummary): WBSCostSummary {
+  const out = { ...raw } as Record<string, unknown>;
+  for (const key of WBS_SUMMARY_NUMERIC) out[key] = toNumberOr0(raw[key]);
+  return out as unknown as WBSCostSummary;
+}
+
+const normalizeBreakdown = <T extends { total_pert: number; assignment_count: number }>(
+  raw: Raw<T, 'total_pert' | 'assignment_count'>
+): T =>
+  ({ ...raw, total_pert: toNumberOr0(raw.total_pert), assignment_count: toNumberOr0(raw.assignment_count) }) as unknown as T;
+
+export interface RawProjectEstimationSummary
+  extends Omit<
+    ProjectEstimationSummary,
+    | 'total_pert_estimate'
+    | 'total_std_deviation'
+    | 'confidence_80_low'
+    | 'confidence_80_high'
+    | 'total_risk_exposure'
+    | 'risk_adjusted_estimate'
+    | 'by_cost_type'
+    | 'by_region'
+    | 'by_resource'
+    | 'by_supplier'
+    | 'wbs_summaries'
+  > {
+  total_pert_estimate: number | string | null;
+  total_std_deviation: number | string | null;
+  confidence_80_low: number | string | null;
+  confidence_80_high: number | string | null;
+  total_risk_exposure: number | string | null;
+  risk_adjusted_estimate: number | string | null;
+  by_cost_type: Raw<CostBreakdownItem, 'total_pert' | 'assignment_count'>[];
+  by_region: Raw<CostBreakdownItem, 'total_pert' | 'assignment_count'>[];
+  by_resource: Raw<CostBreakdownItem, 'total_pert' | 'assignment_count'>[];
+  by_supplier: Raw<SupplierBreakdownItem, 'total_pert' | 'assignment_count'>[];
+  wbs_summaries: RawWBSCostSummary[];
+}
+
+export function normalizeProjectEstimation(raw: RawProjectEstimationSummary): ProjectEstimationSummary {
+  return {
+    ...raw,
+    total_pert_estimate: toNumberOr0(raw.total_pert_estimate),
+    total_std_deviation: toNumberOr0(raw.total_std_deviation),
+    confidence_80_low: toNumberOr0(raw.confidence_80_low),
+    confidence_80_high: toNumberOr0(raw.confidence_80_high),
+    total_risk_exposure: toNumberOr0(raw.total_risk_exposure),
+    risk_adjusted_estimate: toNumberOr0(raw.risk_adjusted_estimate),
+    by_cost_type: (raw.by_cost_type ?? []).map((i) => normalizeBreakdown<CostBreakdownItem>(i)),
+    by_region: (raw.by_region ?? []).map((i) => normalizeBreakdown<CostBreakdownItem>(i)),
+    by_resource: (raw.by_resource ?? []).map((i) => normalizeBreakdown<CostBreakdownItem>(i)),
+    by_supplier: (raw.by_supplier ?? []).map((i) => normalizeBreakdown<SupplierBreakdownItem>(i)),
+    wbs_summaries: (raw.wbs_summaries ?? []).map(normalizeWBSCostSummary),
+  };
+}
+
+// ============================================================
 // Assignment API functions
 // ============================================================
 
 export async function getAssignments(projectId: number, wbsId: number): Promise<AssignmentListResponse> {
-  const response = await client.get(`/projects/${projectId}/wbs/${wbsId}/assignments`);
-  return response.data;
+  const response = await client.get<{ items: RawAssignment[]; total: number }>(`/projects/${projectId}/wbs/${wbsId}/assignments`);
+  return { ...response.data, items: response.data.items.map(normalizeAssignment) };
 }
 
 export async function getAssignment(projectId: number, wbsId: number, assignmentId: number): Promise<Assignment> {
-  const response = await client.get(`/projects/${projectId}/wbs/${wbsId}/assignments/${assignmentId}`);
-  return response.data;
+  const response = await client.get<RawAssignment>(`/projects/${projectId}/wbs/${wbsId}/assignments/${assignmentId}`);
+  return normalizeAssignment(response.data);
 }
 
 export async function createAssignment(projectId: number, wbsId: number, data: AssignmentCreate): Promise<Assignment> {
-  const response = await client.post(`/projects/${projectId}/wbs/${wbsId}/assignments`, data);
-  return response.data;
+  const response = await client.post<RawAssignment>(`/projects/${projectId}/wbs/${wbsId}/assignments`, data);
+  return normalizeAssignment(response.data);
 }
 
 export async function updateAssignment(
@@ -205,8 +311,8 @@ export async function updateAssignment(
   assignmentId: number,
   data: AssignmentUpdate
 ): Promise<Assignment> {
-  const response = await client.put(`/projects/${projectId}/wbs/${wbsId}/assignments/${assignmentId}`, data);
-  return response.data;
+  const response = await client.put<RawAssignment>(`/projects/${projectId}/wbs/${wbsId}/assignments/${assignmentId}`, data);
+  return normalizeAssignment(response.data);
 }
 
 export async function deleteAssignment(projectId: number, wbsId: number, assignmentId: number): Promise<void> {
@@ -218,18 +324,18 @@ export async function deleteAssignment(projectId: number, wbsId: number, assignm
 // ============================================================
 
 export async function getRisks(projectId: number, wbsId: number): Promise<RiskListResponse> {
-  const response = await client.get(`/projects/${projectId}/wbs/${wbsId}/risks`);
-  return response.data;
+  const response = await client.get<{ items: RawRisk[]; total: number }>(`/projects/${projectId}/wbs/${wbsId}/risks`);
+  return { ...response.data, items: response.data.items.map(normalizeRisk) };
 }
 
 export async function getRisk(projectId: number, wbsId: number, riskId: number): Promise<Risk> {
-  const response = await client.get(`/projects/${projectId}/wbs/${wbsId}/risks/${riskId}`);
-  return response.data;
+  const response = await client.get<RawRisk>(`/projects/${projectId}/wbs/${wbsId}/risks/${riskId}`);
+  return normalizeRisk(response.data);
 }
 
 export async function createRisk(projectId: number, wbsId: number, data: RiskCreate): Promise<Risk> {
-  const response = await client.post(`/projects/${projectId}/wbs/${wbsId}/risks`, data);
-  return response.data;
+  const response = await client.post<RawRisk>(`/projects/${projectId}/wbs/${wbsId}/risks`, data);
+  return normalizeRisk(response.data);
 }
 
 export async function updateRisk(
@@ -238,8 +344,8 @@ export async function updateRisk(
   riskId: number,
   data: RiskUpdate
 ): Promise<Risk> {
-  const response = await client.put(`/projects/${projectId}/wbs/${wbsId}/risks/${riskId}`, data);
-  return response.data;
+  const response = await client.put<RawRisk>(`/projects/${projectId}/wbs/${wbsId}/risks/${riskId}`, data);
+  return normalizeRisk(response.data);
 }
 
 export async function deleteRisk(projectId: number, wbsId: number, riskId: number): Promise<void> {
@@ -251,13 +357,13 @@ export async function deleteRisk(projectId: number, wbsId: number, riskId: numbe
 // ============================================================
 
 export async function getProjectEstimation(projectId: number): Promise<ProjectEstimationSummary> {
-  const response = await client.get(`/projects/${projectId}/estimation`);
-  return response.data;
+  const response = await client.get<RawProjectEstimationSummary>(`/projects/${projectId}/estimation`);
+  return normalizeProjectEstimation(response.data);
 }
 
 export async function getWBSEstimation(projectId: number, wbsId: number): Promise<WBSCostSummary> {
-  const response = await client.get(`/projects/${projectId}/wbs/${wbsId}/estimation`);
-  return response.data;
+  const response = await client.get<RawWBSCostSummary>(`/projects/${projectId}/wbs/${wbsId}/estimation`);
+  return normalizeWBSCostSummary(response.data);
 }
 
 // ============================================================

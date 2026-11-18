@@ -55,30 +55,35 @@ const plain = (items: Item[]): CodeDescription[] =>
 const weighted = (items: Item[]): CodeWeight[] =>
   items.map((i) => ({ code: i.code ?? '', description: i.description ?? '', weight: i.weight || 0 }));
 
+/**
+ * Every signed-in user may read these lists (the API only restricts writes), so nothing here is role-gated.
+ * Each list loads independently: one failing request leaves that dropdown empty instead of blanking every form.
+ */
 export async function loadReferenceData(): Promise<ReferenceData> {
   const active = { is_active: true };
+  const items = <T>(p: Promise<{ items: T[] }>) => p.then((r) => r.items).catch((): T[] => []);
   const [resources, suppliers, costTypes, regions, businessAreas, techniques, riskCategories, probability, severity] =
     await Promise.all([
-      resourcesApi.list({ ...active, limit: 1000 }),
-      suppliersApi.list({ ...active, limit: 1000 }),
-      configApi.listItems('cost-types', active),
-      configApi.listItems('regions', active),
-      configApi.listItems('business-areas', active),
-      configApi.listItems('estimating-techniques', active),
-      configApi.listItems('risk-categories', active),
-      configApi.listItems('probability-levels', active),
-      configApi.listItems('severity-levels', active),
+      items(resourcesApi.list({ ...active, limit: 1000 })),
+      items(suppliersApi.list({ ...active, limit: 1000 })),
+      items(configApi.listItems('cost-types', active)),
+      items(configApi.listItems('regions', active)),
+      items(configApi.listItems('business-areas', active)),
+      items(configApi.listItems('estimating-techniques', active)),
+      items(configApi.listItems('risk-categories', active)),
+      items(configApi.listItems('probability-levels', active)),
+      items(configApi.listItems('severity-levels', active)),
     ]);
   return {
-    resources: resources.items.map((r) => ({ code: r.resource_code, description: r.description })),
-    suppliers: suppliers.items.map((s) => ({ code: s.supplier_code ?? '', name: s.name })),
-    costTypes: plain(costTypes.items),
-    regions: plain(regions.items),
-    businessAreas: plain(businessAreas.items),
-    estimatingTechniques: plain(techniques.items),
-    riskCategories: plain(riskCategories.items),
-    probabilityLevels: weighted(probability.items),
-    severityLevels: weighted(severity.items),
+    resources: resources.map((r) => ({ code: r.resource_code, description: r.description })),
+    suppliers: suppliers.map((s) => ({ code: s.supplier_code ?? '', name: s.name })),
+    costTypes: plain(costTypes),
+    regions: plain(regions),
+    businessAreas: plain(businessAreas),
+    estimatingTechniques: plain(techniques),
+    riskCategories: plain(riskCategories),
+    probabilityLevels: weighted(probability),
+    severityLevels: weighted(severity),
   };
 }
 
