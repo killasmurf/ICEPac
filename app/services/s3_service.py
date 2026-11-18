@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 class S3Service:
     """Service for managing file uploads and downloads to/from AWS S3"""
 
-    def __init__(self):
+    def __init__(self, client_config=None):
+        """``client_config`` is an optional botocore ``Config`` (timeouts etc.)."""
         self.bucket_name = settings.S3_BUCKET_NAME
         self.region = settings.AWS_REGION
 
@@ -31,6 +32,9 @@ class S3Service:
 
         if settings.S3_ENDPOINT_URL:
             session_kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+
+        if client_config is not None:
+            session_kwargs["config"] = client_config
 
         self.s3_client = boto3.client("s3", **session_kwargs)
 
