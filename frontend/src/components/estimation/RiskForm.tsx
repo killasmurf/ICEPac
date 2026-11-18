@@ -16,6 +16,8 @@ interface RiskFormProps {
 }
 
 interface FormState {
+  title: string;
+  status: string;
   risk_category_code: string;
   risk_cost: string;
   probability_code: string;
@@ -23,16 +25,26 @@ interface FormState {
   mitigation_plan: string;
 }
 
+const STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'mitigated', label: 'Mitigated' },
+  { value: 'closed', label: 'Closed' },
+];
+
 const toFormData = (risk?: Risk | null): FormState =>
   risk
     ? {
-        risk_category_code: risk.risk_category_code,
+        title: risk.title,
+        status: risk.status,
+        risk_category_code: risk.risk_category_code ?? '',
         risk_cost: String(risk.risk_cost),
         probability_code: risk.probability_code || '',
         severity_code: risk.severity_code || '',
         mitigation_plan: risk.mitigation_plan || '',
       }
     : {
+        title: '',
+        status: 'open',
         risk_category_code: '',
         risk_cost: '0',
         probability_code: '',
@@ -51,12 +63,14 @@ const RiskForm: React.FC<RiskFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<FormState>(() => toFormData(risk));
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState(false);
   // Reset the form when the dialog opens or the edited item changes
   // (adjusting state during render rather than in an effect).
   const [formSource, setFormSource] = useState({ risk, open });
   if (formSource.risk !== risk || formSource.open !== open) {
     setFormSource({ risk, open });
     setFormData(toFormData(risk));
+    setTouched(false);
   }
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,14 +78,17 @@ const RiskForm: React.FC<RiskFormProps> = ({
   };
 
   const costError = validateMoney(formData.risk_cost);
+  const titleError = formData.title.trim() === '' ? 'Title is required' : formData.title.length > 255 ? 'Title must be 255 characters or fewer' : undefined;
   const categoryMissing = !formData.risk_category_code;
-  const invalid = !!costError || categoryMissing;
+  const invalid = !!costError || categoryMissing || !!titleError;
 
   const handleSubmit = async () => {
     if (invalid) return;
     setLoading(true);
     try {
       await onSubmit({
+        title: formData.title.trim(),
+        status: formData.status,
         risk_category_code: formData.risk_category_code,
         risk_cost: parseAmount(formData.risk_cost) ?? 0,
         probability_code: formData.probability_code,
@@ -92,6 +109,9 @@ const RiskForm: React.FC<RiskFormProps> = ({
   const riskExposure = costError ? null : (parseAmount(formData.risk_cost) ?? 0) * probWeight * sevWeight;
 
   const isEdit = !!risk;
+  const statusOptions = STATUS_OPTIONS.some((o) => o.value === formData.status)
+    ? STATUS_OPTIONS
+    : [...STATUS_OPTIONS, { value: formData.status, label: formData.status }];
 
   const categoryOptions =
     formData.risk_category_code && !riskCategories.some((c) => c.code === formData.risk_category_code)
@@ -109,6 +129,31 @@ const RiskForm: React.FC<RiskFormProps> = ({
       submitDisabled={invalid}
     >
       <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 8 }}>
+          <TextField
+            fullWidth
+            label="Title"
+            value={formData.title}
+            onChange={handleChange('title')}
+            onBlur={() => setTouched(true)}
+            required
+            autoFocus
+            error={touched && !!titleError}
+            helperText={touched && titleError ? titleError : 'A short name for this risk'}
+            slotProps={{ htmlInput: { maxLength: 255 } }}
+          />
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField select fullWidth label="Status" value={formData.status} onChange={handleChange('status')}>
+            {statusOptions.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
         <Grid size={{ xs: 12 }}>
           <TextField
             select

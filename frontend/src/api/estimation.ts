@@ -66,19 +66,28 @@ export interface AssignmentListResponse {
 
 export interface Risk {
   id: number;
-  wbs_id: number;
-  risk_category_code: string;
+  /** Exactly one of wbs_id / project_id is set. WBS-scoped risks have wbs_id. */
+  wbs_id: number | null;
+  project_id: number | null;
+  title: string;
+  status: string;
+  risk_category_code: string | null;
   risk_cost: number;
   probability_code: string | null;
   severity_code: string | null;
   mitigation_plan: string | null;
-  risk_exposure: number;
+  date_identified: string;
+  risk_exposure: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface RiskCreate {
-  risk_category_code: string;
+  /** Required by the API (max 255). */
+  title: string;
+  /** open | mitigated | closed. Defaults to open on the server. */
+  status?: string;
+  risk_category_code?: string;
   risk_cost?: number;
   probability_code?: string;
   severity_code?: string;
@@ -86,6 +95,8 @@ export interface RiskCreate {
 }
 
 export interface RiskUpdate {
+  title?: string;
+  status?: string;
   risk_category_code?: string;
   risk_cost?: number;
   probability_code?: string;

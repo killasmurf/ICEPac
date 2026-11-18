@@ -206,12 +206,19 @@ describe('WBSDetailPanel', () => {
     await screen.findByRole('dialog', { name: 'New Risk' });
     await userEvent.click(screen.getByRole('combobox', { name: /Risk Category/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'TECH - Technical' }));
+    setValue(/^Title/, 'Vendor slips');
     setValue('Risk Cost', '4000');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
-    await waitFor(() => expect(h.createRisk).toHaveBeenCalledWith(1, 10, expect.objectContaining({ risk_category_code: 'TECH', risk_cost: 4000 })));
+    await waitFor(() =>
+      expect(h.createRisk).toHaveBeenCalledWith(
+        1,
+        10,
+        expect.objectContaining({ title: 'Vendor slips', status: 'open', risk_category_code: 'TECH', risk_cost: 4000 })
+      )
+    );
     expect(await screen.findByText('Risk created')).toBeInTheDocument();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit risk TECH' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit risk Integration slips' }));
     await screen.findByRole('dialog', { name: 'Edit Risk' });
     setValue('Risk Cost', '12000');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
@@ -219,7 +226,7 @@ describe('WBSDetailPanel', () => {
     // toasts are queued one at a time, so later ones wait for the earlier to hide
     expect(await screen.findByText('Risk updated', {}, { timeout: 8000 })).toBeInTheDocument();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete risk TECH' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete risk Integration slips' }));
     const confirm = await screen.findByRole('dialog', { name: 'Delete risk?' });
     await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(h.deleteRisk).toHaveBeenCalledWith(1, 10, 5));
