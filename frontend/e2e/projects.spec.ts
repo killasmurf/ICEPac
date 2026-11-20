@@ -202,6 +202,127 @@ test.describe('projects list', () => {
   });
 });
 
+const listParams = (r: { url(): string }) => new URL(r.url()).searchParams;
+const isList = (r: { method(): string; url(): string }) => r.method() === 'GET' && /\/api\/v1\/projects\?/.test(r.url());
+
+test.describe('archived projects', () => {
+  test('the Archived toggle lists archived projects, marks them and keeps ?archived=1', async ({ page }, testInfo) => {
+    await setup(page);
+    await page.goto('/projects');
+    await expect(page.getByRole('link', { name: 'Harbour Bridge Refurbishment' })).toBeVisible();
+    const req = page.waitForRequest((r) => isList(r) && listParams(r).get('archived') === 'true');
+    await page.getByRole('button', { name: 'Archived', exact: true }).click();
+    await req;
+    await expect(page).toHaveURL(/archived=1/);
+    await expect(page.getByRole('link', { name: 'Old Wharf Dredging' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Harbour Bridge Refurbishment' })).toHaveCount(0);
+    await expect(page.getByText('2 archived projects')).toBeVisible();
+    await expect(page.getByText('Archived', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New project' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Archive / })).toHaveCount(0);
+    await noHorizontalScroll(page);
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-archived-light');
+    expect(await axeBlocking(page)).toEqual([]);
+
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Old Wharf Dredging' })).toBeVisible();
+    await page.getByRole('button', { name: 'Active', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Harbour Bridge Refurbishment' })).toBeVisible();
+    await expect(page).not.toHaveURL(/archived/);
+  });
+
+  test('archived table view and dark mode', async ({ page }, testInfo) => {
+    await setup(page, { scheme: 'dark', view: 'table' });
+    await page.goto('/projects?archived=1');
+    await expect(page.getByRole('grid', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Legacy Billing Migration' })).toBeVisible();
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-archived-table-dark');
+    expect(await axeBlocking(page)).toEqual([]);
+  });
+
+  test('restore confirms, issues POST /projects/3/restore, toasts and updates the list', async ({ page }, testInfo) => {
+    await setup(page);
+    await page.goto('/projects?archived=1');
+    await page.getByRole('button', { name: 'Restore Old Wharf Dredging' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Restore project?' });
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-restore-dialog-light');
+    const req = page.waitForRequest((r) => r.method() === 'POST' && /\/api\/v1\/projects\/3\/restore$/.test(r.url()));
+    await dialog.getByRole('button', { name: 'Restore project' }).click();
+    await req;
+    await expect(page.getByText('Project restored')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Old Wharf Dredging' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Legacy Billing Migration' })).toBeVisible();
+  });
+
+  test('archive text points to the Archived view', async ({ page }) => {
+    await setup(page);
+    await page.goto('/projects');
+    await page.getByRole('button', { name: 'Archive Harbour Bridge Refurbishment' }).click();
+    await expect(page.getByRole('dialog', { name: 'Archive project?' })).toContainText('restore it later from the Archived view');
+  });
+
+  test('viewers see no Restore action', async ({ page }) => {
+    api = await mockApi(page);
+    await loginAs(page, 'viewer');
+    await page.goto('/projects?archived=1');
+    await expect(page.getByRole('link', { name: 'Old Wharf Dredging' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Restore / })).toHaveCount(0);
+  });
+});
+
+test.describe('projects sorting and status filter', () => {
+  test('the card Sort by select sends sort and order and returns to page 1', async ({ page }, testInfo) => {
+    await setup(page, { many: true });
+    await page.goto('/projects');
+    await page.getByRole('button', { name: 'Go to page 2' }).click();
+    await expect(page.getByRole('link', { name: /Project 13/ })).toBeVisible();
+    const req = page.waitForRequest((r) => isList(r) && listParams(r).get('sort') === 'name' && listParams(r).get('order') === 'desc');
+    await page.getByRole('combobox', { name: 'Sort by' }).click();
+    await page.getByRole('option', { name: 'Name Z to A' }).click();
+    const sent = listParams(await req);
+    expect(sent.get('skip')).toBe('0');
+    await expect(page).toHaveURL(/sort=name&order=desc/);
+    await expect(page.getByRole('link', { name: /Project 15/ })).toBeVisible();
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-sorted-cards-light');
+  });
+
+  test('table headers sort on the server and the sort survives a reload', async ({ page }, testInfo) => {
+    await setup(page, { many: true, view: 'table' });
+    await page.goto('/projects');
+    await expect(page.getByRole('grid', { name: 'Projects' })).toBeVisible();
+    const asc = page.waitForRequest((r) => isList(r) && listParams(r).get('sort') === 'name' && listParams(r).get('order') === 'asc');
+    await page.getByRole('columnheader', { name: /^Project/ }).click();
+    await asc;
+    const desc = page.waitForRequest((r) => isList(r) && listParams(r).get('sort') === 'name' && listParams(r).get('order') === 'desc');
+    await page.getByRole('columnheader', { name: /^Project/ }).click();
+    await desc;
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-sorted-table-light');
+    await page.reload();
+    await expect(page.getByRole('columnheader', { name: /^Project/ })).toHaveAttribute('aria-sort', 'descending');
+  });
+
+  test('the status filter sends status, resets paging and is kept in the URL', async ({ page }, testInfo) => {
+    await setup(page, { many: true });
+    await page.goto('/projects');
+    await page.getByRole('button', { name: 'Go to page 2' }).click();
+    await expect(page.getByRole('link', { name: /Project 13/ })).toBeVisible();
+    const req = page.waitForRequest((r) => isList(r) && listParams(r).get('status') === 'imported');
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Imported' }).click();
+    expect(listParams(await req).get('skip')).toBe('0');
+    await expect(page).toHaveURL(/status=imported/);
+    await saveScreenshot(page, testInfo, 'closeout', 'projects-status-filter-light');
+    await page.reload();
+    await expect(page.getByRole('combobox', { name: 'Status' })).toContainText('Imported');
+  });
+
+  test('a filter with no matches shows the filtered empty state', async ({ page }) => {
+    await setup(page);
+    await page.goto('/projects?status=import_failed');
+    await expect(page.getByText('No projects match your filters')).toBeVisible();
+  });
+});
+
 test.describe('project import (ProjectUpload on the project page)', () => {
   async function openImport(page: Page) {
     await page.goto('/projects/1?tab=imports');

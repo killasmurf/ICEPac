@@ -141,9 +141,30 @@ export interface WBSTreeResponse {
 // Project API functions
 // ============================================================
 
-export async function getProjects(skip = 0, limit = 100, search?: string): Promise<ProjectListResponse> {
-  const params: Record<string, string | number> = { skip, limit };
+export type ProjectSortField = 'name' | 'created_at' | 'updated_at' | 'status' | 'manager';
+export type ProjectSortOrder = 'asc' | 'desc';
+
+export interface ProjectListOptions {
+  /** true lists archived projects only; omitted or false lists active projects. */
+  archived?: boolean;
+  /** One of the project status values, for example "active" or "draft". */
+  status?: string;
+  sort?: ProjectSortField;
+  order?: ProjectSortOrder;
+}
+
+export async function getProjects(
+  skip = 0,
+  limit = 100,
+  search?: string,
+  options: ProjectListOptions = {},
+): Promise<ProjectListResponse> {
+  const params: Record<string, string | number | boolean> = { skip, limit };
   if (search) params.search = search;
+  if (options.archived) params.archived = true;
+  if (options.status) params.status = options.status;
+  if (options.sort) params.sort = options.sort;
+  if (options.order) params.order = options.order;
   const response = await client.get('/projects', { params });
   return response.data;
 }
@@ -165,6 +186,11 @@ export async function updateProject(id: number, data: ProjectUpdateInput): Promi
 
 export async function deleteProject(id: number): Promise<void> {
   await client.delete(`/projects/${id}`);
+}
+
+export async function restoreProject(id: number): Promise<Project> {
+  const response = await client.post(`/projects/${id}/restore`);
+  return response.data;
 }
 
 // ============================================================

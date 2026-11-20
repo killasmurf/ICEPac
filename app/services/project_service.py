@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.database.project import Project
+from app.models.database.project import Project, ProjectStatus
 from app.models.schemas.project import ProjectCreate, ProjectUpdate
 from app.repositories.project_repository import ProjectRepository
 
@@ -53,3 +53,43 @@ class ProjectService:
         project = self.get_or_404(project_id)
         self.repository.update(project, {"archived": True})
         return True
+
+    def list_filtered(
+        self,
+        archived: bool = False,
+        search: Optional[str] = None,
+        status: Optional[ProjectStatus] = None,
+        sort: Optional[str] = None,
+        order: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Project]:
+        return self.repository.list_filtered(
+            archived=archived,
+            search=search,
+            status=status,
+            sort=sort,
+            order=order,
+            skip=skip,
+            limit=limit,
+        )
+
+    def count_filtered(
+        self,
+        archived: bool = False,
+        search: Optional[str] = None,
+        status: Optional[ProjectStatus] = None,
+    ) -> int:
+        return self.repository.count_filtered(
+            archived=archived, search=search, status=status
+        )
+
+    def restore(self, project_id: int) -> Project:
+        """Restore an archived project; 404 if missing, 409 if not archived."""
+        project = self.get_or_404(project_id)
+        if not project.archived:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Project is not archived",
+            )
+        return self.repository.update(project, {"archived": False})

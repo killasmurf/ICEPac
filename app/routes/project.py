@@ -1,10 +1,13 @@
 """Project routes."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_any_role
+from app.models.database.project import ProjectStatus
 from app.models.schemas.import_job import (
     ImportJobListResponse,
     ImportJobResponse,
@@ -18,10 +21,20 @@ from app.models.schemas.project import (
 )
 from app.models.schemas.wbs import WBSListResponse, WBSTreeNode, WBSTreeResponse
 from app.repositories.wbs_repository import WBSRepository
+from app.services.audit_service import AuditService
 from app.services.import_service import ImportService
 from app.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects")
+
+
+def _audit_snapshot(project) -> dict:
+    """Audit-safe view of the fields archive/restore change."""
+    return {
+        "project_name": project.project_name,
+        "archived": bool(project.archived),
+        "status": getattr(project.status, "value", project.status),
+    }
 
 
 # ============================================================
@@ -33,18 +46,32 @@ router = APIRouter(prefix="/projects")
 async def list_projects(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    search: str = Query(None),
+    search: Optional[str] = Query(None),
+    archived: bool = Query(False, description="true lists archived projects only"),
+    status: Optional[ProjectStatus] = Query(None, description="Status filter"),
+    sort: Optional[Literal["name", "created_at", "updated_at", "status", "manager"]] = (
+        Query(None, description="Sort field (default updated_at)")
+    ),
+    order: Optional[Literal["asc", "desc"]] = Query(
+        None, description="Default: desc for dates, asc for name/status/manager"
+    ),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """List active projects with optional search."""
+    """List projects (active by default) with search, status filter and sorting."""
     service = ProjectService(db)
-    if search:
-        items = service.search(search, skip=skip, limit=limit)
-        total = service.count_search(search)
-    else:
-        items = service.get_multi(skip=skip, limit=limit)
-        total = service.count()
+    items = service.list_filtered(
+        archived=archived,
+        search=search or None,
+        status=status,
+        sort=sort,
+        order=order,
+        skip=skip,
+        limit=limit,
+    )
+    total = service.count_filtered(
+        archived=archived, search=search or None, status=status
+    )
     return ProjectListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
@@ -85,12 +112,48 @@ async def update_project(
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(
     project_id: int,
+    request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
     _=Depends(require_any_role("admin", "manager")),
 ):
     """Archive a project (soft delete)."""
     service = ProjectService(db)
+    project = service.get_or_404(project_id)
+    old_values = _audit_snapshot(project)
     service.delete(project_id)
+    AuditService(db).log_update(
+        "Project",
+        project_id,
+        old_values,
+        _audit_snapshot(project),
+        current_user.id,
+        request,
+    )
+
+
+@router.post("/{project_id}/restore", response_model=ProjectResponse)
+async def restore_project(
+    project_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_any_role("admin", "manager")),
+):
+    """Restore an archived project."""
+    service = ProjectService(db)
+    project = service.get_or_404(project_id)
+    old_values = _audit_snapshot(project)
+    restored = service.restore(project_id)
+    AuditService(db).log_update(
+        "Project",
+        project_id,
+        old_values,
+        _audit_snapshot(restored),
+        current_user.id,
+        request,
+    )
+    return restored
 
 
 # ============================================================
