@@ -1,5 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VIEW_STORAGE_KEY, readStoredView, storeView, toCreateBody, toSkip, toUpdateBody, validateProjectName } from './projectsPageUtils';
+import {
+  SORT_OPTIONS,
+  VIEW_STORAGE_KEY,
+  defaultOrder,
+  readQueryState,
+  readStoredView,
+  sortSelectValue,
+  storeView,
+  toCreateBody,
+  toSkip,
+  toUpdateBody,
+  validateProjectName,
+  writeQueryState,
+} from './projectsPageUtils';
 
 afterEach(() => {
   window.localStorage.clear();
@@ -54,5 +67,57 @@ describe('form helpers', () => {
     expect(toSkip(0, 10)).toBe(0);
     expect(toSkip(3, 12)).toBe(36);
     expect(toSkip(-1, 10)).toBe(0);
+  });
+});
+
+describe('URL query state', () => {
+  it('reads valid values and drops unknown ones', () => {
+    expect(readQueryState(new URLSearchParams('archived=1&status=draft&sort=name&order=desc'))).toEqual({
+      archived: true,
+      status: 'draft',
+      sort: 'name',
+      order: 'desc',
+    });
+    expect(readQueryState(new URLSearchParams('archived=0&status=nope&sort=x&order=up'))).toEqual({
+      archived: false,
+      status: undefined,
+      sort: undefined,
+      order: undefined,
+    });
+  });
+
+  it('ignores order without a valid sort', () => {
+    expect(readQueryState(new URLSearchParams('order=asc')).order).toBeUndefined();
+  });
+
+  it('writes state, keeps unrelated keys and removes cleared ones', () => {
+    const next = writeQueryState(new URLSearchParams('new=1&sort=name&order=asc&status=draft'), {
+      archived: true,
+      status: undefined,
+      sort: 'manager',
+      order: 'desc',
+    });
+    expect(next.get('new')).toBe('1');
+    expect(next.get('archived')).toBe('1');
+    expect(next.get('sort')).toBe('manager');
+    expect(next.get('order')).toBe('desc');
+    expect(next.has('status')).toBe(false);
+    const cleared = writeQueryState(next, { archived: false, status: undefined, sort: undefined, order: undefined });
+    expect(cleared.toString()).toBe('new=1');
+  });
+});
+
+describe('sort options', () => {
+  it('uses the server default directions', () => {
+    expect(defaultOrder('name')).toBe('asc');
+    expect(defaultOrder('updated_at')).toBe('desc');
+    expect(sortSelectValue({ sort: undefined, order: undefined })).toBe('updated_at:desc');
+    expect(sortSelectValue({ sort: 'name', order: undefined })).toBe('name:asc');
+  });
+
+  it('offers both directions of every field with unique values', () => {
+    expect(SORT_OPTIONS).toHaveLength(10);
+    expect(new Set(SORT_OPTIONS.map((o) => o.value)).size).toBe(10);
+    expect(SORT_OPTIONS.map((o) => o.label)).toContain('Name Z to A');
   });
 });

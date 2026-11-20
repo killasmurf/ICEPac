@@ -3,24 +3,56 @@ import { loadFixture } from './load';
 interface ProjectRow {
   id: number;
   project_name: string;
+  project_manager: string | null;
+  status: string | null;
+  created_at: string;
+  updated_at: string;
+  archived: boolean;
 }
 interface Listing {
   items: ProjectRow[];
   total: number;
 }
 
+const SORT_KEYS: Record<string, keyof ProjectRow> = {
+  name: 'project_name',
+  manager: 'project_manager',
+  status: 'status',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+};
+const TEXT_SORTS = ['name', 'manager', 'status'];
+
 /** Routes for the Projects list and the ProjectUpload component. Pass as the second argument of mockApi. */
 export function projectsRoutes(options: { many?: boolean } = {}) {
   let polls = 0;
+  const restored = new Set<number>();
+  const restore = (id: number) => () => {
+    restored.add(id);
+    return { ...loadFixture<Listing>('projects-archived').items.find((p) => p.id === id), archived: false };
+  };
   return {
     'GET /projects': (url: URL) => {
-      const data = loadFixture<Listing>(options.many ? 'projects-many' : 'projects');
+      const archived = url.searchParams.get('archived') === 'true';
+      const source = archived
+        ? loadFixture<Listing>('projects-archived').items.filter((p) => !restored.has(p.id))
+        : loadFixture<Listing>(options.many ? 'projects-many' : 'projects').items;
       const skip = Number(url.searchParams.get('skip') ?? 0);
       const limit = Number(url.searchParams.get('limit') ?? 100);
       const search = (url.searchParams.get('search') ?? '').toLowerCase();
-      const matches = data.items.filter((p) => p.project_name.toLowerCase().includes(search));
+      const status = url.searchParams.get('status');
+      const sort = url.searchParams.get('sort');
+      const order = url.searchParams.get('order') ?? (TEXT_SORTS.includes(sort ?? '') ? 'asc' : 'desc');
+      const matches = source.filter((p) => p.project_name.toLowerCase().includes(search) && (!status || p.status === status));
+      if (sort) {
+        const key = SORT_KEYS[sort];
+        const dir = order === 'desc' ? -1 : 1;
+        matches.sort((x, y) => dir * String(x[key] ?? '').localeCompare(String(y[key] ?? '')) || dir * (x.id - y.id));
+      }
       return { items: matches.slice(skip, skip + limit), total: matches.length, skip, limit };
     },
+    'POST /projects/3/restore': restore(3),
+    'POST /projects/4/restore': restore(4),
     'POST /projects': () => ({ ...loadFixture<Listing>('projects').items[0], id: 99, project_name: 'Created' }),
     'PUT /projects/1': () => loadFixture<Listing>('projects').items[0],
     'DELETE /projects/1': () => null,

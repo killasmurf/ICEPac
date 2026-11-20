@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
 import Link from '@mui/material/Link';
 import Pagination from '@mui/material/Pagination';
 import TextField from '@mui/material/TextField';
@@ -13,14 +14,15 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ArchiveOutlined from '@mui/icons-material/ArchiveOutlined';
+import RestoreFromTrashOutlined from '@mui/icons-material/RestoreFromTrashOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
 import GridViewOutlined from '@mui/icons-material/GridViewOutlined';
 import TableRowsOutlined from '@mui/icons-material/TableRowsOutlined';
-import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import type { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { createProject, deleteProject, getProjects, updateProject, type Project } from '../api/projects';
+import { createProject, deleteProject, getProjects, restoreProject, updateProject, type Project } from '../api/projects';
 import { useAuth } from '../auth/AuthContext';
 import CardSkeleton from '../components/common/CardSkeleton';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -30,18 +32,26 @@ import ErrorState from '../components/common/ErrorState';
 import FormDialog from '../components/common/FormDialog';
 import PageHeader from '../components/common/PageHeader';
 import SearchField from '../components/common/SearchField';
-import StatusChip from '../components/common/StatusChip';
+import StatusChip, { resolveStatus } from '../components/common/StatusChip';
 import { useToast } from '../components/feedback/ToastProvider';
 import { formatDate, formatNumber } from '../utils/format';
 import {
   CARD_PAGE_SIZE,
+  COLUMN_TO_SORT,
   EMPTY_FORM,
+  PROJECT_STATUSES,
+  SORT_OPTIONS,
+  SORT_TO_COLUMN,
+  defaultOrder,
+  readQueryState,
   readStoredView,
+  sortSelectValue,
   storeView,
   toCreateBody,
   toSkip,
   toUpdateBody,
   validateProjectName,
+  writeQueryState,
   type ProjectFormValues,
   type ProjectsView,
 } from './projectsPageUtils';
@@ -64,21 +74,25 @@ const Projects: React.FC = () => {
   const [form, setForm] = useState<ProjectFormValues>(EMPTY_FORM);
   const [nameTouched, setNameTouched] = useState(false);
   const [archiving, setArchiving] = useState<Project | null>(null);
+  const [restoring, setRestoring] = useState<Project | null>(null);
+
+  const query = readQueryState(searchParams);
+  const { archived, status, sort, order } = query;
 
   const pageSize = view === 'cards' ? CARD_PAGE_SIZE : tableModel.pageSize;
   const page = view === 'cards' ? cardPage : tableModel.page;
   const skip = toSkip(page, pageSize);
 
   const list = useQuery({
-    queryKey: ['projects', 'list', { skip, limit: pageSize, search }],
-    queryFn: () => getProjects(skip, pageSize, search || undefined),
+    queryKey: ['projects', 'list', { skip, limit: pageSize, search, archived, status, sort, order }],
+    queryFn: () => getProjects(skip, pageSize, search || undefined, { archived, status, sort, order }),
     placeholderData: keepPreviousData,
   });
   const rows = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
 
   const wantsNew = searchParams.get('new') === '1';
-  const dialog: DialogState = editing ? { mode: 'edit', project: editing } : wantsNew && canManage ? { mode: 'create' } : null;
+  const dialog: DialogState = editing ? { mode: 'edit', project: editing } : wantsNew && canManage && !archived ? { mode: 'create' } : null;
 
   // The create dialog is driven by ?new=1 so the command palette can link straight to it.
   const openCreate = () => {
@@ -122,19 +136,36 @@ const Projects: React.FC = () => {
     },
   });
 
+  // Step back when the last project on a later page was archived or restored.
+  const stepBackIfLast = () => {
+    if (rows.length === 1 && page > 0) {
+      setCardPage((p) => Math.max(0, p - 1));
+      setTableModel((m) => ({ ...m, page: Math.max(0, m.page - 1) }));
+    }
+  };
+
   const archive = useMutation({
     mutationFn: (project: Project) => deleteProject(project.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success('Project archived');
       setArchiving(null);
-      // Step back when the last project on a later page was archived.
-      if (rows.length === 1 && page > 0) {
-        setCardPage((p) => Math.max(0, p - 1));
-        setTableModel((m) => ({ ...m, page: Math.max(0, m.page - 1) }));
-      }
+      stepBackIfLast();
     },
     onError: () => setArchiving(null),
+  });
+
+  const restore = useMutation({
+    mutationFn: (project: Project) => restoreProject(project.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success('Project restored');
+      setRestoring(null);
+      stepBackIfLast();
+    },
+    onError: () => setRestoring(null),
   });
 
   const nameError = validateProjectName(form.project_name);
@@ -150,27 +181,79 @@ const Projects: React.FC = () => {
     storeView(next);
   };
 
-  const handleSearch = (value: string) => {
-    setSearch(value.trim());
+  const resetPaging = () => {
     setCardPage(0);
     setTableModel((m) => ({ ...m, page: 0 }));
   };
 
-  const newProjectButton = canManage ? (
+  const handleSearch = (value: string) => {
+    setSearch(value.trim());
+    resetPaging();
+  };
+
+  // Archived, status and sort live in the URL; changing any of them returns to the first page.
+  const updateQuery = (patch: Partial<typeof query>) => {
+    setSearchParams(writeQueryState(searchParams, { ...query, ...patch }));
+    resetPaging();
+  };
+
+  const changeScope = (_: unknown, next: 'active' | 'archived' | null) => {
+    if (next) updateQuery({ archived: next === 'archived' });
+  };
+
+  const changeSortOption = (value: string) => {
+    const option = SORT_OPTIONS.find((o) => o.value === value);
+    if (!option) return;
+    // The server default (updated_at desc) is expressed by sending nothing.
+    const isDefault = option.sort === 'updated_at' && option.order === 'desc';
+    updateQuery({ sort: isDefault ? undefined : option.sort, order: isDefault ? undefined : option.order });
+  };
+
+  // Stable reference: the grid treats a new sortModel array as a sort change and jumps back to page 1.
+  const sortModel = useMemo<GridSortModel>(
+    () => (sort ? [{ field: SORT_TO_COLUMN[sort], sort: order ?? defaultOrder(sort) }] : []),
+    [sort, order],
+  );
+  const changeSortModel = (model: GridSortModel) => {
+    const item = model[0];
+    const field = item ? COLUMN_TO_SORT[item.field] : undefined;
+    const next = field && item.sort ? { sort: field, order: item.sort } : { sort: undefined, order: undefined };
+    // The grid also reports unchanged models (for example on a page change); that must not reset paging.
+    if (next.sort === sort && next.order === (sort ? (order ?? defaultOrder(sort)) : undefined)) return;
+    updateQuery(next);
+  };
+
+  const newProjectButton = canManage && !archived ? (
     <Button color="secondary" variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
       New project
     </Button>
   ) : undefined;
 
-  const emptyTitle = search ? 'No projects match your search' : 'No projects yet';
-  const emptyDescription = search
-    ? `Nothing matched "${search}". Try a different name or clear the search.`
-    : canManage
+  const filtered = Boolean(search || status);
+  let emptyTitle = 'No projects yet';
+  if (filtered) emptyTitle = 'No projects match your filters';
+  else if (archived) emptyTitle = 'No archived projects';
+  let emptyDescription: string;
+  if (search) emptyDescription = `Nothing matched "${search}". Try a different name or clear the search.`;
+  else if (status) emptyDescription = 'No projects have this status. Choose another status or clear the filter.';
+  else if (archived) emptyDescription = 'Archived projects appear here, where they can be restored.';
+  else
+    emptyDescription = canManage
       ? 'Create a project, then import an MS Project file to build its work breakdown structure.'
       : 'Projects will appear here once a manager creates them.';
 
-  const renderActions = (project: Project) =>
-    canManage ? (
+  const renderActions = (project: Project) => {
+    if (!canManage) return null;
+    if (archived) {
+      return (
+        <Tooltip title="Restore project">
+          <IconButton size="small" aria-label={`Restore ${project.project_name}`} onClick={(e) => { e.stopPropagation(); setRestoring(project); }}>
+            <RestoreFromTrashOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      );
+    }
+    return (
       <Box sx={{ display: 'flex', gap: 0.5 }}>
         <Tooltip title="Edit project">
           <IconButton size="small" aria-label={`Edit ${project.project_name}`} onClick={(e) => { e.stopPropagation(); openEdit(project); }}>
@@ -183,7 +266,8 @@ const Projects: React.FC = () => {
           </IconButton>
         </Tooltip>
       </Box>
-    ) : null;
+    );
+  };
 
   const columns: GridColDef<Project>[] = [
     {
@@ -191,15 +275,18 @@ const Projects: React.FC = () => {
       headerName: 'Project',
       flex: 1.4,
       minWidth: 200,
-      sortable: false,
+      sortable: true,
       renderCell: ({ row }) => (
-        <Link component={RouterLink} to={`/projects/${row.id}`} underline="hover" color="text.primary" fontWeight={600} onClick={(e) => e.stopPropagation()}>
-          {row.project_name}
-        </Link>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Link component={RouterLink} to={`/projects/${row.id}`} underline="hover" color="text.primary" fontWeight={600} onClick={(e) => e.stopPropagation()}>
+            {row.project_name}
+          </Link>
+          {row.archived && <StatusChip kind="project" value="archived" />}
+        </Box>
       ),
     },
-    { field: 'project_manager', headerName: 'Manager', flex: 1, minWidth: 140, sortable: false, valueGetter: (_v, row) => row.project_manager ?? '—' },
-    { field: 'status', headerName: 'Status', width: 140, sortable: false, renderCell: ({ row }) => (row.status ? <StatusChip kind="project" value={row.status} /> : '—') },
+    { field: 'project_manager', headerName: 'Manager', flex: 1, minWidth: 140, sortable: true, valueGetter: (_v, row) => row.project_manager ?? '—' },
+    { field: 'status', headerName: 'Status', width: 140, sortable: true, renderCell: ({ row }) => (row.status ? <StatusChip kind="project" value={row.status} /> : '—') },
     {
       field: 'task_count',
       headerName: 'Tasks',
@@ -211,8 +298,8 @@ const Projects: React.FC = () => {
       cellClassName: 'tabular-nums',
       valueFormatter: (value: number) => formatNumber(value),
     },
-    { field: 'updated_at', headerName: 'Updated', width: 130, sortable: false, valueFormatter: (value: string) => formatDate(value) },
-    { field: 'created_at', headerName: 'Created', width: 130, sortable: false, valueFormatter: (value: string) => formatDate(value) },
+    { field: 'updated_at', headerName: 'Updated', width: 130, sortable: true, valueFormatter: (value: string) => formatDate(value) },
+    { field: 'created_at', headerName: 'Created', width: 130, sortable: true, valueFormatter: (value: string) => formatDate(value) },
     ...(canManage
       ? [{ field: 'actions', headerName: 'Actions', width: 110, sortable: false, filterable: false, disableColumnMenu: true, renderCell: ({ row }: { row: Project }) => renderActions(row) } satisfies GridColDef<Project>]
       : []),
@@ -241,6 +328,8 @@ const Projects: React.FC = () => {
         rowCount={total}
         paginationModel={tableModel}
         onPaginationModelChange={setTableModel}
+        sortModel={sortModel}
+        onSortModelChange={changeSortModel}
         onRowClick={(row) => navigate(`/projects/${row.id}`)}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
@@ -283,6 +372,7 @@ const Projects: React.FC = () => {
                   {project.project_manager ? `Manager: ${project.project_manager}` : 'No manager assigned'}
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+                  {project.archived && <StatusChip kind="project" value="archived" />}
                   {project.status && <StatusChip kind="project" value={project.status} />}
                   {project.task_count > 0 && (
                     <Typography variant="body2" color="text.secondary" className="tabular-nums">
@@ -316,7 +406,11 @@ const Projects: React.FC = () => {
     <>
       <PageHeader
         title="Projects"
-        subtitle={list.data ? `${formatNumber(total)} ${total === 1 ? 'project' : 'projects'}${search ? ' found' : ''}` : undefined}
+        subtitle={
+          list.data
+            ? `${formatNumber(total)} ${archived ? 'archived ' : ''}${total === 1 ? 'project' : 'projects'}${filtered ? ' found' : ''}`
+            : undefined
+        }
         actions={newProjectButton}
       />
 
@@ -324,14 +418,50 @@ const Projects: React.FC = () => {
         <Box sx={{ flex: '1 1 260px', maxWidth: 420 }}>
           <SearchField onChange={handleSearch} placeholder="Search projects" label="Search projects" fullWidth />
         </Box>
-        <ToggleButtonGroup size="small" exclusive value={view} onChange={changeView} aria-label="Projects view">
-          <ToggleButton value="cards" aria-label="Card view">
-            <GridViewOutlined fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="table" aria-label="Table view">
-            <TableRowsOutlined fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+          <ToggleButtonGroup size="small" exclusive value={archived ? 'archived' : 'active'} onChange={changeScope}
+            aria-label="Project scope"
+            sx={{ '& .MuiToggleButton-root': { px: 2, color: 'text.secondary', '&.Mui-selected': { color: 'text.primary', fontWeight: 600 } } }}
+          >
+            <ToggleButton value="active">Active</ToggleButton>
+            <ToggleButton value="archived">Archived</ToggleButton>
+          </ToggleButtonGroup>
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={changeView} aria-label="Projects view">
+            <ToggleButton value="cards" aria-label="Card view">
+              <GridViewOutlined fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="table" aria-label="Table view">
+              <TableRowsOutlined fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
+        <TextField
+          select
+          size="small"
+          label="Status"
+          value={status ?? ''}
+          onChange={(e) => updateQuery({ status: e.target.value || undefined })}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">All statuses</MenuItem>
+          {PROJECT_STATUSES.map((value) => (
+            <MenuItem key={value} value={value}>
+              {resolveStatus('project', value).label}
+            </MenuItem>
+          ))}
+        </TextField>
+        {view === 'cards' && (
+          <TextField select size="small" label="Sort by" value={sortSelectValue(query)} onChange={(e) => changeSortOption(e.target.value)} sx={{ minWidth: 200 }}>
+            {SORT_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
       </Box>
 
       {content}
@@ -363,8 +493,8 @@ const Projects: React.FC = () => {
         title="Archive project?"
         message={
           <>
-            <strong>{archiving?.project_name}</strong> will be hidden from the projects list. Nothing is deleted and its data is kept, but
-            there is no screen to restore an archived project yet.
+            <strong>{archiving?.project_name}</strong> will be hidden from the projects list. Nothing is deleted and its data is kept. You
+            can restore it later from the Archived view.
           </>
         }
         confirmLabel="Archive project"
@@ -372,6 +502,20 @@ const Projects: React.FC = () => {
         loading={archive.isPending}
         onConfirm={() => archiving && archive.mutate(archiving)}
         onClose={() => setArchiving(null)}
+      />
+
+      <ConfirmDialog
+        open={restoring != null}
+        title="Restore project?"
+        message={
+          <>
+            <strong>{restoring?.project_name}</strong> will return to the Active projects list.
+          </>
+        }
+        confirmLabel="Restore project"
+        loading={restore.isPending}
+        onConfirm={() => restoring && restore.mutate(restoring)}
+        onClose={() => setRestoring(null)}
       />
     </>
   );
