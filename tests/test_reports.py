@@ -130,25 +130,22 @@ ROUTE_FOR = {
     "cost_by_supplier": "cost-by-supplier",
     "cost_by_eoc": "cost-by-eoc",
     "cost_by_technique": "cost-by-technique",
+    "cost_by_region": "cost-by-region",
     "boe_summary": "boe-summary",
     "boe_detailed": "boe-detailed",
+    "boe_by_wbs": "boe-by-wbs",
     "risk_assessment": "risk-assessment",
     "risk_summary": "risk-summary",
     "estimator_activity": "estimator-activity",
+    "approver_activity": "approver-activity",
     "change_history": "change-history",
+    "resource_utilization": "resource-utilization",
+    "project_summary": "project-summary",
 }
-# Advertised in the catalog; only reachable through /generate and /export.
-NO_CONVENIENCE_ROUTE = [
-    "cost_by_region",
-    "boe_by_wbs",
-    "approver_activity",
-    "resource_utilization",
-    "project_summary",
-]
 
 
-def test_convenience_routes_plus_missing_ones_cover_the_catalog():
-    assert sorted([*ROUTE_FOR, *NO_CONVENIENCE_ROUTE]) == sorted(CATALOG_TYPES)
+def test_every_catalog_report_has_a_convenience_route():
+    assert sorted(ROUTE_FOR) == sorted(CATALOG_TYPES)
 
 
 @pytest.mark.parametrize("report_type,route", sorted(ROUTE_FOR.items()))
@@ -165,19 +162,35 @@ def test_convenience_route_returns_report(client, admin, seeded, report_type, ro
     assert resp.json()["report_type"] == report_type
 
 
-@pytest.mark.parametrize("report_type", NO_CONVENIENCE_ROUTE)
-def test_catalog_reports_without_a_convenience_route_are_404_not_500(
-    client, admin, seeded, report_type
-):
+@pytest.mark.parametrize("report_type,route", sorted(ROUTE_FOR.items()))
+def test_convenience_route_matches_generate(client, admin, seeded, report_type, route):
+    payload = {
+        "report_type": report_type,
+        "filters": {"project_id": seeded["project"].id},
+    }
+    generated = client.post(f"{API}/generate", json=payload, headers=auth(admin))
+    dedicated = client.post(f"{API}/{route}", json=payload, headers=auth(admin))
+    assert generated.status_code == 200, generated.text
+    assert dedicated.status_code == 200, dedicated.text
+    for key in ("report_type", "columns", "rows", "totals"):
+        assert dedicated.json()[key] == generated.json()[key], key
+
+
+def test_convenience_route_ignores_a_mismatched_body_report_type(client, admin, seeded):
     resp = client.post(
-        f"{API}/{report_type.replace('_', '-')}",
+        f"{API}/cost-by-region",
         json={
-            "report_type": report_type,
+            "report_type": "cost_by_wbs",
             "filters": {"project_id": seeded["project"].id},
         },
         headers=auth(admin),
     )
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json()["report_type"] == "cost_by_region"
+
+
+def test_convenience_routes_require_authentication(client):
+    assert client.post(f"{API}/project-summary", json={}).status_code in (401, 403)
 
 
 # ---- column-name drift fixes (PR #11 6ace7fa, aebd24c) -----------------------
