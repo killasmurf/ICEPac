@@ -14,7 +14,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ArchiveOutlined from '@mui/icons-material/ArchiveOutlined';
-import RestoreFromTrashOutlined from '@mui/icons-material/RestoreFromTrashOutlined';
+import UnarchiveOutlined from '@mui/icons-material/UnarchiveOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
 import GridViewOutlined from '@mui/icons-material/GridViewOutlined';
@@ -248,7 +248,7 @@ const Projects: React.FC = () => {
       return (
         <Tooltip title="Restore project">
           <IconButton size="small" aria-label={`Restore ${project.project_name}`} onClick={(e) => { e.stopPropagation(); setRestoring(project); }}>
-            <RestoreFromTrashOutlined fontSize="small" />
+            <UnarchiveOutlined fontSize="small" />
           </IconButton>
         </Tooltip>
       );
