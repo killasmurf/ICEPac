@@ -152,6 +152,17 @@ async def cost_by_technique(
     return ReportEngine(db).generate(request)
 
 
+@router.post("/cost-by-region", response_model=ReportResult)
+async def cost_by_region(
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Cost breakdown by geographic region."""
+    request.report_type = ReportType.COST_BY_REGION
+    return ReportEngine(db).generate(request)
+
+
 # ════════════════════════════════════════════════════════════════
 # BOE Reports
 # ════════════════════════════════════════════════════════════════
@@ -176,6 +187,17 @@ async def boe_detailed(
 ):
     """Detailed Basis of Estimate."""
     request.report_type = ReportType.BOE_DETAILED
+    return ReportEngine(db).generate(request)
+
+
+@router.post("/boe-by-wbs", response_model=ReportResult)
+async def boe_by_wbs(
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Basis of Estimate per WBS item."""
+    request.report_type = ReportType.BOE_BY_WBS
     return ReportEngine(db).generate(request)
 
 
@@ -228,6 +250,44 @@ async def change_history(
     current_user=Depends(get_current_user),
 ):
     request.report_type = ReportType.CHANGE_HISTORY
+    return ReportEngine(db).generate(request)
+
+
+@router.post("/approver-activity", response_model=ReportResult)
+async def approver_activity(
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Approval decisions and history."""
+    request.report_type = ReportType.APPROVER_ACTIVITY
+    return ReportEngine(db).generate(request)
+
+
+# ════════════════════════════════════════════════════════════════
+# Utilization Reports
+# ════════════════════════════════════════════════════════════════
+
+
+@router.post("/resource-utilization", response_model=ReportResult)
+async def resource_utilization(
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Resource allocation across projects."""
+    request.report_type = ReportType.RESOURCE_UTILIZATION
+    return ReportEngine(db).generate(request)
+
+
+@router.post("/project-summary", response_model=ReportResult)
+async def project_summary(
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Overall project status and metrics."""
+    request.report_type = ReportType.PROJECT_SUMMARY
     return ReportEngine(db).generate(request)
 
 

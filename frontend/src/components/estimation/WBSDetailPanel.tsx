@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useCallback, useId, useState } from 'react';
 import { Box, Button, Divider, Drawer, Grid, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,6 +37,7 @@ import ErrorState from '../common/ErrorState';
 import { useToast } from '../feedback/ToastProvider';
 import { invalidateEstimation, wbsDetailsKey } from './queryKeys';
 import { summaryRangeBar } from './estimationUtils';
+import { INITIAL_WBS_PANEL_STATE, WbsDeleteTarget, WbsPanelUiPatch, WbsPanelUiState } from './useWbsPanelState';
 
 interface WBSDetailPanelProps {
   open: boolean;
@@ -49,6 +50,12 @@ interface WBSDetailPanelProps {
   variant?: 'drawer' | 'inline';
   /** Called after any successful create, update, delete or approval action, so the parent can refresh its own data. */
   onChanged?: () => void;
+  /**
+   * Optional controlled UI state (tab, open forms, typed drafts, delete target). A parent that outlives the panel
+   * passes it with `onUiStateChange` so the state survives the panel remounting; when absent the panel keeps it itself.
+   */
+  uiState?: WbsPanelUiState;
+  onUiStateChange?: WbsPanelUiPatch;
   // Lookup data for forms
   resources?: { code: string; description: string }[];
   suppliers?: { code: string; name: string }[];
@@ -83,7 +90,7 @@ const fetchDetails = async (projectId: number, wbsId: number) => {
   return { assignments, risks, approval, estimation };
 };
 
-type DeleteTarget = { kind: 'assignment'; item: Assignment } | { kind: 'risk'; item: Risk } | null;
+type DeleteTarget = WbsDeleteTarget;
 
 const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   open,
@@ -93,6 +100,8 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   canApprove,
   variant = 'drawer',
   onChanged,
+  uiState,
+  onUiStateChange,
   resources = [],
   suppliers = [],
   costTypes = [],
@@ -106,14 +115,18 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
   const toast = useToast();
   const titleId = useId();
   const queryClient = useQueryClient();
-  const [tabValue, setTabValue] = useState(0);
-
-  // Form / dialog states
-  const [assignmentFormOpen, setAssignmentFormOpen] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
-  const [riskFormOpen, setRiskFormOpen] = useState(false);
-  const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [localUi, setLocalUi] = useState<WbsPanelUiState>(INITIAL_WBS_PANEL_STATE);
+  const ui = uiState ?? localUi;
+  const patchUi = useCallback<WbsPanelUiPatch>(
+    (patch) => (onUiStateChange ? onUiStateChange(patch) : setLocalUi((prev) => ({ ...prev, ...patch }))),
+    [onUiStateChange],
+  );
+  const { tab: tabValue, editingAssignment, editingRisk, deleteTarget } = ui;
+  const assignmentFormOpen = ui.assignmentFormOpen;
+  const riskFormOpen = ui.riskFormOpen;
+  const setDeleteTarget = (target: DeleteTarget) => patchUi({ deleteTarget: target });
+  const closeAssignmentForm = () => patchUi({ assignmentFormOpen: false, assignmentDraft: null });
+  const closeRiskForm = () => patchUi({ riskFormOpen: false, riskDraft: null });
 
   const wbsId = wbs?.id;
 
@@ -147,7 +160,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
         : createAssignment(projectId, wbsId as number, vars.data as AssignmentCreate),
     onSuccess: (_result, vars) => {
       toast.success(vars.editing ? 'Assignment updated' : 'Assignment created');
-      setAssignmentFormOpen(false);
+      closeAssignmentForm();
       void refresh();
     },
   });
@@ -159,7 +172,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
         : createRisk(projectId, wbsId as number, vars.data as RiskCreate),
     onSuccess: (_result, vars) => {
       toast.success(vars.editing ? 'Risk updated' : 'Risk created');
-      setRiskFormOpen(false);
+      closeRiskForm();
       void refresh();
     },
   });
@@ -179,13 +192,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
   // Assignment handlers
   const handleAddAssignment = () => {
-    setEditingAssignment(null);
-    setAssignmentFormOpen(true);
+    patchUi({ editingAssignment: null, assignmentDraft: null, assignmentFormOpen: true });
   };
 
   const handleEditAssignment = (assignment: Assignment) => {
-    setEditingAssignment(assignment);
-    setAssignmentFormOpen(true);
+    patchUi({ editingAssignment: assignment, assignmentDraft: null, assignmentFormOpen: true });
   };
 
   const handleAssignmentSubmit = async (data: AssignmentCreate | AssignmentUpdate) => {
@@ -195,13 +206,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
   // Risk handlers
   const handleAddRisk = () => {
-    setEditingRisk(null);
-    setRiskFormOpen(true);
+    patchUi({ editingRisk: null, riskDraft: null, riskFormOpen: true });
   };
 
   const handleEditRisk = (risk: Risk) => {
-    setEditingRisk(risk);
-    setRiskFormOpen(true);
+    patchUi({ editingRisk: risk, riskDraft: null, riskFormOpen: true });
   };
 
   const handleRiskSubmit = async (data: RiskCreate | RiskUpdate) => {
@@ -246,7 +255,7 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
       {/* Tabs */}
       <Tabs
         value={tabValue}
-        onChange={(_, v: number) => setTabValue(v)}
+        onChange={(_, v: number) => patchUi({ tab: v })}
         variant="scrollable"
         scrollButtons="auto"
         aria-label="WBS details"
@@ -346,9 +355,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
       {/* Forms and confirmations */}
       <AssignmentForm
         open={assignmentFormOpen}
-        onClose={() => setAssignmentFormOpen(false)}
+        onClose={closeAssignmentForm}
         onSubmit={handleAssignmentSubmit}
         assignment={editingAssignment}
+        draft={ui.assignmentDraft}
+        onDraftChange={(draft) => patchUi({ assignmentDraft: draft })}
         resources={resources}
         suppliers={suppliers}
         costTypes={costTypes}
@@ -359,9 +370,11 @@ const WBSDetailPanel: React.FC<WBSDetailPanelProps> = ({
 
       <RiskForm
         open={riskFormOpen}
-        onClose={() => setRiskFormOpen(false)}
+        onClose={closeRiskForm}
         onSubmit={handleRiskSubmit}
         risk={editingRisk}
+        draft={ui.riskDraft}
+        onDraftChange={(draft) => patchUi({ riskDraft: draft })}
         riskCategories={riskCategories}
         probabilityLevels={probabilityLevels}
         severityLevels={severityLevels}

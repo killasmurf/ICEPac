@@ -25,9 +25,13 @@ interface AssignmentFormProps {
   regions: { code: string; description: string }[];
   businessAreas: { code: string; description: string }[];
   estimatingTechniques: { code: string; description: string }[];
+  /** Restores typed values when the form remounts (e.g. a layout change). Ignored when absent. */
+  draft?: AssignmentFormDraft | null;
+  /** Called with the current values on every edit so the owner can keep them across a remount. */
+  onDraftChange?: (draft: AssignmentFormDraft) => void;
 }
 
-interface FormState {
+export interface AssignmentFormDraft {
   resource_code: string;
   supplier_code: string;
   cost_type_code: string;
@@ -41,6 +45,8 @@ interface FormState {
   import_content_pct: string;
   aii_pct: string;
 }
+
+type FormState = AssignmentFormDraft;
 
 const toFormData = (assignment?: Assignment | null): FormState =>
   assignment
@@ -89,8 +95,10 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
   regions,
   businessAreas,
   estimatingTechniques,
+  draft,
+  onDraftChange,
 }) => {
-  const [formData, setFormData] = useState<FormState>(() => toFormData(assignment));
+  const [formData, setFormData] = useState<FormState>(() => draft ?? toFormData(assignment));
   const [loading, setLoading] = useState(false);
   // Reset the form when the dialog opens or the edited item changes
   // (adjusting state during render rather than in an effect).
@@ -101,7 +109,9 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
   }
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    const next = { ...formData, [field]: event.target.value };
+    setFormData(next);
+    onDraftChange?.(next);
   };
 
   // Picking a resource pre-fills its default supplier, but only while the supplier is still empty, so a

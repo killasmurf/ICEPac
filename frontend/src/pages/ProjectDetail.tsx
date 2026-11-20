@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import CardSkeleton from '../components/common/CardSkeleton';
 import ErrorState from '../components/common/ErrorState';
 import EstimationSummary from '../components/estimation/EstimationSummary';
+import { ArchivedProjectBanner } from '../components/project/ArchivedProjectBanner';
 import ProjectUpload from '../components/project/ProjectUpload';
 import { ProjectRiskRegister } from '../components/project/ProjectRiskRegister';
 import ProjectHeader from './projectDetail/ProjectHeader';
@@ -117,6 +118,7 @@ const ProjectDetail: React.FC = () => {
 
   return (
     <Box>
+      <ArchivedProjectBanner project={data} />
       <ProjectHeader project={data} estimation={estimation.data} estimationLoading={estimation.isPending} />
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
