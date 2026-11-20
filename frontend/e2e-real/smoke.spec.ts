@@ -3,7 +3,7 @@
  * scripts/seed_smoke.py. No mocks. Run order matters (read-only flows first, then mutations),
  * and the database must be freshly seeded (`--reset`) before every run.
  *
- * Tests marked test.fail() document known product bugs; see docs/REAL_API_SMOKE.md (finding IDs).
+ * Findings F-01 to F-16 in docs/REAL_API_SMOKE.md were fixed in #29 and #30; every test here is a plain assertion.
  */
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -75,8 +75,6 @@ const test = base.extend<{ _diag: void }>({
   ],
 });
 
-/** Marks the current test as a documented product bug. Set SMOKE_FIXED=1 to run these tests as plain assertions (e.g. to verify a fix). */
-const knownBug = (why: string) => test.fail(!process.env.SMOKE_FIXED, why);
 
 // ------------------------------------------------------------------ helpers
 async function login(page: Page, role: 'admin' | 'manager' | 'user', password?: string) {
@@ -90,7 +88,11 @@ async function login(page: Page, role: 'admin' | 'manager' | 'user', password?: 
 }
 
 async function shot(page: Page, name: string) {
-  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+  // Chromium's full-page capture briefly resizes the window to 1x1, which flips the app across its
+  // md breakpoint and back and remounts the WBS layout, closing any open dialog. Capture only the
+  // viewport while a dialog is open so the screenshot does not change the page under test.
+  const dialogOpen = (await page.getByRole('dialog').count()) > 0;
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: !dialogOpen });
 }
 
 async function apiToken(page: Page): Promise<string> {
@@ -148,35 +150,6 @@ async function pickOption(page: Page, label: string | RegExp, option: string | R
 }
 
 
-/**
- * WORKAROUND for finding F-01 (blocker): GET and POST /projects/{id}/wbs/{id}/approval always return 500
- * (WBSApprovalResponse.model_validate(WBS) lacks wbs_id), which makes the whole WBS detail panel show
- * "Could not load WBS details". To keep exercising everything behind it against the real backend, flows that
- * need the panel call shimApproval(): it answers ONLY that endpoint from the real WBS list API. For POST it still
- * lets the real request run first (the state change is committed server-side before the 500), then reports 200.
- */
-async function shimApproval(page: Page, pid: number) {
-  await page.route(/\/projects\/\d+\/wbs\/\d+\/approval$/, async (route) => {
-    const url = route.request().url();
-    const wbsId = Number(/wbs\/(\d+)\/approval/.exec(url)?.[1]);
-    if (route.request().method() === 'POST') await route.fetch();
-    const token = await page.evaluate(() => localStorage.getItem('access_token'));
-    const list = await (await page.request.get(`${API}/projects/${pid}/wbs?limit=1000`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    const w = list.items.find((i: { id: number }) => i.id === wbsId);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'access-control-allow-origin': '*' },
-      body: JSON.stringify({
-        wbs_id: w.id,
-        approval_status: w.approval_status,
-        approver: w.approver,
-        approver_date: w.approver_date,
-        estimate_revision: w.estimate_revision,
-      }),
-    });
-  });
-}
 
 // ================================================================== 0. login page
 test('login page renders', async ({ page }) => {
@@ -218,7 +191,6 @@ test('admin: dashboard figures match the seed, charts and health panel render', 
 
 // Finding F-08: /dashboard/health-detailed runs db.execute("SELECT 1") (not text()), so the DB probe always fails.
 test('admin: dashboard system health reports the database as healthy', async ({ page }) => {
-  knownBug('F-08: health probe uses a raw SQL string; SQLAlchemy 2 raises ArgumentError so database is always unhealthy');
   await login(page, 'admin');
   const health = page.getByRole('region', { name: 'System health' });
   await expect(health).toBeVisible();
@@ -230,12 +202,16 @@ test('admin: dashboard system health reports the database as healthy', async ({ 
 
 // Finding F-09: recent_activity.username is always "" because AuditLog has no `username` attribute.
 test('admin: dashboard recent activity names the acting user', async ({ page }) => {
-  knownBug('F-09: /dashboard/stats recent_activity[].username is always an empty string');
   await login(page, 'admin');
   const res = await page.request.get(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${await apiToken(page)}` } });
   const body = await res.json();
-  const withUser = body.recent_activity.filter((a: { username: string }) => a.username);
-  expect(withUser.length).toBe(body.recent_activity.filter((a: { entity_type: string }) => a.entity_type).length - 1 /* one FAILED_LOGIN has no user */);
+  const audit = await (await page.request.get(`${API}/admin/audit-logs?limit=500`, { headers: { Authorization: `Bearer ${await apiToken(page)}` } })).json();
+  const auditUser = new Map((audit.items as { id: number; username: string | null }[]).map((a) => [a.id, a.username ?? null]));
+  const activity = body.recent_activity as { id: number; username: string | null }[];
+  expect(activity.length).toBeGreaterThan(0);
+  // Every entry names the same actor as the audit log (null only for entries with no user), never "".
+  for (const a of activity) expect(a.username).toBe(auditUser.get(a.id) ?? null);
+  expect(activity.some((a) => a.username)).toBe(true);
 });
 
 // ================================================================== 2. projects + WBS
@@ -249,7 +225,6 @@ test('projects list shows the seeded projects', async ({ page }) => {
 test('project: WBS tree shows the seeded 3-level hierarchy and the detail panel lists assignments with PERT values', async ({ page }) => {
   await login(page, 'admin');
   const harbour = projectOf('harbour');
-  await shimApproval(page, await projectId(page, harbour.name)); // F-01 workaround
   await page.goto('/projects');
   await page.getByText(harbour.name, { exact: true }).first().click();
   await expect(page).toHaveURL(/\/projects\/\d+/);
@@ -283,11 +258,9 @@ test('project: WBS tree shows the seeded 3-level hierarchy and the detail panel 
 
 // Finding F-14: API serialises Decimal as strings ("12000.00"); the totals strip adds them as numbers and shows $NaN.
 test('WBS detail: assignment totals strip shows Best/Likely/Worst sums', async ({ page }) => {
-  knownBug('F-14: AssignmentList totals sum string decimals from the API, so Best/Likely/Worst render as $NaN');
   await login(page, 'admin');
   const harbour = projectOf('harbour');
   const id = await projectId(page, harbour.name);
-  await shimApproval(page, id); // F-01 workaround
   await openProject(page, id);
   await selectWbs(page, '1.1.1', 'Geotechnical Survey');
   const geo = flatten(harbour.wbs).find((w) => w.code === '1.1.1') as SeedWbs;
@@ -299,7 +272,6 @@ test('WBS detail: assignment totals strip shows Best/Likely/Worst sums', async (
 
 // Finding F-01 (blocker): GET /projects/{id}/wbs/{id}/approval 500s for every WBS item.
 test('project: selecting a WBS item loads its detail panel (no workaround)', async ({ page }) => {
-  knownBug('F-01: GET /projects/{id}/wbs/{id}/approval returns 500 (WBSApprovalResponse needs wbs_id); the panel shows "Could not load WBS details"');
   await login(page, 'admin');
   const id = await projectId(page, projectOf('harbour').name);
   await openProject(page, id);
@@ -335,7 +307,6 @@ test('project with null manager, null description and zero-value assignments ren
 // ================================================================== 3. reports (read-only, before mutations)
 // Finding F-03: every report that touches WBS.title 500s (cost_by_wbs, boe_*, risk_*, project_summary).
 test('reports: Cost by WBS preview total equals the seeded total; CSV and XLSX export', async ({ page }) => {
-  knownBug('F-03: POST /reports/generate for cost_by_wbs returns 500 (AttributeError: WBS has no attribute title)');
   const harbour = projectOf('harbour');
   await login(page, 'admin');
   await page.goto('/reports');
@@ -396,9 +367,9 @@ test('reports: other report types load (smoke of every catalog entry via the API
     status[t] = r.status();
   }
   findings.reportStatus = status;
-  // Known-bad types are documented in F-03; assert the remaining ones work.
+  // F-03 is fixed: no catalog type may fail with a server error.
   const bad = Object.entries(status).filter(([, s]) => s >= 500).map(([t]) => t).sort();
-  expect(bad).toEqual(['boe_by_wbs', 'boe_detailed', 'boe_summary', 'cost_by_wbs', 'project_summary', 'risk_assessment', 'risk_summary']);
+  expect(bad).toEqual([]);
 });
 
 // ================================================================== 4. mutations
@@ -408,7 +379,6 @@ test('create an assignment through the form; header totals update to the new sum
   const id = await projectId(page, harbour.name);
   const before = (await projectEstimation(page, id)).total_pert_estimate as number;
   expect(before).toBeCloseTo(projectPert(harbour), 2);
-  await shimApproval(page, id); // F-01 workaround
   await openProject(page, id);
   await expect(band(page)).toContainText(whole(before));
   await selectWbs(page, '1.2.1', 'Structural Design');
@@ -442,7 +412,6 @@ test('create an assignment through the form; header totals update to the new sum
 test('submit a WBS item for approval, then approve it; the status chip changes', async ({ page }) => {
   await login(page, 'admin');
   const id = await projectId(page, projectOf('harbour').name);
-  await shimApproval(page, id); // F-01 workaround
   await openProject(page, id);
   await selectWbs(page, '1.2.2', 'Utilities Relocation Design');
   const header = page.locator('h2', { hasText: 'Utilities Relocation Design' }).locator('..');
@@ -461,7 +430,6 @@ test('submit a WBS item for approval, then approve it; the status chip changes',
 
 // Finding F-02 (blocker): POST /projects/{id}/risks returns 500 ('risk_exposure' is an invalid keyword argument for Risk).
 test('add a project-level risk; the Risks card count increases by one', async ({ page }) => {
-  knownBug("F-02: POST /projects/{id}/risks returns 500 (RiskBase.risk_exposure is passed to the Risk ORM constructor); the browser then reports it as a CORS error (F-10)");
   await login(page, 'admin');
   const id = await projectId(page, projectOf('harbour').name);
   const beforeCount = (await projectEstimation(page, id)).total_risks as number;
@@ -488,14 +456,16 @@ test('project Risks tab lists the seeded project-level risks and the header card
   const id = await projectId(page, harbour.name);
   await openProject(page, id, '?tab=risks');
   for (const r of harbour.project_risks as { title: string }[]) await expect(page.getByText(r.title, { exact: true })).toBeVisible();
-  await expect(stat(band(page), 'Risks')).toHaveText(String(harbour.project_risks.length));
+  // Since F-04 the header card counts WBS-level plus project-level risks, so it must agree with the API total
+  // (other tests in this run add risks, so compare with the live count rather than the seed).
+  const est = await (await page.request.get(`${API}/projects/${id}/estimation`, { headers: { Authorization: `Bearer ${await apiToken(page)}` } })).json();
+  await expect(stat(band(page), 'Risks')).toHaveText(String(est.total_risks));
   await page.waitForTimeout(500);
   await shot(page, '12b-project-risks-seeded');
 });
 
 // Finding F-04: estimation endpoint counts only project-level risks; WBS-level risks are dropped.
 test('project header Risks card counts WBS-level plus project-level risks (matches the dashboard portfolio)', async ({ page }) => {
-  knownBug('F-04: GET /projects/{id}/estimation uses RiskRepository.get_by_project (project-level only), so WBS-level risks are missing from total_risks/exposure/per-WBS risk_count');
   await login(page, 'admin');
   const id = await projectId(page, projectOf('harbour').name);
   const token = await apiToken(page);
@@ -507,15 +477,14 @@ test('project header Risks card counts WBS-level plus project-level risks (match
 
 // Findings F-05 and F-02: the WBS-scoped risk form posts no `title` (422), and with a title the server 500s.
 test('WBS detail: add a WBS-level risk through the form', async ({ page }) => {
-  knownBug('F-05: frontend RiskCreate omits required `title` -> 422; F-02: with a title the endpoint 500s anyway');
   await login(page, 'admin');
   const id = await projectId(page, projectOf('harbour').name);
-  await shimApproval(page, id); // F-01 workaround
   await openProject(page, id);
   await selectWbs(page, '1.2.1', 'Structural Design');
   await page.getByRole('tablist', { name: 'WBS details' }).getByRole('tab', { name: 'Risks' }).click();
   await page.getByRole('button', { name: 'Add Risk' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'New Risk' });
+  await dialog.getByLabel('Title').fill('Smoke test WBS risk: design rework');
   await pickOption(page, 'Risk Category', /^TECH/);
   await dialog.getByLabel('Risk Cost').fill('5000');
   await shot(page, '12c-wbs-risk-form');
@@ -597,7 +566,6 @@ test('admin: config tables list loads and cost-types lists the seeded rows', asy
 
 // Finding F-06: GET /admin/config/{weighted-table} omits `weight` (response_model is the unweighted ConfigItemResponse).
 test('admin: probability levels show their weights', async ({ page }) => {
-  knownBug('F-06: GET /admin/config/probability-levels returns items without `weight`, so the weight column is blank and forms treat every weight as 0');
   await login(page, 'admin');
   await page.goto('/admin/config');
   await page.getByRole('tab', { name: /Probability/ }).click();
@@ -633,7 +601,6 @@ test('admin: audit logs show entries for the actions performed', async ({ page }
 
 // Finding F-11: creating an assignment / project risk / logging in is not written to the audit log.
 test('audit log records assignment creation, project-risk creation and logins', async ({ page }) => {
-  knownBug('F-11: no audit entries are written for assignment/risk CRUD or for logins');
   await login(page, 'admin');
   const res = await page.request.get(`${API}/admin/audit-logs?limit=500`, { headers: { Authorization: `Bearer ${await apiToken(page)}` } });
   const items = (await res.json()).items as { action: string; entity_type: string; user_agent: string | null }[];
@@ -644,55 +611,64 @@ test('audit log records assignment creation, project-risk creation and logins', 
 });
 
 // ================================================================== 6. manager
-test('manager: what the UI shows for Administration, and what the API allows (recorded as findings)', async ({ page }) => {
+// Owner decision (F-13): managers manage users, but may not create admins, grant the admin role
+// (their own account included) or change admin accounts. Audit logs stay admin-only.
+test('manager: sees Administration without Audit Logs; can create a user but cannot create or become an admin', async ({ page }) => {
   await login(page, 'manager');
   await shot(page, '16-dashboard-manager');
-  const navAdmin = await page.getByText('Administration', { exact: true }).count();
+  const nav = page.getByRole('navigation');
+  await expect(nav.getByText('Administration', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Users' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Audit Logs' })).toHaveCount(0);
   await page.goto('/admin/users');
-  const notAuthorised = await page.getByRole('heading', { name: 'Not authorised' }).count();
+  await expect(page.getByRole('heading', { name: 'Not authorised' })).toHaveCount(0);
+  await expect(page.getByText(user('admin').username).first()).toBeVisible();
   await shot(page, '17-manager-admin-users');
-  const token = await apiToken(page);
-  const headers = { Authorization: `Bearer ${token}` };
-  const me = await (await page.request.get(`${API}/auth/me`, { headers })).json();
+  await page.goto('/admin/audit-logs');
+  await expect(page.getByRole('heading', { name: 'Not authorised' })).toBeVisible();
 
-  const listUsers = await page.request.get(`${API}/admin/users`, { headers });
-  const create = await page.request.post(`${API}/admin/users`, {
+  const headers = { Authorization: `Bearer ${await apiToken(page)}` };
+  const me = await (await page.request.get(`${API}/auth/me`, { headers })).json();
+  expect((await page.request.get(`${API}/admin/users`, { headers })).status()).toBe(200);
+  expect((await page.request.get(`${API}/admin/audit-logs`, { headers })).status()).toBe(403);
+
+  const createAdmin = await page.request.post(`${API}/admin/users`, {
     headers,
     data: { username: 'smoke_rogue_admin', email: 'rogue@example.com', full_name: 'Rogue', password: 'RogueAdmin#2026', role: 'admin' },
   });
-  const created = create.status() === 201 ? await create.json() : null;
   const selfPromote = await page.request.put(`${API}/admin/users/${me.id}`, { headers, data: { role: 'admin' } });
-  const promotedRole = selfPromote.status() === 200 ? (await selfPromote.json()).role : null;
-
-  // Clean up: remove the created user, restore own role, using whatever access we now have.
-  const cleanup: Record<string, number | string> = {};
-  if (created) cleanup.deleteCreated = (await page.request.delete(`${API}/admin/users/${created.id}`, { headers })).status();
-  if (promotedRole === 'admin') cleanup.restoreRole = (await page.request.put(`${API}/admin/users/${me.id}`, { headers, data: { role: 'manager' } })).status();
-  // Verify with an admin token that nothing is left behind.
-  const adminLogin = await page.request.post(`${API}/auth/login`, { form: { username: user('admin').username, password: user('admin').password } });
-  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access_token}` };
-  const users = (await (await page.request.get(`${API}/admin/users`, { headers: adminHeaders })).json()).items as { id: number; username: string; role: string }[];
-  const leftover = users.filter((u) => u.username === 'smoke_rogue_admin');
-  const managerNow = users.find((u) => u.id === me.id);
-  if (leftover.length) for (const u of leftover) await page.request.delete(`${API}/admin/users/${u.id}`, { headers: adminHeaders });
-  if (managerNow && managerNow.role !== 'manager') await page.request.put(`${API}/admin/users/${me.id}`, { headers: adminHeaders, data: { role: 'manager' } });
+  const createUser = await page.request.post(`${API}/admin/users`, {
+    headers,
+    data: { username: 'smoke_mgr_created', email: 'mgr-created@example.com', full_name: 'Created By Manager', password: 'Created#2026x', role: 'user' },
+  });
+  const created = createUser.status() === 201 ? await createUser.json() : null;
+  const deleteCreated = created ? (await page.request.delete(`${API}/admin/users/${created.id}`, { headers })).status() : null;
 
   findings.managerPermissions = {
-    uiAdministrationNavItems: navAdmin,
-    uiAdminUsersPageNotAuthorised: notAuthorised > 0,
-    apiListUsers: listUsers.status(),
-    apiCreateAdminUser: create.status(),
-    apiCreatedRole: created?.role ?? null,
+    apiCreateAdminUser: createAdmin.status(),
     apiSelfPromoteToAdmin: selfPromote.status(),
-    apiSelfPromoteRole: promotedRole,
-    cleanup,
-    leftoverAfterCleanup: leftover.length,
-    managerRoleRestored: managerNow?.role,
+    apiCreatePlainUser: createUser.status(),
+    apiDeletePlainUser: deleteCreated,
   };
   test.info().annotations.push({ type: 'manager-permissions', description: JSON.stringify(findings.managerPermissions) });
-  // The UI hides Administration from managers (documented behaviour); the API result is a finding, not a failure.
-  expect(navAdmin).toBe(0);
-  expect(notAuthorised).toBeGreaterThan(0);
+
+  // Belt and braces: whatever happened above, leave no rogue admin and keep the manager a manager.
+  const adminLogin = await page.request.post(`${API}/auth/login`, { form: { username: user('admin').username, password: user('admin').password } });
+  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access_token}` };
+  const users = (await (await page.request.get(`${API}/admin/users?limit=1000`, { headers: adminHeaders })).json()).items as { id: number; username: string; role: string }[];
+  for (const u of users.filter((x) => x.username === 'smoke_rogue_admin' || x.username === 'smoke_mgr_created')) {
+    await page.request.delete(`${API}/admin/users/${u.id}`, { headers: adminHeaders });
+  }
+  const managerNow = users.find((u) => u.id === me.id);
+  if (managerNow && managerNow.role !== 'manager') {
+    await page.request.put(`${API}/admin/users/${me.id}`, { headers: adminHeaders, data: { role: 'manager' } });
+  }
+
+  expect(createAdmin.status()).toBe(403);
+  expect(selfPromote.status()).toBe(403);
+  expect(managerNow?.role).toBe('manager');
+  expect(createUser.status()).toBe(201);
+  expect(deleteCreated).toBe(204);
 });
 
 // ================================================================== 7. plain user
@@ -707,16 +683,20 @@ test('user: Administration is hidden and /admin/users says Not authorised', asyn
 
 // Finding F-07: the estimation forms load their dropdown data from /admin/* (admin|manager only).
 test('user: estimation forms get their dropdown data (resources, cost types, ...)', async ({ page }) => {
-  knownBug('F-07: reference data is fetched from /admin/resources, /admin/config/*, which return 403 to role=user, so the assignment form has empty dropdowns');
   await login(page, 'user', NEW_USER_PASSWORD);
   const id = await projectId(page, projectOf('depot').name);
-  await shimApproval(page, id); // F-01 workaround
   await openProject(page, id);
   await selectWbs(page, '1.2', 'Drainage');
   await page.getByRole('button', { name: 'Add Assignment' }).first().click();
-  await page.getByRole('combobox', { name: 'Resource' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  // The reference lists load when the form opens; reopen the dropdown until they have arrived.
+  await expect(async () => {
+    await page.keyboard.press('Escape').catch(() => {});
+    await dialog.getByRole('combobox', { name: 'Resource' }).click();
+    await expect(page.getByRole('option').first()).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
   await shot(page, '20-user-assignment-form');
-  await expect(page.getByRole('option').first()).toBeVisible();
 });
 
 test('every page visited: summary of console errors and failed responses is written to diagnostics-summary.json', async () => {

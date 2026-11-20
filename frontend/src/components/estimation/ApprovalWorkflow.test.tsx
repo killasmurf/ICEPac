@@ -104,7 +104,7 @@ describe('ApprovalWorkflow', () => {
   });
 
   it('shows the approver and locks an approved estimate', () => {
-    setup(status('approved', { approver: 'sam', approver_date: '2026-03-05T00:00:00Z', estimate_revision: 2 }));
+    setup(status('approved', { approver: 'sam', approver_date: '2026-03-05T00:00:00', estimate_revision: 2 }));
     expect(screen.getByText(/Approved by: sam on 05 Mar 2026/)).toBeInTheDocument();
     expect(screen.getByText('Rev 2')).toBeInTheDocument();
     expect(screen.getByText('This estimate has been approved and is locked')).toBeInTheDocument();

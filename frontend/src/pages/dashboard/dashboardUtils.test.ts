@@ -96,11 +96,21 @@ describe('healthRows', () => {
   });
 });
 
+describe('relativeTime with zone-less API timestamps', () => {
+  it('reads them as UTC, so a just-written entry is "just now" in any time zone', () => {
+    const now = new Date('2026-11-18T05:51:00Z');
+    expect(relativeTime('2026-11-18T05:50:35.909975', now)).toBe('just now');
+    expect(relativeTime('2026-11-18T02:51:00', now)).toBe('3 hours ago');
+  });
+});
+
 describe('describeAction', () => {
   it('maps known actions and keeps unknown ones readable', () => {
     expect(describeAction('CREATE')).toEqual({ verb: 'created', icon: 'create' });
     expect(describeAction('update').icon).toBe('update');
-    expect(describeAction('FAILED_LOGIN')).toEqual({ verb: 'failed login', icon: 'other' });
+    expect(describeAction('FAILED_LOGIN')).toEqual({ verb: 'failed to sign in', icon: 'other', noTarget: true });
+    expect(describeAction('LOGIN')).toEqual({ verb: 'signed in', icon: 'other', noTarget: true });
+    expect(describeAction('SOME_OTHER_EVENT')).toEqual({ verb: 'some other event', icon: 'other' });
     expect(activityTarget({ entity_type: 'Resource', entity_id: 45 })).toBe('Resource #45');
     expect(activityTarget({ entity_type: 'Resource', entity_id: null })).toBe('Resource');
   });
