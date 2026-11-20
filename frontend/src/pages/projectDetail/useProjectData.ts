@@ -38,7 +38,8 @@ export interface CodeWeight extends CodeDescription {
   weight: number;
 }
 export interface ReferenceData {
-  resources: CodeDescription[];
+  /** `supplier_code` is the resource's default supplier, used to pre-fill the assignment form. */
+  resources: (CodeDescription & { supplier_code: string | null })[];
   suppliers: { code: string; name: string }[];
   costTypes: CodeDescription[];
   regions: CodeDescription[];
@@ -75,7 +76,11 @@ export async function loadReferenceData(): Promise<ReferenceData> {
       items(configApi.listItems('severity-levels', active)),
     ]);
   return {
-    resources: resources.map((r) => ({ code: r.resource_code, description: r.description })),
+    resources: resources.map((r) => ({
+      code: r.resource_code,
+      description: r.description,
+      supplier_code: r.supplier_code ?? null,
+    })),
     suppliers: suppliers.map((s) => ({ code: s.supplier_code ?? '', name: s.name })),
     costTypes: plain(costTypes),
     regions: plain(regions),

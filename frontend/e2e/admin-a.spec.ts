@@ -309,6 +309,26 @@ test.describe('users: server-side search, filters, sorting and URL state', () =>
     await expect(page.getByLabel('Search users')).toHaveValue('');
     await expect(page).not.toHaveURL(/q=/);
   });
+
+  test('back and forward keep the search box in step with the URL', async ({ page }) => {
+    await page.goto('/admin/users?q=zzzz');
+    await expect(page.getByText('No users match your filters')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    await expect(page.getByLabel('Search users')).toHaveValue('');
+    await page.goBack();
+    await expect(page).toHaveURL(/[?&]q=zzzz/);
+    await expect(page.getByLabel('Search users')).toHaveValue('zzzz');
+    await expect(page.getByText('No users match your filters')).toBeVisible();
+    await page.goForward();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(page.getByLabel('Search users')).toHaveValue('');
+    // Typing still works after the remounts, without losing focus mid-word.
+    await page.getByLabel('Search users').fill('user2');
+    await expect(page).toHaveURL(/[?&]q=user2/);
+    await expect(page.getByLabel('Search users')).toHaveValue('user2');
+    await expect(page.getByLabel('Search users')).toBeFocused();
+  });
 });
 
 test.describe('phones: users and resources tables', () => {
