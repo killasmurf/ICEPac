@@ -1,7 +1,7 @@
 """Dashboard API — aggregates stats from all circuits for the main dashboard."""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -29,29 +29,38 @@ async def dashboard_stats(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Aggregated statistics across all circuits."""
+    """Aggregated statistics across all circuits.
+
+    Project, WBS, assignment and risk figures cover live projects only: an
+    archived project drops out of every total until it is restored.
+    """
+    live = _live_project_ids(db)
+    live_wbs = db.query(WBS.id).filter(WBS.project_id.in_(live))
+    wbs_q = db.query(func.count(WBS.id)).filter(WBS.project_id.in_(live))
+    # A risk belongs to a WBS item or directly to a project, never both.
+    live_risks = or_(Risk.wbs_id.in_(live_wbs), Risk.project_id.in_(live))
     return {
         "projects": {
-            "total": db.query(func.count(Project.id)).scalar() or 0,
+            "total": db.query(func.count(Project.id))
+            .filter(Project.archived.is_(False))
+            .scalar()
+            or 0,
             "active": db.query(func.count(Project.id))
-            .filter(Project.status == "active")
+            .filter(Project.archived.is_(False), Project.status == "active")
             .scalar()
             or 0,
         },
         "wbs": {
-            "total": db.query(func.count(WBS.id)).scalar() or 0,
-            "approved": db.query(func.count(WBS.id))
-            .filter(WBS.approval_status == "approved")
-            .scalar()
-            or 0,
-            "pending": db.query(func.count(WBS.id))
-            .filter(WBS.approval_status == "submitted")
-            .scalar()
-            or 0,
+            "total": wbs_q.scalar() or 0,
+            "approved": wbs_q.filter(WBS.approval_status == "approved").scalar() or 0,
+            "pending": wbs_q.filter(WBS.approval_status == "submitted").scalar() or 0,
         },
         "estimation": {
-            "assignments": db.query(func.count(ResourceAssignment.id)).scalar() or 0,
-            "risks": db.query(func.count(Risk.id)).scalar() or 0,
+            "assignments": db.query(func.count(ResourceAssignment.id))
+            .filter(ResourceAssignment.wbs_id.in_(live_wbs))
+            .scalar()
+            or 0,
+            "risks": db.query(func.count(Risk.id)).filter(live_risks).scalar() or 0,
             "total_pert": round(
                 float(
                     db.query(
@@ -63,7 +72,9 @@ async def dashboard_stats(
                             )
                             / 6
                         )
-                    ).scalar()
+                    )
+                    .filter(ResourceAssignment.wbs_id.in_(live_wbs))
+                    .scalar()
                     or 0
                 ),
                 2,
@@ -104,13 +115,15 @@ async def dashboard_portfolio(
     """Per-project portfolio summary, ordered by total PERT estimate (desc).
 
     Uses separate grouped aggregate queries (never joined together, to avoid
-    fan-out) and combines them in Python.
+    fan-out) and combines them in Python. Archived projects are excluded.
     """
+    live = _live_project_ids(db)
     # WBS counts per (project, approval status)
     wbs_counts: dict = {}
     approval_totals = {"draft": 0, "submitted": 0, "approved": 0, "rejected": 0}
     rows = (
         db.query(WBS.project_id, WBS.approval_status, func.count(WBS.id))
+        .filter(WBS.project_id.in_(live))
         .group_by(WBS.project_id, WBS.approval_status)
         .all()
     )
@@ -134,6 +147,7 @@ async def dashboard_portfolio(
             ),
         )
         .join(WBS, ResourceAssignment.wbs_id == WBS.id)
+        .filter(WBS.project_id.in_(live))
         .group_by(WBS.project_id)
         .all()
     )
@@ -144,6 +158,7 @@ async def dashboard_portfolio(
     wbs_risk_rows = (
         db.query(WBS.project_id, func.count(Risk.id))
         .join(WBS, Risk.wbs_id == WBS.id)
+        .filter(WBS.project_id.in_(live))
         .group_by(WBS.project_id)
         .all()
     )
@@ -151,7 +166,7 @@ async def dashboard_portfolio(
         risk_by_project[pid] = risk_by_project.get(pid, 0) + count
     direct_risk_rows = (
         db.query(Risk.project_id, func.count(Risk.id))
-        .filter(Risk.project_id.isnot(None))
+        .filter(Risk.project_id.in_(live))
         .group_by(Risk.project_id)
         .all()
     )
@@ -159,9 +174,11 @@ async def dashboard_portfolio(
         risk_by_project[pid] = risk_by_project.get(pid, 0) + count
 
     projects = []
-    for project_id, name, status in db.query(
-        Project.id, Project.project_name, Project.status
-    ).all():
+    for project_id, name, status in (
+        db.query(Project.id, Project.project_name, Project.status)
+        .filter(Project.archived.is_(False))
+        .all()
+    ):
         counts = wbs_counts.get(project_id, {})
         projects.append(
             PortfolioProject(
@@ -219,6 +236,11 @@ def health_detailed(
     ]
     checks["overall"] = "degraded" if unhealthy else "healthy"
     return checks
+
+
+def _live_project_ids(db: Session):
+    """Subquery of the ids of projects that are not archived."""
+    return db.query(Project.id).filter(Project.archived.is_(False))
 
 
 def _recent_activity(db: Session, limit: int = 5) -> list:
