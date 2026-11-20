@@ -6,7 +6,7 @@ from one empty, merged side branch, and has a single head:
 ```
 a41d9a15aea8 -> b7e2f3a1c9d4 -> 002_admin_tables -> 003_project_import
   -> 004_wbs_approval_status -> 005_report_tables -> 006_project_level_risks
-  -> 007_merge_legacy_branch (head)
+  -> 007_merge_legacy_branch -> 008_resource_supplier (head)
 a41d9a15aea8 -> 002_remaining_tables (empty, merged by 007)
 ```
 
@@ -47,7 +47,7 @@ local data.
 | Your database `alembic current` says | What to do |
 | --- | --- |
 | nothing / no database | Fresh database, above. |
-| `006_project_level_risks` (the old mainline head) | `alembic upgrade head`. This only moves the version to `007_merge_legacy_branch`; the schema is unchanged. Tested. |
+| `006_project_level_risks` (the old mainline head) or `007_merge_legacy_branch` | `alembic upgrade head`. From 006 this records the merge (no schema change), then `008_resource_supplier` adds the nullable `supplier_code` column (with a foreign key to `tblSupplier`) to `tblResource`. Tested. |
 | `002_remaining_tables` (the old second head) | It cannot be upgraded in place: that migration created older, different table definitions. **Drop and recreate the database** (local dev data is lost): `dropdb icepac && createdb icepac && alembic upgrade head`. If you run `alembic upgrade head` against it anyway, `002_admin_tables` aborts with a clear message and the transaction is rolled back, leaving the database untouched. Tested. |
 | built with `create_all` (no `alembic_version`) | Either recreate as above, or keep the data and run `alembic stamp head`, then `alembic check`. The stamped schema comes from the models, so it has no seed rows. Tested. |
 

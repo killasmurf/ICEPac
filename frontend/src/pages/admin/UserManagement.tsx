@@ -90,7 +90,18 @@ export default function UserManagement() {
   // Search, filters, sort and page live in the URL; the server does all of the work.
   const [searchParams, setSearchParams] = useSearchParams();
   const listState = parseUserListState(searchParams);
-  const [searchKey, setSearchKey] = useState(0); // remounts the search box when the filters are cleared
+  const [searchKey, setSearchKey] = useState(0); // remounts the search box when its text must change
+  // The search box owns its text while the user types. When the URL's search changes from elsewhere
+  // (back/forward, clearing the filters), remount the box so it shows the URL's value.
+  const [typedSearch, setTypedSearch] = useState(listState.search);
+  const [seenSearch, setSeenSearch] = useState(listState.search);
+  if (listState.search !== seenSearch) {
+    setSeenSearch(listState.search);
+    if (listState.search !== typedSearch) {
+      setTypedSearch(listState.search);
+      setSearchKey((k) => k + 1);
+    }
+  }
   const changeList = (change: Partial<UserListState>, replace = false) =>
     setSearchParams(writeUserListState(applyUserListChange(listState, change)), { replace });
   const paginationModel = useMemo<GridPaginationModel>(
@@ -290,8 +301,11 @@ export default function UserManagement() {
         label="Search users"
         placeholder="Search users"
         key={searchKey}
-        defaultValue={searchKey === 0 ? listState.search : ''}
-        onChange={(search) => changeList({ search }, true)}
+        defaultValue={listState.search}
+        onChange={(search) => {
+          setTypedSearch(search);
+          changeList({ search }, true);
+        }}
       />
       <TextField
         select
