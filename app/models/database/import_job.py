@@ -39,8 +39,13 @@ class ImportJob(Base):
     file_size = Column(Integer, nullable=True)
 
     # Status tracking
+    # Persist enum *values* ('pending'), matching the PostgreSQL ``importstatus``
+    # type created by the migrations (see user.py for the full explanation).
     status = Column(
-        SQLEnum(ImportStatus), default=ImportStatus.PENDING, nullable=False, index=True
+        SQLEnum(ImportStatus, values_callable=lambda e: [m.value for m in e]),
+        default=ImportStatus.PENDING,
+        nullable=False,
+        index=True,
     )
     progress = Column(Float, default=0.0, nullable=False)
     celery_task_id = Column(String(255), nullable=True, index=True)
