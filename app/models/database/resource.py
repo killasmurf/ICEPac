@@ -2,7 +2,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 
 from app.core.database import Base
 
@@ -22,11 +31,19 @@ class Resource(Base):
     eoc = Column(String(50), nullable=True)  # Element of Cost
     cost = Column(Numeric(18, 2), default=0, nullable=False)
     units = Column(String(50), nullable=True)
+    # Default supplier; pre-fills the supplier of a new assignment.
+    supplier_code = Column(
+        String(50), ForeignKey("tblSupplier.supplier_code"), nullable=True
+    )
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
+
+    # Not a column: filled in by ResourceService.attach_supplier_names() so the
+    # API can show the supplier's name without a query per row.
+    supplier_name = None
 
     def __repr__(self):
         return f"<Resource(id={self.id}, code='{self.resource_code}')>"

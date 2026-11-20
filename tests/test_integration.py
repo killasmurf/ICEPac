@@ -347,7 +347,12 @@ class TestModelRegistry:
 
 
 def _parse_migration_chain(versions_dir):
-    """Parse alembic migration files into a {revision: down_revision} map."""
+    """Parse alembic migration files into a {revision: down_revision(s)} map.
+
+    Reads the module-level ``revision`` / ``down_revision`` assignments with ``ast`` so
+    annotated assignments (``revision: str = ...``) and merge tuples are understood.
+    """
+    import ast
     import os
 
     chain = {}
@@ -355,13 +360,22 @@ def _parse_migration_chain(versions_dir):
         if not f.endswith(".py") or f.startswith("__"):
             continue
         with open(os.path.join(versions_dir, f)) as fh:
-            content = fh.read()
-        rev = down = None
-        for line in content.split("\n"):
-            if line.startswith("revision ="):
-                rev = line.split("=")[1].strip().strip('"').strip("'")
-            if line.startswith("down_revision ="):
-                down = line.split("=")[1].strip().strip('"').strip("'")
+            tree = ast.parse(fh.read())
+        rev = None
+        down = None
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                names, value = [
+                    t.id for t in node.targets if hasattr(t, "id")
+                ], node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                names, value = [getattr(node.target, "id", None)], node.value
+            else:
+                continue
+            if "revision" in names:
+                rev = ast.literal_eval(value)
+            if "down_revision" in names:
+                down = ast.literal_eval(value)
         if rev:
             chain[rev] = down
     return chain
@@ -383,9 +397,10 @@ class TestMigrationChain:
             pytest.skip("alembic/versions not found")
 
         chain = _parse_migration_chain(versions_dir)
-        for rev, down in chain.items():
-            if not down or down in ("None", "null"):
+        for rev, downs in chain.items():
+            if not downs:
                 continue
-            if _is_hash_based_revision(down):
-                continue
-            assert down in chain, f"Migration {rev} references missing {down}"
+            for down in [downs] if isinstance(downs, str) else downs:
+                if _is_hash_based_revision(down):
+                    continue
+                assert down in chain, f"Migration {rev} references missing {down}"

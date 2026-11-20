@@ -51,6 +51,10 @@ export interface Resource {
   /** Pydantic serialises Decimal as a JSON string; normalised to a number in this API layer. */
   cost: number;
   units: string | null;
+  /** Default supplier (tblSupplier.supplier_code); older servers do not send it. */
+  supplier_code?: string | null;
+  /** Name of the default supplier, resolved by the server. */
+  supplier_name?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -63,6 +67,8 @@ export interface ResourceCreate {
   eoc?: string;
   cost: number;
   units?: string;
+  /** Must be an existing supplier code (422 otherwise). */
+  supplier_code?: string | null;
   is_active?: boolean;
 }
 
@@ -73,6 +79,8 @@ export interface ResourceUpdate {
   eoc?: string;
   cost?: number;
   units?: string;
+  /** null clears the default supplier. */
+  supplier_code?: string | null;
   is_active?: boolean;
 }
 
@@ -162,13 +170,37 @@ export interface ConfigTableInfo {
 
 // ── Users ────────────────────────────────────────────────────
 
-// Query parameters below are limited to those the backend routes accept
-// (see app/routes/admin.py). The users route has no search or filters.
+// Query parameters below are limited to those the backend routes accept (see app/routes/admin.py).
+
+export type UserSortField = 'username' | 'full_name' | 'email' | 'role' | 'last_login' | 'created_at';
+export type SortOrder = 'asc' | 'desc';
+
+/** GET /admin/users query: search, filters and sorting are all applied by the server. */
+export interface UserListParams {
+  skip?: number;
+  limit?: number;
+  /** Case-insensitive match on username, email and full name. */
+  search?: string;
+  role?: UserRole;
+  is_active?: boolean;
+  sort?: UserSortField;
+  order?: SortOrder;
+}
 
 export const usersApi = {
-  list: (params?: { skip?: number; limit?: number }) =>
+  list: (params?: UserListParams) =>
     client
-      .get<PaginatedResponse<User>>(`${API_BASE}/users`, { params: { skip: params?.skip, limit: params?.limit } })
+      .get<PaginatedResponse<User>>(`${API_BASE}/users`, {
+        params: {
+          skip: params?.skip,
+          limit: params?.limit,
+          search: params?.search || undefined,
+          role: params?.role,
+          is_active: params?.is_active,
+          sort: params?.sort,
+          order: params?.sort ? params.order : undefined,
+        },
+      })
       .then((r) => r.data),
   get: (id: number) => client.get<User>(`${API_BASE}/users/${id}`).then((r) => r.data),
   create: (data: UserCreate) => client.post<User>(`${API_BASE}/users`, data).then((r) => r.data),
@@ -195,7 +227,7 @@ type RawResource = Omit<Resource, 'cost'> & { cost: number | string | null | und
 export const normalizeResource = (raw: RawResource): Resource => ({ ...raw, cost: toNumberOr0(raw.cost) });
 
 export const resourcesApi = {
-  list: (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean }) =>
+  list: (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean; supplier_code?: string }) =>
     client
       .get<PaginatedResponse<RawResource>>(`${API_BASE}/resources`, {
         params: {
@@ -203,6 +235,7 @@ export const resourcesApi = {
           limit: params?.limit,
           search: params?.search,
           active_only: params?.is_active ? true : undefined,
+          supplier_code: params?.supplier_code || undefined,
         },
       })
       .then((r) => ({ ...r.data, items: r.data.items.map(normalizeResource) })),

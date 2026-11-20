@@ -18,11 +18,11 @@
     "pmb-weights": [["P1", "Early", 0.25], ["P2", "Mid", 0.5], ["P3", "Late", 1.0]]
   },
   "resources": [
-    {"code": "ENG-SR", "description": "Senior Engineer", "eoc": "LAB", "cost": 1800, "units": "day"},
-    {"code": "ENG-JR", "description": "Graduate Engineer", "eoc": "LAB", "cost": 900, "units": "day"},
-    {"code": "CON-EXT", "description": "External Contractor - Specialist Structural Inspection and Certification Services (long description to test table layout)", "eoc": "SUB", "cost": 2400, "units": "day"},
-    {"code": "EQP-CRN", "description": "Mobile Crane 200t", "eoc": "EQP", "cost": 5200, "units": "day"},
-    {"code": "MAT-STL", "description": "Structural Steel", "eoc": "MAT", "cost": 3100, "units": "tonne"},
+    {"code": "ENG-SR", "description": "Senior Engineer", "eoc": "LAB", "cost": 1800, "units": "day", "supplier": "GEO-01"},
+    {"code": "ENG-JR", "description": "Graduate Engineer", "eoc": "LAB", "cost": 900, "units": "day", "supplier": "GEO-01"},
+    {"code": "CON-EXT", "description": "External Contractor - Specialist Structural Inspection and Certification Services (long description to test table layout)", "eoc": "SUB", "cost": 2400, "units": "day", "supplier": "GEO-01"},
+    {"code": "EQP-CRN", "description": "Mobile Crane 200t", "eoc": "EQP", "cost": 5200, "units": "day", "supplier": "CRN-03"},
+    {"code": "MAT-STL", "description": "Structural Steel", "eoc": "MAT", "cost": 3100, "units": "tonne", "supplier": "STL-02"},
     {"code": "IT-DEV", "description": "Data Engineer", "eoc": "LAB", "cost": 1500, "units": "day"}
   ],
   "suppliers": [

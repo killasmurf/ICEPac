@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.database.resource import Resource
+from app.models.database.resource import Resource, Supplier
 from app.repositories.base import BaseRepository
 
 
@@ -73,3 +73,66 @@ class ResourceRepository(BaseRepository[Resource]):
             )
         )
         return self.db.scalar(stmt) or 0
+
+    @staticmethod
+    def _filters(search: Optional[str], active_only: bool, supplier_code):
+        conditions = []
+        if search:
+            term = f"%{search}%"
+            conditions.append(
+                or_(
+                    Resource.resource_code.ilike(term),
+                    Resource.description.ilike(term),
+                    Resource.eoc.ilike(term),
+                )
+            )
+        if active_only:
+            conditions.append(Resource.is_active.is_(True))
+        if supplier_code:
+            conditions.append(Resource.supplier_code == supplier_code)
+        return conditions
+
+    def list_filtered(
+        self,
+        search: Optional[str] = None,
+        active_only: bool = False,
+        supplier_code: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Resource]:
+        """Resources matching every given filter, ordered by code."""
+        stmt = (
+            select(Resource)
+            .where(*self._filters(search, active_only, supplier_code))
+            .order_by(Resource.resource_code)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def count_filtered(
+        self,
+        search: Optional[str] = None,
+        active_only: bool = False,
+        supplier_code: Optional[str] = None,
+    ) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Resource)
+            .where(*self._filters(search, active_only, supplier_code))
+        )
+        return self.db.scalar(stmt) or 0
+
+    def supplier_names(self, codes) -> dict:
+        """Map supplier code -> name for the given codes, in one query."""
+        codes = {c for c in codes if c}
+        if not codes:
+            return {}
+        stmt = select(Supplier.supplier_code, Supplier.name).where(
+            Supplier.supplier_code.in_(codes)
+        )
+        return {code: name for code, name in self.db.execute(stmt).all()}
+
+    def supplier_exists(self, supplier_code: str) -> bool:
+        stmt = select(Supplier.id).where(Supplier.supplier_code == supplier_code)
+        return self.db.scalar(stmt) is not None

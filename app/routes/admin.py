@@ -10,6 +10,7 @@ opened up without a write route silently losing its role check):
   reset the password of an existing admin account.
 """
 
+import enum
 from datetime import datetime
 from typing import Optional, Union
 
@@ -52,6 +53,21 @@ from app.services.user_service import UserService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+class UserSortField(str, enum.Enum):
+    USERNAME = "username"
+    FULL_NAME = "full_name"
+    EMAIL = "email"
+    ROLE = "role"
+    LAST_LOGIN = "last_login"
+    CREATED_AT = "created_at"
+
+
+class SortOrder(str, enum.Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
 # Applied per route: admin or manager.
 STAFF = [Depends(require_any_role("admin", "manager"))]
 ADMIN_ONLY = [Depends(require_any_role("admin"))]
@@ -89,13 +105,31 @@ def _forbid_admin_escalation(acting_user, target_user=None, new_role=None) -> No
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    search: Optional[str] = Query(None, max_length=255),
+    role: Optional[UserRole] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    sort: Optional[UserSortField] = Query(None),
+    order: SortOrder = Query(SortOrder.ASC),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """List all users with pagination."""
+    """List users with pagination, search, filters and sorting.
+
+    ``search`` matches username, email and full name (case-insensitive).
+    Without ``sort`` users are ordered by id. Users with no value for the sort
+    field (e.g. never logged in) always come last.
+    """
     service = UserService(db)
-    users = service.get_multi(skip=skip, limit=limit)
-    total = service.count()
+    users = service.list_filtered(
+        search=search,
+        role=role,
+        is_active=is_active,
+        sort=sort.value if sort else "id",
+        order=order.value,
+        skip=skip,
+        limit=limit,
+    )
+    total = service.count_filtered(search=search, role=role, is_active=is_active)
     return UserListResponse(items=users, total=total, skip=skip, limit=limit)
 
 
@@ -140,6 +174,10 @@ async def update_user(
     """Update an existing user (managers cannot touch admins or grant admin)."""
     service = UserService(db)
     old_user = service.get_or_404(user_id)
+    if user_in.is_active is False and old_user.id == current_user.id:
+        raise HTTPException(
+            status_code=403, detail="You cannot deactivate your own account"
+        )
     _forbid_admin_escalation(current_user, old_user, user_in.role)
     old_values = serialize_for_audit(old_user)
     user = service.update(user_id, user_in)
@@ -185,6 +223,10 @@ async def delete_user(
     """Delete a user (managers cannot delete admins)."""
     service = UserService(db)
     user = service.get_or_404(user_id)
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=403, detail="You cannot delete your own account"
+        )
     _forbid_admin_escalation(current_user, user)
     old_values = serialize_for_audit(user)
     service.delete(user_id)
@@ -204,20 +246,15 @@ async def list_resources(
     limit: int = Query(100, ge=1, le=1000),
     search: Optional[str] = Query(None, min_length=1),
     active_only: bool = Query(False),
+    supplier_code: Optional[str] = Query(None, min_length=1, max_length=50),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """List resources with optional search and filtering."""
+    """List resources with optional search, active and supplier filters."""
     service = ResourceService(db)
-    if search:
-        items = service.search(search, skip=skip, limit=limit)
-        total = service.count_search(search)
-    elif active_only:
-        items = service.get_active(skip=skip, limit=limit)
-        total = service.count_active()
-    else:
-        items = service.get_multi(skip=skip, limit=limit)
-        total = service.count()
+    supplier = supplier_code.upper().strip() if supplier_code else None
+    items = service.list_filtered(search, active_only, supplier, skip=skip, limit=limit)
+    total = service.count_filtered(search, active_only, supplier)
     return ResourceListResponse(items=items, total=total, skip=skip, limit=limit)
 
 
@@ -228,7 +265,8 @@ async def get_resource(
     current_user=Depends(get_current_user),
 ):
     """Get a single resource."""
-    return ResourceService(db).get_or_404(resource_id)
+    service = ResourceService(db)
+    return service.attach_supplier_names(service.get_or_404(resource_id))
 
 
 @router.post(
@@ -248,7 +286,7 @@ async def create_resource(
     audit.log_create(
         "Resource", resource.id, serialize_for_audit(resource), current_user.id, request
     )
-    return resource
+    return service.attach_supplier_names(resource)
 
 
 @router.put(
@@ -276,7 +314,7 @@ async def update_resource(
         current_user.id,
         request,
     )
-    return resource
+    return service.attach_supplier_names(resource)
 
 
 @router.delete("/resources/{resource_id}", status_code=204, dependencies=STAFF)

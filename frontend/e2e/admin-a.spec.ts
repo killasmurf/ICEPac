@@ -210,15 +210,125 @@ test.describe('users actions', () => {
     await expect(page.getByRole('dialog').getByRole('combobox', { name: 'Status' })).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByText('You cannot deactivate your own account')).toBeVisible();
   });
+});
 
-  test('role and status filters narrow the table', async ({ page }) => {
+test.describe('users: server-side search, filters, sorting and URL state', () => {
+  const usersRequests = (page: Page) => {
+    const seen: URL[] = [];
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (r.method() === 'GET' && u.pathname.endsWith('/api/v1/admin/users')) seen.push(u);
+    });
+    return seen;
+  };
+
+  test('the role filter is a request parameter and lives in the URL', async ({ page }) => {
     await page.goto('/admin/users');
     await expect(page.getByText('Test User 2')).toBeVisible();
+    const req = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('role=manager'));
     await page.getByRole('combobox', { name: 'Role' }).click();
     await page.getByRole('option', { name: 'Manager' }).click();
+    const params = new URL((await req).url()).searchParams;
+    expect(params.get('role')).toBe('manager');
+    expect(params.get('skip')).toBe('0');
+    await expect(page).toHaveURL(/[?&]role=manager/);
     await expect(page.getByText('Test User 2')).toHaveCount(0);
-    await expect(page.getByText('Test User 1')).toHaveCount(0);
+    await expect(page.getByText(/1.*2 of 2/)).toBeVisible();
   });
+
+  test('the status filter sends is_active', async ({ page }) => {
+    await page.goto('/admin/users');
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    const req = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('is_active=false'));
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Inactive' }).click();
+    await req;
+    await expect(page).toHaveURL(/[?&]status=inactive/);
+    await expect(page.getByText(/1.*2 of 2/)).toBeVisible();
+  });
+
+  test('search is debounced into one request with the search parameter, never fetching 1000 users', async ({ page }) => {
+    const seen = usersRequests(page);
+    await page.goto('/admin/users');
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    const req = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('search='));
+    await page.getByLabel('Search users').fill('user2');
+    const params = new URL((await req).url()).searchParams;
+    expect(params.get('search')).toBe('user2');
+    await expect(page).toHaveURL(/[?&]q=user2/);
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    await expect(page.getByText('Test User 3')).toHaveCount(0);
+    expect(seen.filter((u) => u.searchParams.get('limit') === '1000')).toEqual([]);
+    expect(seen.every((u) => u.searchParams.get('limit') === '10')).toBe(true);
+  });
+
+  test('changing a filter returns to the first page', async ({ page }) => {
+    await page.goto('/admin/users?page=1');
+    await expect(page.getByText(/11.*12 of 12/)).toBeVisible();
+    const req = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('role=admin'));
+    await page.getByRole('combobox', { name: 'Role' }).click();
+    await page.getByRole('option', { name: 'Admin' }).click();
+    expect(new URL((await req).url()).searchParams.get('skip')).toBe('0');
+    await expect(page).not.toHaveURL(/page=/);
+    await expect(page.getByText(/1.*4 of 4/)).toBeVisible();
+  });
+
+  test('clicking a column header sorts on the server, ascending then descending', async ({ page }) => {
+    await page.goto('/admin/users');
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    const asc = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('sort=role'));
+    await page.getByRole('columnheader', { name: 'Role' }).click();
+    const ascParams = new URL((await asc).url()).searchParams;
+    expect([ascParams.get('sort'), ascParams.get('order')]).toEqual(['role', 'asc']);
+    await expect(page).toHaveURL(/[?&]sort=role/);
+
+    const desc = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('order=desc'));
+    await page.getByRole('columnheader', { name: 'Role' }).click();
+    const descParams = new URL((await desc).url()).searchParams;
+    expect([descParams.get('sort'), descParams.get('order')]).toEqual(['role', 'desc']);
+    await expect(page).toHaveURL(/order=desc/);
+  });
+
+  test('a shared URL restores search, filters, sort and page', async ({ page }) => {
+    const req = page.waitForRequest((r) => r.url().includes('/api/v1/admin/users?') && r.url().includes('role=user'));
+    await page.goto('/admin/users?q=user&role=user&status=active&sort=username&order=desc&page=0&pageSize=25');
+    const params = new URL((await req).url()).searchParams;
+    expect(Object.fromEntries(params)).toMatchObject({
+      search: 'user', role: 'user', is_active: 'true', sort: 'username', order: 'desc', skip: '0', limit: '25',
+    });
+    await expect(page.getByLabel('Search users')).toHaveValue('user');
+    await expect(page.getByRole('combobox', { name: 'Role' })).toHaveText('User');
+    await expect(page.getByRole('combobox', { name: 'Status' })).toHaveText('Active');
+  });
+
+  test('clear filters resets the URL and the search box', async ({ page }) => {
+    await page.goto('/admin/users?q=zzzz');
+    await expect(page.getByText('No users match your filters')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.getByText('Test User 2')).toBeVisible();
+    await expect(page.getByLabel('Search users')).toHaveValue('');
+    await expect(page).not.toHaveURL(/q=/);
+  });
+});
+
+test.describe('phones: users and resources tables', () => {
+  for (const screen of [
+    { name: 'users', path: '/admin/users', ready: 'Test User 2', actions: ['Edit user2', 'Reset password for user2', 'Delete user2'] },
+    { name: 'resources', path: '/admin/resources', ready: 'Resource 2 description', actions: ['Edit RES-002', 'Delete RES-002'] },
+  ]) {
+    test(`${screen.name} need no sideways scrolling and the actions are reachable`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'mobile', 'phone layout');
+      await page.goto(screen.path);
+      await expect(page.getByText(screen.ready)).toBeVisible();
+      const scroller = await page.locator('.MuiDataGrid-virtualScroller').evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
+      expect(scroller.sw).toBeLessThanOrEqual(scroller.cw);
+      await noHorizontalScroll(page);
+      for (const name of screen.actions) {
+        await expect(page.getByRole('button', { name })).toBeInViewport();
+      }
+      await saveScreenshot(page, testInfo, 'closeout', `admin-${screen.name}-phone`);
+    });
+  }
 });
 
 test.describe('resources actions', () => {
@@ -275,6 +385,61 @@ test.describe('resources actions', () => {
     const active = page.waitForRequest((r) => r.url().includes('active_only=true'));
     await page.getByLabel('Active only').check();
     await active;
+  });
+
+  test('shows the default supplier of each resource', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the supplier column is hidden on phones');
+    await page.goto('/admin/resources');
+    const grid = page.getByRole('grid', { name: 'Resources' });
+    await expect(grid.getByRole('columnheader', { name: 'Supplier' })).toBeVisible();
+    await expect(grid.getByRole('row', { name: /RES-001/ })).toContainText('Supplier 1 Pty Ltd');
+    await expect(grid.getByRole('row', { name: /RES-004/ })).toContainText('None');
+  });
+
+  test('filtering by supplier sends supplier_code and resets the page', async ({ page }) => {
+    await page.goto('/admin/resources');
+    await expect(page.getByText('Resource 2 description')).toBeVisible();
+    const req = page.waitForRequest((r) => r.url().includes('/admin/resources') && r.url().includes('supplier_code=SUP-001'));
+    await page.getByRole('combobox', { name: 'Supplier' }).click();
+    await page.getByRole('option', { name: 'Supplier 1 Pty Ltd' }).click();
+    expect(new URL((await req).url()).searchParams.get('skip')).toBe('0');
+    await expect(page.getByText('Resource 1 description')).toBeVisible();
+    await expect(page.getByText('Resource 2 description')).toHaveCount(0);
+  });
+
+  test('the form picks a default supplier from the suppliers list and sends it', async ({ page }) => {
+    await page.goto('/admin/resources');
+    await revealActions(page);
+    await page.getByRole('button', { name: 'Edit RES-001' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('combobox', { name: 'Default supplier' })).toHaveText('Supplier 1 Pty Ltd');
+    await dialog.getByRole('combobox', { name: 'Default supplier' }).click();
+    await page.getByRole('option', { name: 'Supplier 3 Pty Ltd' }).click();
+    const req = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/resources/1'));
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    expect((await req).postDataJSON()).toMatchObject({ supplier_code: 'SUP-003' });
+  });
+
+  test('choosing None clears the supplier with an explicit null; create sends the supplier', async ({ page }) => {
+    await page.goto('/admin/resources');
+    await revealActions(page);
+    await page.getByRole('button', { name: 'Edit RES-001' }).click();
+    await page.getByRole('dialog').getByRole('combobox', { name: 'Default supplier' }).click();
+    await page.getByRole('option', { name: 'None' }).click();
+    const put = page.waitForRequest((r) => r.method() === 'PUT' && r.url().endsWith('/admin/resources/1'));
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    expect((await put).postDataJSON()).toMatchObject({ supplier_code: null });
+    await expect(page.getByText('Resource "RES-001" updated')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add resource' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Resource code').fill('new-002');
+    await dialog.getByLabel('Description').fill('Another');
+    await dialog.getByRole('combobox', { name: 'Default supplier' }).click();
+    await page.getByRole('option', { name: 'Supplier 2 Pty Ltd' }).click();
+    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/admin/resources'));
+    await page.getByRole('button', { name: 'Create resource' }).click();
+    expect((await post).postDataJSON()).toMatchObject({ resource_code: 'new-002', supplier_code: 'SUP-002' });
   });
 });
 

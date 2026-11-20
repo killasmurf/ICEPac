@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { makeAssignment } from './testHelpers';
 import AssignmentForm from './AssignmentForm';
+import { resourcesApi } from '../../api/admin';
 
 const lookups = {
   resources: [{ code: 'ENG', description: 'Engineer' }, { code: 'PM', description: 'Project manager' }],
@@ -114,5 +115,69 @@ describe('AssignmentForm', () => {
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Update' })).toBeEnabled());
+  });
+
+  describe('default supplier of the chosen resource', () => {
+    const supplierLookups = {
+      resources: [
+        { code: 'ENG', description: 'Engineer', supplier_code: 'ACME' },
+        { code: 'PM', description: 'Project manager', supplier_code: null },
+      ],
+      suppliers: [
+        { code: 'ACME', name: 'Acme Pty Ltd' },
+        { code: 'ZED', name: 'Zed Ltd' },
+      ],
+    };
+    const supplierBox = () => screen.getByRole('combobox', { name: 'Supplier' });
+
+    it('pre-fills the supplier when the field is empty', async () => {
+      setup(supplierLookups);
+      await chooseResource('ENG - Engineer');
+      expect(supplierBox()).toHaveTextContent('ACME - Acme Pty Ltd');
+    });
+
+    it('reports the pre-filled supplier in the draft', async () => {
+      const onDraftChange = vi.fn();
+      setup({ ...supplierLookups, onDraftChange });
+      await chooseResource('ENG - Engineer');
+      expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({ resource_code: 'ENG', supplier_code: 'ACME' }));
+    });
+
+    it('leaves the supplier empty for a resource without one', async () => {
+      setup(supplierLookups);
+      await chooseResource('PM - Project manager');
+      expect(supplierBox()).not.toHaveTextContent('ACME');
+    });
+
+    it('does not overwrite a supplier the user already chose', async () => {
+      setup(supplierLookups);
+      await userEvent.click(supplierBox());
+      await userEvent.click(await screen.findByRole('option', { name: 'ZED - Zed Ltd' }));
+      await chooseResource('ENG - Engineer');
+      expect(supplierBox()).toHaveTextContent('ZED - Zed Ltd');
+    });
+
+    it('does not overwrite the supplier of an assignment being edited', async () => {
+      setup({ ...supplierLookups, assignment: makeAssignment({ resource_code: 'PM', supplier_code: 'ZED' }) });
+      await chooseResource('ENG - Engineer');
+      expect(supplierBox()).toHaveTextContent('ZED - Zed Ltd');
+    });
+
+    it('looks the default up from the server when the resource list carries no suppliers', async () => {
+      const list = vi.spyOn(resourcesApi, 'list').mockResolvedValue({
+        items: [
+          { id: 1, resource_code: 'ENG-2', description: 'x', eoc: null, cost: 1, units: null, supplier_code: 'ZED', is_active: true, created_at: '', updated_at: '' },
+          { id: 2, resource_code: 'ENG', description: 'Engineer', eoc: null, cost: 1, units: null, supplier_code: 'ACME', is_active: true, created_at: '', updated_at: '' },
+        ],
+        total: 2,
+        skip: 0,
+        limit: 100,
+      });
+      setup({ suppliers: supplierLookups.suppliers });
+      await chooseResource('ENG - Engineer');
+      await vi.waitFor(() => expect(supplierBox()).toHaveTextContent('ACME - Acme Pty Ltd'));
+      expect(list).toHaveBeenCalledWith({ search: 'ENG', limit: 100 });
+      list.mockRestore();
+    });
   });
 });
