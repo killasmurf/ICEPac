@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -30,7 +31,7 @@ def upgrade() -> None:
         sa.Column('username', sa.String(length=100), nullable=False),
         sa.Column('hashed_password', sa.String(length=255), nullable=False),
         sa.Column('full_name', sa.String(length=255), nullable=True),
-        sa.Column('role', sa.Enum('admin', 'manager', 'user', 'viewer', name='userrole'), nullable=False),
+        sa.Column('role', postgresql.ENUM('admin', 'manager', 'user', 'viewer', name='userrole', create_type=False), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('is_verified', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
@@ -38,16 +39,16 @@ def upgrade() -> None:
         sa.Column('last_login', sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_users_email'), 'tblUsers', ['email'], unique=True)
-    op.create_index(op.f('ix_users_id'), 'tblUsers', ['id'], unique=False)
-    op.create_index(op.f('ix_users_username'), 'tblUsers', ['username'], unique=True)
+    op.create_index(op.f('ix_tblUsers_email'), 'tblUsers', ['email'], unique=True)
+    op.create_index(op.f('ix_tblUsers_id'), 'tblUsers', ['id'], unique=False)
+    op.create_index(op.f('ix_tblUsers_username'), 'tblUsers', ['username'], unique=True)
 
 
 def downgrade() -> None:
     # Drop users table and indexes
-    op.drop_index(op.f('ix_users_username'), table_name='tblUsers')
-    op.drop_index(op.f('ix_users_id'), table_name='tblUsers')
-    op.drop_index(op.f('ix_users_email'), table_name='tblUsers')
+    op.drop_index(op.f('ix_tblUsers_username'), table_name='tblUsers')
+    op.drop_index(op.f('ix_tblUsers_id'), table_name='tblUsers')
+    op.drop_index(op.f('ix_tblUsers_email'), table_name='tblUsers')
     op.drop_table('tblUsers')
 
     # Drop enum type

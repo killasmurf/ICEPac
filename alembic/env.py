@@ -22,7 +22,7 @@ from app.models.database import (  # noqa: F401
     CostType, ExpenseType, Region, BusinessArea,
     EstimatingTechnique, RiskCategory, ProbabilityLevel,
     SeverityLevel, ExpenditureIndicator, PMBWeight,
-    AuditLog, HelpCategory, HelpTopic, HelpDescription,
+    AuditLog, HelpCategory, HelpTopic, HelpDescription, ReportJob,
 )
 
 # this is the Alembic Config object, which provides
@@ -30,7 +30,12 @@ from app.models.database import (  # noqa: F401
 config = context.config
 
 # Set the sqlalchemy.url from our application settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# A URL that was set explicitly (e.g. by tests or ``alembic -x``-style callers
+# via Config.set_main_option) wins; otherwise use the application settings.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option(
+        "sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%")
+    )
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -88,7 +93,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():

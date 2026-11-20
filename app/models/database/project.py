@@ -11,6 +11,10 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
+def _enum_values(enum_cls):
+    return [member.value for member in enum_cls]
+
+
 class ProjectStatus(str, enum.Enum):
     """Project lifecycle status."""
 
@@ -48,9 +52,17 @@ class Project(Base):
 
     # Source file tracking (Phase 3)
     source_file = Column(String(500), nullable=True)
-    source_format = Column(SQLEnum(ProjectSourceFormat), nullable=True)
+    # Persist enum *values* ('mpp'), matching the PostgreSQL types created by
+    # the migrations (see user.py for the full explanation).
+    source_format = Column(
+        SQLEnum(ProjectSourceFormat, values_callable=_enum_values), nullable=True
+    )
     s3_key = Column(String(1000), nullable=True)
-    status = Column(SQLEnum(ProjectStatus), default=ProjectStatus.DRAFT, nullable=False)
+    status = Column(
+        SQLEnum(ProjectStatus, values_callable=_enum_values),
+        default=ProjectStatus.DRAFT,
+        nullable=False,
+    )
 
     # Project schedule dates (from MS Project)
     start_date = Column(DateTime, nullable=True)
