@@ -88,7 +88,11 @@ async function login(page: Page, role: 'admin' | 'manager' | 'user', password?: 
 }
 
 async function shot(page: Page, name: string) {
-  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+  // Chromium's full-page capture briefly resizes the window to 1x1, which flips the app across its
+  // md breakpoint and back and remounts the WBS layout, closing any open dialog. Capture only the
+  // viewport while a dialog is open so the screenshot does not change the page under test.
+  const dialogOpen = (await page.getByRole('dialog').count()) > 0;
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: !dialogOpen });
 }
 
 async function apiToken(page: Page): Promise<string> {
