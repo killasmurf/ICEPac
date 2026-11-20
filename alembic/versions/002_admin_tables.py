@@ -1,7 +1,7 @@
 """Phase 2: Admin Circuit Tables
 
 Revision ID: 002_admin_tables
-Revises: 001_help_system
+Revises: b7e2f3a1c9d4
 Create Date: 2026-01-26
 
 This migration creates the admin system tables:
@@ -12,7 +12,6 @@ This migration creates the admin system tables:
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 
 
 # revision identifiers, used by Alembic
@@ -22,8 +21,22 @@ branch_labels = None
 depends_on = None
 
 
+def _refuse_legacy_database() -> None:
+    """Abort clearly on a database built by the old 002_remaining_tables."""
+    inspector = sa.inspect(op.get_bind())
+    if inspector.has_table("tblResource") or inspector.has_table("tblProjects"):
+        raise RuntimeError(
+            "This database already contains tables created by the legacy "
+            "002_remaining_tables migration (tblResource/tblProjects exist but "
+            "revision 002_admin_tables has not been applied). It cannot be "
+            "upgraded in place: drop and recreate the database, then run "
+            "'alembic upgrade head'. See docs/MIGRATIONS.md."
+        )
+
+
 def upgrade() -> None:
     """Create admin system tables."""
+    _refuse_legacy_database()
     
     # ================================================================
     # Resources Table
@@ -40,11 +53,11 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('resource_code', name='uq_resources_code')
     )
-    op.create_index('ix_resources_id', 'tblResource', ['id'])
-    op.create_index('ix_resources_code', 'tblResource', ['resource_code'])
-    op.create_index('ix_resources_is_active', 'tblResource', ['is_active'])
+    op.create_index('ix_tblResource_id', 'tblResource', ['id'])
+    op.create_index(
+        'ix_tblResource_resource_code', 'tblResource', ['resource_code'], unique=True
+    )
 
     # ================================================================
     # Suppliers Table
@@ -62,11 +75,11 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('supplier_code', name='uq_suppliers_code')
     )
-    op.create_index('ix_suppliers_id', 'tblSupplier', ['id'])
-    op.create_index('ix_suppliers_code', 'tblSupplier', ['supplier_code'])
-    op.create_index('ix_suppliers_is_active', 'tblSupplier', ['is_active'])
+    op.create_index('ix_tblSupplier_id', 'tblSupplier', ['id'])
+    op.create_index(
+        'ix_tblSupplier_supplier_code', 'tblSupplier', ['supplier_code'], unique=True
+    )
 
     # ================================================================
     # Standard Configuration Tables
@@ -90,10 +103,9 @@ def upgrade() -> None:
             sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
             sa.PrimaryKeyConstraint('id'),
-            sa.UniqueConstraint('code', name=f'uq_{table_name}_code')
         )
         op.create_index(f'ix_{table_name}_id', table_name, ['id'])
-        op.create_index(f'ix_{table_name}_code', table_name, ['code'])
+        op.create_index(f'ix_{table_name}_code', table_name, ['code'], unique=True)
 
     # ================================================================
     # Weighted Configuration Tables
@@ -114,10 +126,9 @@ def upgrade() -> None:
             sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
             sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
             sa.PrimaryKeyConstraint('id'),
-            sa.UniqueConstraint('code', name=f'uq_{table_name}_code')
         )
         op.create_index(f'ix_{table_name}_id', table_name, ['id'])
-        op.create_index(f'ix_{table_name}_code', table_name, ['code'])
+        op.create_index(f'ix_{table_name}_code', table_name, ['code'], unique=True)
 
     # ================================================================
     # Audit Logs Table
@@ -129,19 +140,20 @@ def upgrade() -> None:
         sa.Column('action', sa.String(50), nullable=False),
         sa.Column('entity_type', sa.String(100), nullable=False),
         sa.Column('entity_id', sa.Integer(), nullable=True),
-        sa.Column('old_values', JSONB(), nullable=True),
-        sa.Column('new_values', JSONB(), nullable=True),
+        sa.Column('old_values', sa.JSON(), nullable=True),
+        sa.Column('new_values', sa.JSON(), nullable=True),
         sa.Column('ip_address', sa.String(45), nullable=True),
         sa.Column('user_agent', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['user_id'], ['tblUsers.id'], name='fk_audit_logs_user_id', ondelete='SET NULL')
+        sa.ForeignKeyConstraint(['user_id'], ['tblUsers.id'], name='fk_audit_logs_user_id')
     )
-    op.create_index('ix_audit_logs_id', 'tblLog', ['id'])
-    op.create_index('ix_audit_logs_user_id', 'tblLog', ['user_id'])
-    op.create_index('ix_audit_logs_action', 'tblLog', ['action'])
-    op.create_index('ix_audit_logs_entity', 'tblLog', ['entity_type', 'entity_id'])
-    op.create_index('ix_audit_logs_created_at', 'tblLog', ['created_at'])
+    op.create_index('ix_tblLog_id', 'tblLog', ['id'])
+    op.create_index('ix_tblLog_user_id', 'tblLog', ['user_id'])
+    op.create_index('ix_tblLog_action', 'tblLog', ['action'])
+    op.create_index('ix_tblLog_entity_type', 'tblLog', ['entity_type'])
+    op.create_index('ix_tblLog_entity_id', 'tblLog', ['entity_id'])
+    op.create_index('ix_tblLog_created_at', 'tblLog', ['created_at'])
 
     # ================================================================
     # Seed Data: Configuration Tables
@@ -149,7 +161,7 @@ def upgrade() -> None:
     
     # Cost Types
     op.execute("""
-        INSERT INTO tblCostType (code, description, is_active) VALUES
+        INSERT INTO "tblCostType" (code, description, is_active) VALUES
         ('LABOR', 'Labor costs', true),
         ('MATERIAL', 'Material costs', true),
         ('EQUIPMENT', 'Equipment costs', true),
@@ -161,7 +173,7 @@ def upgrade() -> None:
 
     # Expense Types
     op.execute("""
-        INSERT INTO tblExpType (code, description, is_active) VALUES
+        INSERT INTO "tblExpType" (code, description, is_active) VALUES
         ('CAPEX', 'Capital Expenditure', true),
         ('OPEX', 'Operating Expenditure', true),
         ('DIRECT', 'Direct Expense', true),
@@ -170,7 +182,7 @@ def upgrade() -> None:
 
     # Regions
     op.execute("""
-        INSERT INTO tblRegion (code, description, is_active) VALUES
+        INSERT INTO "tblRegion" (code, description, is_active) VALUES
         ('NA', 'North America', true),
         ('EU', 'Europe', true),
         ('APAC', 'Asia Pacific', true),
@@ -181,7 +193,7 @@ def upgrade() -> None:
 
     # Business Areas
     op.execute("""
-        INSERT INTO tblBus_Area (code, description, is_active) VALUES
+        INSERT INTO "tblBus_Area" (code, description, is_active) VALUES
         ('IT', 'Information Technology', true),
         ('ENG', 'Engineering', true),
         ('MFG', 'Manufacturing', true),
@@ -193,7 +205,7 @@ def upgrade() -> None:
 
     # Estimating Techniques
     op.execute("""
-        INSERT INTO tblEstimatingTechnique (code, description, is_active) VALUES
+        INSERT INTO "tblEstimatingTechnique" (code, description, is_active) VALUES
         ('ANALOG', 'Analogous Estimation', true),
         ('PARAM', 'Parametric Estimation', true),
         ('BOTTOMUP', 'Bottom-Up Estimation', true),
@@ -205,7 +217,7 @@ def upgrade() -> None:
 
     # Risk Categories
     op.execute("""
-        INSERT INTO tblRiskCategory (code, description, is_active) VALUES
+        INSERT INTO "tblRiskCategory" (code, description, is_active) VALUES
         ('TECH', 'Technical Risk', true),
         ('SCHEDULE', 'Schedule Risk', true),
         ('COST', 'Cost Risk', true),
@@ -217,7 +229,7 @@ def upgrade() -> None:
 
     # Expenditure Indicators
     op.execute("""
-        INSERT INTO tblExpInd (code, description, is_active) VALUES
+        INSERT INTO "tblExpInd" (code, description, is_active) VALUES
         ('PLANNED', 'Planned Expenditure', true),
         ('ACTUAL', 'Actual Expenditure', true),
         ('COMMITTED', 'Committed Expenditure', true),
@@ -226,7 +238,7 @@ def upgrade() -> None:
 
     # Probability Levels
     op.execute("""
-        INSERT INTO tblProbabilityOccurrence (code, description, weight, is_active) VALUES
+        INSERT INTO "tblProbabilityOccurrence" (code, description, weight, is_active) VALUES
         ('RARE', 'Rare (1-10%)', 0.05, true),
         ('UNLIKELY', 'Unlikely (11-30%)', 0.20, true),
         ('POSSIBLE', 'Possible (31-50%)', 0.40, true),
@@ -236,7 +248,7 @@ def upgrade() -> None:
 
     # Severity Levels
     op.execute("""
-        INSERT INTO tblSeverityOccurrence (code, description, weight, is_active) VALUES
+        INSERT INTO "tblSeverityOccurrence" (code, description, weight, is_active) VALUES
         ('NEGLIGIBLE', 'Negligible Impact', 0.05, true),
         ('MINOR', 'Minor Impact', 0.10, true),
         ('MODERATE', 'Moderate Impact', 0.25, true),
@@ -246,7 +258,7 @@ def upgrade() -> None:
 
     # PMB Weights
     op.execute("""
-        INSERT INTO tblPMBWeight (code, description, weight, is_active) VALUES
+        INSERT INTO "tblPMBWeight" (code, description, weight, is_active) VALUES
         ('LOW', 'Low Confidence', 0.25, true),
         ('MEDIUM', 'Medium Confidence', 0.50, true),
         ('HIGH', 'High Confidence', 0.75, true),
@@ -257,7 +269,7 @@ def upgrade() -> None:
     # Seed Data: Sample Resources
     # ================================================================
     op.execute("""
-        INSERT INTO tblResource (resource_code, description, eoc, cost, units, is_active) VALUES
+        INSERT INTO "tblResource" (resource_code, description, eoc, cost, units, is_active) VALUES
         ('ENG-SR', 'Senior Engineer', 'LABOR', 150.00, 'hour', true),
         ('ENG-JR', 'Junior Engineer', 'LABOR', 85.00, 'hour', true),
         ('PM', 'Project Manager', 'LABOR', 175.00, 'hour', true),
@@ -274,7 +286,7 @@ def upgrade() -> None:
     # Seed Data: Sample Suppliers
     # ================================================================
     op.execute("""
-        INSERT INTO tblSupplier (supplier_code, name, contact, phone, email, is_active) VALUES
+        INSERT INTO "tblSupplier" (supplier_code, name, contact, phone, email, is_active) VALUES
         ('ACME', 'Acme Corporation', 'John Smith', '+1-555-0100', 'john@acme.com', true),
         ('TECHSOL', 'Tech Solutions Inc', 'Jane Doe', '+1-555-0200', 'jane@techsol.com', true),
         ('GLOBSERV', 'Global Services Ltd', 'Bob Wilson', '+1-555-0300', 'bob@globserv.com', true),

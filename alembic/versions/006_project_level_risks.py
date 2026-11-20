@@ -61,7 +61,7 @@ def upgrade() -> None:
         ),
     )
     # Backfill any NULL statuses
-    op.execute("UPDATE tblRisks SET status = 'open' WHERE status IS NULL")
+    op.execute("UPDATE \"tblRisks\" SET status = 'open' WHERE status IS NULL")
     op.alter_column("tblRisks", "status", nullable=False)
 
     # 3. Add nullable title column, backfill, then make NOT NULL
@@ -71,7 +71,7 @@ def upgrade() -> None:
     )
     # Backfill placeholder titles for any existing WBS-scoped risks.
     op.execute(
-        "UPDATE tblRisks SET title = '(legacy WBS-scoped risk #' || id || ')' "
+        "UPDATE \"tblRisks\" SET title = '(legacy WBS-scoped risk #' || id || ')' "
         "WHERE title IS NULL"
     )
     op.alter_column("tblRisks", "title", nullable=False)

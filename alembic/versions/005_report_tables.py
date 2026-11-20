@@ -6,7 +6,6 @@ Create Date: 2026-04-26
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "005_report_tables"
 down_revision = "004_wbs_approval_status"
@@ -18,11 +17,11 @@ def upgrade():
     op.create_table(
         "tblReportJobs",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("tblUsers.id"), nullable=False),
         sa.Column("report_type", sa.String(50), nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
-        sa.Column("parameters", JSONB(), nullable=True),
-        sa.Column("result_summary", JSONB(), nullable=True),
+        sa.Column("parameters", sa.JSON(), nullable=True),
+        sa.Column("result_summary", sa.JSON(), nullable=True),
         sa.Column("output_format", sa.String(10), nullable=False, server_default="json"),
         sa.Column("file_path", sa.String(500), nullable=True),
         sa.Column("file_size", sa.Integer(), nullable=True),
@@ -34,9 +33,10 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
-    op.create_index("ix_report_jobs_user", "tblReportJobs", ["user_id"])
-    op.create_index("ix_report_jobs_status", "tblReportJobs", ["status"])
-    op.create_index("ix_report_jobs_type", "tblReportJobs", ["report_type"])
+    op.create_index("ix_tblReportJobs_id", "tblReportJobs", ["id"])
+    op.create_index("ix_tblReportJobs_user_id", "tblReportJobs", ["user_id"])
+    op.create_index("ix_tblReportJobs_status", "tblReportJobs", ["status"])
+    op.create_index("ix_tblReportJobs_report_type", "tblReportJobs", ["report_type"])
 
 
 def downgrade():

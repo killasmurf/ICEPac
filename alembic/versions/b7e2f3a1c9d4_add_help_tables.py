@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('name'),
     )
-    op.create_index(op.f('ix_help_categories_id'), 'tblHelpCategory', ['id'], unique=False)
+    op.create_index(op.f('ix_tblHelpCategory_id'), 'tblHelpCategory', ['id'], unique=False)
 
     # Create help_topics table
     op.create_table(
@@ -47,7 +47,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['category_id'], ['tblHelpCategory.id']),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_help_topics_id'), 'tblHelp', ['id'], unique=False)
+    op.create_index(op.f('ix_tblHelp_id'), 'tblHelp', ['id'], unique=False)
 
     # Create help_descriptions table
     op.create_table(
@@ -60,13 +60,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['topic_id'], ['tblHelp.id']),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_help_descriptions_id'), 'tblHelpDescr', ['id'], unique=False)
+    op.create_index(op.f('ix_tblHelpDescr_id'), 'tblHelpDescr', ['id'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_help_descriptions_id'), table_name='tblHelpDescr')
+    op.drop_index(op.f('ix_tblHelpDescr_id'), table_name='tblHelpDescr')
     op.drop_table('tblHelpDescr')
-    op.drop_index(op.f('ix_help_topics_id'), table_name='tblHelp')
+    op.drop_index(op.f('ix_tblHelp_id'), table_name='tblHelp')
     op.drop_table('tblHelp')
-    op.drop_index(op.f('ix_help_categories_id'), table_name='tblHelpCategory')
+    op.drop_index(op.f('ix_tblHelpCategory_id'), table_name='tblHelpCategory')
     op.drop_table('tblHelpCategory')
