@@ -13,7 +13,10 @@ import Card from '@mui/material/Card';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import { useSearchParams } from 'react-router-dom';
+import type { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { usersApi, type User, type UserCreate, type UserRole, type UserUpdate } from '../../api/admin';
 import { useAuth } from '../../auth/AuthContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -27,11 +30,17 @@ import { useToast } from '../../components/feedback/ToastProvider';
 import { formatDateTime } from '../../utils/format';
 import RowActionButton from './RowActionButton';
 import { assignableRoles, manageBlockedReason, roleChangeBlockedReason } from './userPermissions';
-import { filterUsers, hasUserFilters, NO_USER_FILTERS, type UserFilters } from './userFilters';
+import {
+  applyUserListChange,
+  hasUserFilters,
+  parseUserListState,
+  userListApiParams,
+  USER_ROLES,
+  writeUserListState,
+  type UserListState,
+} from './userListState';
 
-const ROLES: UserRole[] = ['admin', 'manager', 'user', 'viewer']; // role filter: every role can be filtered on
 const ROLE_LABEL: Record<UserRole, string> = { admin: 'Admin', manager: 'Manager', user: 'User', viewer: 'Viewer' };
-const FILTERED_FETCH_LIMIT = 1000; // the API maximum; used when client-side filters are active
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface UserForm {
@@ -64,17 +73,34 @@ interface PasswordForm {
 }
 const EMPTY_PASSWORD: PasswordForm = { current: '', next: '', confirm: '' };
 
-/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
+/**
+ * Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. Phones keep the
+ * name (with the username and an inactive hint under it), the role and the three action buttons.
+ */
 const USER_LOW_PRIORITY = ['username', 'email', 'is_active', 'last_login'];
 
 export default function UserManagement() {
   const columnVisibilityModel = useResponsiveColumns(USER_LOW_PRIORITY);
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down('sm'));
   const { user: me, role: actorRole } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 10 });
-  const [filters, setFilters] = useState<UserFilters>(NO_USER_FILTERS);
+  // Search, filters, sort and page live in the URL; the server does all of the work.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const listState = parseUserListState(searchParams);
+  const [searchKey, setSearchKey] = useState(0); // remounts the search box when the filters are cleared
+  const changeList = (change: Partial<UserListState>, replace = false) =>
+    setSearchParams(writeUserListState(applyUserListChange(listState, change)), { replace });
+  const paginationModel = useMemo<GridPaginationModel>(
+    () => ({ page: listState.page, pageSize: listState.pageSize }),
+    [listState.page, listState.pageSize],
+  );
+  const sortModel = useMemo<GridSortModel>(
+    () => (listState.sort ? [{ field: listState.sort, sort: listState.order }] : []),
+    [listState.sort, listState.order],
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
@@ -84,21 +110,15 @@ export default function UserManagement() {
   const [passwordForm, setPasswordForm] = useState<PasswordForm>(EMPTY_PASSWORD);
   const [passwordSubmitted, setPasswordSubmitted] = useState(false);
 
-  const filtered = hasUserFilters(filters);
-  const params = filtered
-    ? { skip: 0, limit: FILTERED_FETCH_LIMIT }
-    : { skip: paginationModel.page * paginationModel.pageSize, limit: paginationModel.pageSize };
+  const filtered = hasUserFilters(listState);
+  const params = userListApiParams(listState);
 
   const query = useQuery({
     queryKey: ['admin', 'users', params],
     queryFn: () => usersApi.list(params),
     placeholderData: keepPreviousData,
   });
-
-  const rows = useMemo(
-    () => (query.data ? (filtered ? filterUsers(query.data.items, filters) : query.data.items) : []),
-    [query.data, filtered, filters],
-  );
+  const rows = query.data?.items ?? [];
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
 
@@ -193,18 +213,29 @@ export default function UserManagement() {
       field: 'full_name',
       headerName: 'Name',
       flex: 1,
-      minWidth: 120,
-      sortable: false,
+      minWidth: phone ? 100 : 120,
       valueGetter: (_v, row) => row.full_name ?? '',
-      renderCell: ({ row }) => row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>,
+      renderCell: ({ row }) => {
+        const name = row.full_name || <Typography component="span" variant="inherit" color="text.secondary">Not set</Typography>;
+        if (!phone) return name;
+        return (
+          <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
+            <Typography variant="inherit" noWrap>
+              {name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="div" noWrap>
+              {row.is_active ? row.username : `${row.username} (inactive)`}
+            </Typography>
+          </Box>
+        );
+      },
     },
-    { field: 'username', headerName: 'Username', flex: 1, minWidth: 130, sortable: false },
-    { field: 'email', headerName: 'Email', flex: 1.3, minWidth: 200, sortable: false },
+    { field: 'username', headerName: 'Username', flex: 1, minWidth: 130 },
+    { field: 'email', headerName: 'Email', flex: 1.3, minWidth: 200 },
     {
       field: 'role',
       headerName: 'Role',
-      width: 110,
-      sortable: false,
+      width: phone ? 100 : 110,
       renderCell: ({ row }) => <StatusChip kind="role" value={row.role} />,
     },
     {
@@ -218,14 +249,13 @@ export default function UserManagement() {
       field: 'last_login',
       headerName: 'Last login',
       width: 180,
-      sortable: false,
       valueGetter: (_v, row) => row.last_login ?? '',
       renderCell: ({ row }) => (row.last_login ? formatDateTime(row.last_login) : 'Never'),
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 150,
+      width: phone ? 112 : 150,
       sortable: false,
       filterable: false,
       renderCell: ({ row }) => (
@@ -259,21 +289,20 @@ export default function UserManagement() {
       <SearchField
         label="Search users"
         placeholder="Search users"
-        onChange={(search) => {
-          setFilters((f) => ({ ...f, search }));
-          setPaginationModel((m) => ({ ...m, page: 0 }));
-        }}
+        key={searchKey}
+        defaultValue={searchKey === 0 ? listState.search : ''}
+        onChange={(search) => changeList({ search }, true)}
       />
       <TextField
         select
         size="small"
         label="Role"
-        value={filters.role}
-        onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value as UserFilters['role'] }))}
+        value={listState.role}
+        onChange={(e) => changeList({ role: e.target.value as UserListState['role'] })}
         sx={{ minWidth: 140 }}
       >
         <MenuItem value="">All roles</MenuItem>
-        {ROLES.map((r) => (
+        {USER_ROLES.map((r) => (
           <MenuItem key={r} value={r}>
             {ROLE_LABEL[r]}
           </MenuItem>
@@ -283,8 +312,8 @@ export default function UserManagement() {
         select
         size="small"
         label="Status"
-        value={filters.status}
-        onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as UserFilters['status'] }))}
+        value={listState.status}
+        onChange={(e) => changeList({ status: e.target.value as UserListState['status'] })}
         sx={{ minWidth: 140 }}
       >
         <MenuItem value="">All statuses</MenuItem>
@@ -330,15 +359,29 @@ export default function UserManagement() {
             rows={rows}
             columns={columns}
             loading={query.isLoading || (query.isFetching && query.isPlaceholderData)}
-            rowCount={filtered ? undefined : (query.data?.total ?? 0)}
-            paginationModel={filtered ? undefined : paginationModel}
-            onPaginationModelChange={filtered ? undefined : setPaginationModel}
+            rowCount={query.data?.total ?? 0}
+            paginationModel={paginationModel}
+            onPaginationModelChange={(m) => {
+              // Before the first response the grid knows no row count and clamps the page to 0: ignore that.
+              if (!query.data || (m.page === listState.page && m.pageSize === listState.pageSize)) return;
+              changeList(m.pageSize !== listState.pageSize ? { pageSize: m.pageSize } : { page: m.page });
+            }}
+            sortModel={sortModel}
+            onSortModelChange={(model) =>
+              changeList(model[0] ? { sort: model[0].field as UserListState['sort'], order: model[0].sort ?? 'asc' } : { sort: '', order: 'asc' })
+            }
             toolbar={toolbar}
             emptyTitle={filtered ? 'No users match your filters' : 'No users yet'}
             emptyDescription={filtered ? 'Try a different search or clear the filters.' : 'Add the first user to get started.'}
             emptyAction={
               filtered ? (
-                <Button variant="outlined" onClick={() => setFilters(NO_USER_FILTERS)}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setSearchKey((k) => k + 1);
+                    changeList({ search: '', role: '', status: '' });
+                  }}
+                >
                   Clear filters
                 </Button>
               ) : (

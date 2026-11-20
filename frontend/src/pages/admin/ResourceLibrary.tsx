@@ -13,8 +13,11 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
-import { resourcesApi, type Resource, type ResourceCreate } from '../../api/admin';
+import { resourcesApi, suppliersApi, type Resource, type ResourceCreate, type ResourceUpdate } from '../../api/admin';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import DataTable, { useResponsiveColumns } from '../../components/common/DataTable';
 import ErrorState from '../../components/common/ErrorState';
@@ -32,10 +35,11 @@ interface ResourceForm {
   eoc: string;
   cost: string;
   units: string;
+  supplier_code: string;
   is_active: boolean;
 }
 
-const EMPTY_FORM: ResourceForm = { resource_code: '', description: '', eoc: '', cost: '0', units: '', is_active: true };
+const EMPTY_FORM: ResourceForm = { resource_code: '', description: '', eoc: '', cost: '0', units: '', supplier_code: '', is_active: true };
 
 type FormErrors = Partial<Record<keyof ResourceForm, string>>;
 
@@ -48,11 +52,16 @@ function validate(form: ResourceForm): FormErrors {
   return errors;
 }
 
-/** Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. */
-const RESOURCE_LOW_PRIORITY = ['eoc', 'units', 'is_active'];
+/**
+ * Columns hidden below the sm breakpoint so the table does not scroll sideways on phones. Phones keep the code
+ * (with the description under it), the cost and the edit and delete buttons.
+ */
+const RESOURCE_LOW_PRIORITY = ['description', 'eoc', 'supplier_name', 'units', 'is_active'];
 
 export default function ResourceLibrary() {
   const columnVisibilityModel = useResponsiveColumns(RESOURCE_LOW_PRIORITY);
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down('sm'));
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -60,6 +69,7 @@ export default function ResourceLibrary() {
   const [search, setSearch] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
   const [eoc, setEoc] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Resource | null>(null);
   const [form, setForm] = useState<ResourceForm>(EMPTY_FORM);
@@ -71,6 +81,7 @@ export default function ResourceLibrary() {
     limit: paginationModel.pageSize,
     search: search || undefined,
     is_active: activeOnly || undefined,
+    supplier_code: supplierFilter || undefined,
   };
 
   const query = useQuery({
@@ -78,6 +89,15 @@ export default function ResourceLibrary() {
     queryFn: () => resourcesApi.list(params),
     placeholderData: keepPreviousData,
   });
+
+  // Suppliers for the filter and the form's supplier select.
+  const suppliersQuery = useQuery({
+    queryKey: ['admin', 'suppliers', 'options'],
+    queryFn: () => suppliersApi.list({ limit: 1000 }),
+    staleTime: 60_000,
+    meta: { silent: true },
+  });
+  const suppliers = suppliersQuery.data?.items ?? [];
 
   // The API has no EOC filter, so the options come from the rows loaded and the filter applies to them.
   const eocOptions = useMemo(
@@ -101,7 +121,11 @@ export default function ResourceLibrary() {
         units: form.units.trim(),
         is_active: form.is_active,
       };
-      return editing ? resourcesApi.update(editing.id, body) : resourcesApi.create(body);
+      if (editing) {
+        const update: ResourceUpdate = { ...body, supplier_code: form.supplier_code || null }; // null clears it
+        return resourcesApi.update(editing.id, update);
+      }
+      return resourcesApi.create(form.supplier_code ? { ...body, supplier_code: form.supplier_code } : body);
     },
     onSuccess: (saved) => {
       toast.success(editing ? `Resource "${saved.resource_code}" updated` : `Resource "${saved.resource_code}" created`);
@@ -127,7 +151,7 @@ export default function ResourceLibrary() {
   };
   const openEdit = (r: Resource) => {
     setEditing(r);
-    setForm({ resource_code: r.resource_code, description: r.description, eoc: r.eoc ?? '', cost: String(r.cost), units: r.units ?? '', is_active: r.is_active });
+    setForm({ resource_code: r.resource_code, description: r.description, eoc: r.eoc ?? '', cost: String(r.cost), units: r.units ?? '', supplier_code: r.supplier_code ?? '', is_active: r.is_active });
     setSubmitted(false);
     setFormOpen(true);
   };
@@ -139,13 +163,43 @@ export default function ResourceLibrary() {
   };
 
   const columns: GridColDef<Resource>[] = [
-    { field: 'resource_code', headerName: 'Code', width: 110, sortable: false },
+    {
+      field: 'resource_code',
+      headerName: 'Code',
+      width: phone ? undefined : 110,
+      flex: phone ? 1 : undefined,
+      minWidth: phone ? 120 : undefined,
+      sortable: false,
+      renderCell: ({ row }) =>
+        phone ? (
+          <Box sx={{ minWidth: 0, lineHeight: 1.3 }}>
+            <Typography variant="inherit" noWrap>
+              {row.resource_code}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="div" noWrap>
+              {row.description}
+            </Typography>
+          </Box>
+        ) : (
+          row.resource_code
+        ),
+    },
     { field: 'description', headerName: 'Description', flex: 1.5, minWidth: 150, sortable: false },
     { field: 'eoc', headerName: 'EOC', width: 130, sortable: false, valueGetter: (_v, row) => row.eoc ?? '' },
     {
+      field: 'supplier_name',
+      headerName: 'Supplier',
+      flex: 1,
+      minWidth: 140,
+      sortable: false,
+      valueGetter: (_v, row) => row.supplier_name ?? row.supplier_code ?? '',
+      renderCell: ({ row }) =>
+        row.supplier_code ? (row.supplier_name ?? row.supplier_code) : <Typography component="span" variant="inherit" color="text.secondary">None</Typography>,
+    },
+    {
       field: 'cost',
       headerName: 'Cost',
-      width: 130,
+      width: phone ? 100 : 130,
       sortable: false,
       type: 'number',
       align: 'right',
@@ -165,7 +219,7 @@ export default function ResourceLibrary() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 110,
+      width: phone ? 84 : 110,
       sortable: false,
       filterable: false,
       renderCell: ({ row }) => (
@@ -196,6 +250,24 @@ export default function ResourceLibrary() {
         ))}
         {eoc && !eocOptions.includes(eoc) && <MenuItem value={eoc}>{eoc}</MenuItem>}
       </TextField>
+      <TextField
+        select
+        size="small"
+        label="Supplier"
+        value={supplierFilter}
+        onChange={(e) => {
+          setSupplierFilter(e.target.value);
+          setPaginationModel((m) => ({ ...m, page: 0 }));
+        }}
+        sx={{ minWidth: 170 }}
+      >
+        <MenuItem value="">All suppliers</MenuItem>
+        {suppliers.map((sp) => (
+          <MenuItem key={sp.supplier_code} value={sp.supplier_code}>
+            {sp.name}
+          </MenuItem>
+        ))}
+      </TextField>
       <FormControlLabel
         control={
           <Switch
@@ -211,7 +283,7 @@ export default function ResourceLibrary() {
     </>
   );
 
-  const filtered = Boolean(search || activeOnly || eoc);
+  const filtered = Boolean(search || activeOnly || eoc || supplierFilter);
   const failedFirstLoad = query.isError && !query.data;
 
   return (
@@ -257,6 +329,7 @@ export default function ResourceLibrary() {
                   onClick={() => {
                     setEoc('');
                     setActiveOnly(false);
+                    setSupplierFilter('');
                   }}
                 >
                   Clear filters
@@ -284,6 +357,23 @@ export default function ResourceLibrary() {
         <TextField label="EOC (element of cost)" value={form.eoc} onChange={(e) => setForm({ ...form, eoc: e.target.value })} />
         <TextField label="Cost" type="number" slotProps={{ inputLabel: { required: true }, htmlInput: { min: 0, step: '0.01' } }} value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} error={Boolean(errors.cost)} helperText={errors.cost} />
         <TextField label="Units" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} />
+        <TextField
+          select
+          label="Default supplier"
+          value={form.supplier_code}
+          onChange={(e) => setForm({ ...form, supplier_code: e.target.value })}
+          helperText="Pre-fills the supplier when this resource is assigned"
+        >
+          <MenuItem value="">None</MenuItem>
+          {form.supplier_code && !suppliers.some((sp) => sp.supplier_code === form.supplier_code) && (
+            <MenuItem value={form.supplier_code}>{editing?.supplier_name ?? form.supplier_code}</MenuItem>
+          )}
+          {suppliers.map((sp) => (
+            <MenuItem key={sp.supplier_code} value={sp.supplier_code}>
+              {sp.name}
+            </MenuItem>
+          ))}
+        </TextField>
         <TextField select label="Status" value={form.is_active ? 'active' : 'inactive'} onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}>
           <MenuItem value="active">Active</MenuItem>
           <MenuItem value="inactive">Inactive</MenuItem>

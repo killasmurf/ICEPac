@@ -7,6 +7,7 @@ import {
   calculatePERT,
   calculateStdDeviation,
 } from '../../api/estimation';
+import { resourcesApi } from '../../api/admin';
 import { PertRangeBar } from '../common/PertRangeBar';
 import { formatCurrency } from '../../utils/format';
 import { FormDialog } from '../common/FormDialog';
@@ -17,7 +18,8 @@ interface AssignmentFormProps {
   onClose: () => void;
   onSubmit: (data: AssignmentCreate | AssignmentUpdate) => Promise<void>;
   assignment?: Assignment | null;
-  resources: { code: string; description: string }[];
+  /** `supplier_code` is the resource's default supplier; when a list does not carry it the form looks it up. */
+  resources: { code: string; description: string; supplier_code?: string | null }[];
   suppliers: { code: string; name: string }[];
   costTypes: { code: string; description: string }[];
   regions: { code: string; description: string }[];
@@ -100,6 +102,28 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  // Picking a resource pre-fills its default supplier, but only while the supplier is still empty, so a
+  // supplier the user already chose is never overwritten.
+  const handleResourceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const code = event.target.value;
+    setFormData((prev) => ({ ...prev, resource_code: code }));
+    const known = resources.find((r) => r.code === code);
+    if (known?.supplier_code) {
+      setFormData((prev) => (prev.resource_code === code && !prev.supplier_code ? { ...prev, supplier_code: known.supplier_code ?? '' } : prev));
+    } else if (known && known.supplier_code === undefined) {
+      // The list was loaded without suppliers: ask the server for this resource's default.
+      resourcesApi
+        .list({ search: code, limit: 100 })
+        .then((res) => {
+          const supplier = res.items.find((r) => r.resource_code === code)?.supplier_code;
+          if (supplier) {
+            setFormData((prev) => (prev.resource_code === code && !prev.supplier_code ? { ...prev, supplier_code: supplier } : prev));
+          }
+        })
+        .catch(() => undefined); // best effort: the supplier can still be chosen by hand
+    }
   };
 
   const threePointErrors = validateThreePoint({
@@ -222,7 +246,7 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
             fullWidth
             label="Resource"
             value={formData.resource_code}
-            onChange={handleChange('resource_code')}
+            onChange={handleResourceChange}
             required
             helperText={resourceMissing ? 'Select a resource' : undefined}
           >
