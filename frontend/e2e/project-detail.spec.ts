@@ -349,3 +349,26 @@ test.describe('WBS tree keeps its expansion', () => {
     await expect(item(page, /Excavation/)).toBeVisible();
   });
 });
+
+test('an archived project shows the archived banner, and Restore calls the restore endpoint', async ({ page }, testInfo) => {
+  const project = { ...loadFixture<{ items: Record<string, unknown>[] }>('projects').items[0], archived: true };
+  await page.route(/\/api\/v1\/projects\/1$/, (route) =>
+    route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(project) }),
+  );
+  await page.route(/\/api\/v1\/projects\/1\/restore$/, (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'application/json',
+      body: JSON.stringify({ ...project, archived: false }),
+    }),
+  );
+  await page.goto('/projects/1');
+  const banner = page.getByRole('alert').filter({ hasText: 'archived' });
+  await expect(banner).toBeVisible();
+  await saveScreenshot(page, testInfo, 'closeout', `project-archived-banner-${testInfo.project.name}`);
+  const restore = page.waitForRequest((r) => r.method() === 'POST' && /\/projects\/1\/restore$/.test(r.url()));
+  await banner.getByRole('button', { name: 'Restore' }).click();
+  await restore;
+  await expect(page.getByText('Project restored')).toBeVisible();
+});
