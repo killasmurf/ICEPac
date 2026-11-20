@@ -136,6 +136,13 @@ describe('AssignmentForm', () => {
       expect(supplierBox()).toHaveTextContent('ACME - Acme Pty Ltd');
     });
 
+    it('reports the pre-filled supplier in the draft', async () => {
+      const onDraftChange = vi.fn();
+      setup({ ...supplierLookups, onDraftChange });
+      await chooseResource('ENG - Engineer');
+      expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({ resource_code: 'ENG', supplier_code: 'ACME' }));
+    });
+
     it('leaves the supplier empty for a resource without one', async () => {
       setup(supplierLookups);
       await chooseResource('PM - Project manager');
