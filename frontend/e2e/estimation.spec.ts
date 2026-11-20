@@ -301,7 +301,8 @@ test.describe('WBS detail panel keeps an open form across layout changes', () =>
   const DESKTOP = { width: 1280, height: 900 };
   const TABLET_PORTRAIT = { width: 800, height: 1100 };
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     test.skip(testInfo.project.name === 'mobile', 'sets its own viewport sizes');
   });
 
