@@ -50,7 +50,8 @@ test('picking a resource with a default supplier fills the empty supplier field'
   await dialog.getByRole('combobox', { name: /Resource/ }).click();
   await page.getByRole('option', { name: 'ENG - Engineer' }).click();
   await expect(dialog.getByRole('combobox', { name: 'Supplier' })).toHaveText('ACME - Acme Pty Ltd');
-  expect(resourceLookups).toEqual(['ENG']);
+  // The project page's reference data already carries each resource's supplier: no extra lookup.
+  expect(resourceLookups).toEqual([]);
   await saveScreenshot(page, testInfo, 'closeout', 'assignment-supplier-prefill');
 
   await dialog.getByLabel('Best Estimate').fill('100');
