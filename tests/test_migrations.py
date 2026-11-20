@@ -46,7 +46,7 @@ def _alembic_config(url: str = "") -> Config:
 def test_single_head():
     """The history must be linear enough to have exactly one head."""
     script = ScriptDirectory.from_config(_alembic_config())
-    assert script.get_heads() == ["007_merge_legacy_branch"]
+    assert script.get_heads() == ["008_resource_supplier"]
     # Every revision must be an ancestor of that head.
     reachable = {rev.revision for rev in script.walk_revisions()}
     on_disk = {
@@ -101,7 +101,7 @@ def test_upgrade_matches_models_and_round_trips(pg_url):
 
     command.upgrade(cfg, "head")
     assert _scalar(pg_url, "SELECT version_num FROM alembic_version") == (
-        "007_merge_legacy_branch"
+        "008_resource_supplier"
     )
     assert _diffs(pg_url) == []
 
@@ -194,7 +194,7 @@ def test_database_at_old_mainline_head_upgrades(pg_url):
     command.upgrade(cfg, "006_project_level_risks")
     command.upgrade(cfg, "head")
     assert _scalar(pg_url, "SELECT version_num FROM alembic_version") == (
-        "007_merge_legacy_branch"
+        "008_resource_supplier"
     )
     assert _diffs(pg_url) == []
 

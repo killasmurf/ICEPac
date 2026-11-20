@@ -19,6 +19,17 @@ class ResourceBase(BaseModel):
     eoc: Optional[str] = Field(None, max_length=50)  # Element of Cost
     cost: Decimal = Field(default=Decimal("0.00"), ge=0)
     units: Optional[str] = Field(None, max_length=50)
+    # Default supplier (a tblSupplier.supplier_code); must exist.
+    supplier_code: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("supplier_code")
+    @classmethod
+    def normalise_supplier_code(cls, v: Optional[str]) -> Optional[str]:
+        """Uppercase the code; a blank value means no supplier."""
+        if v is None:
+            return None
+        v = v.upper().strip()
+        return v or None
 
 
 class ResourceCreate(ResourceBase):
@@ -41,7 +52,17 @@ class ResourceUpdate(BaseModel):
     eoc: Optional[str] = Field(None, max_length=50)
     cost: Optional[Decimal] = Field(None, ge=0)
     units: Optional[str] = Field(None, max_length=50)
+    supplier_code: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
+
+    @field_validator("supplier_code")
+    @classmethod
+    def normalise_supplier_code(cls, v: Optional[str]) -> Optional[str]:
+        """Uppercase the code; a blank value clears the supplier."""
+        if v is None:
+            return None
+        v = v.upper().strip()
+        return v or None
 
     @field_validator("resource_code")
     @classmethod
@@ -57,6 +78,7 @@ class ResourceResponse(ResourceBase):
 
     id: int
     is_active: bool
+    supplier_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

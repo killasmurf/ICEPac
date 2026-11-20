@@ -34,6 +34,28 @@ class UserService:
     def get_multi(self, skip: int = 0, limit: int = 100) -> List[User]:
         return self.repository.get_multi(skip=skip, limit=limit)
 
+    def list_filtered(
+        self,
+        search: Optional[str] = None,
+        role: Optional[UserRole] = None,
+        is_active: Optional[bool] = None,
+        sort: str = "id",
+        order: str = "asc",
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[User]:
+        return self.repository.list_filtered(
+            search, role, is_active, sort, order, skip=skip, limit=limit
+        )
+
+    def count_filtered(
+        self,
+        search: Optional[str] = None,
+        role: Optional[UserRole] = None,
+        is_active: Optional[bool] = None,
+    ) -> int:
+        return self.repository.count_filtered(search, role, is_active)
+
     def count(self) -> int:
         return self.repository.count()
 

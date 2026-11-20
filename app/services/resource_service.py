@@ -47,6 +47,45 @@ class ResourceService:
         """Search resources by code or description."""
         return self.repository.search(query, skip=skip, limit=limit)
 
+    def list_filtered(
+        self,
+        search: Optional[str] = None,
+        active_only: bool = False,
+        supplier_code: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Resource]:
+        """List resources matching every given filter."""
+        items = self.repository.list_filtered(
+            search, active_only, supplier_code, skip=skip, limit=limit
+        )
+        return self.attach_supplier_names(items)
+
+    def count_filtered(
+        self,
+        search: Optional[str] = None,
+        active_only: bool = False,
+        supplier_code: Optional[str] = None,
+    ) -> int:
+        return self.repository.count_filtered(search, active_only, supplier_code)
+
+    def attach_supplier_names(self, resources):
+        """Set ``supplier_name`` on each resource using a single query."""
+        if isinstance(resources, Resource):
+            self.attach_supplier_names([resources])
+            return resources
+        names = self.repository.supplier_names(r.supplier_code for r in resources)
+        for r in resources:
+            r.supplier_name = names.get(r.supplier_code)
+        return resources
+
+    def _check_supplier(self, supplier_code: Optional[str]) -> None:
+        if supplier_code and not self.repository.supplier_exists(supplier_code):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Supplier '{supplier_code}' does not exist",
+            )
+
     def count(self) -> int:
         """Count total resources."""
         return self.repository.count()
@@ -72,6 +111,7 @@ class ResourceService:
                 ),
             )
 
+        self._check_supplier(resource_in.supplier_code)
         data = resource_in.model_dump()
         return self.repository.create(data)
 
@@ -95,6 +135,7 @@ class ResourceService:
                     ),
                 )
 
+        self._check_supplier(update_data.get("supplier_code"))
         return self.repository.update(resource, update_data)
 
     def delete(self, resource_id: int) -> bool:

@@ -121,17 +121,6 @@ def main() -> int:
                     )
 
         # ---- resources and suppliers --------------------------------------
-        for r in DATA["resources"]:
-            if not db.query(Resource).filter_by(resource_code=r["code"]).first():
-                db.add(
-                    Resource(
-                        resource_code=r["code"],
-                        description=r["description"],
-                        eoc=r["eoc"],
-                        cost=r["cost"],
-                        units=r["units"],
-                    )
-                )
         for s in DATA["suppliers"]:
             if not db.query(Supplier).filter_by(supplier_code=s["code"]).first():
                 db.add(
@@ -141,6 +130,19 @@ def main() -> int:
                         contact=s["contact"],
                         email=s["email"],
                         phone=s["phone"],
+                    )
+                )
+        db.flush()  # suppliers first: resources reference them
+        for r in DATA["resources"]:
+            if not db.query(Resource).filter_by(resource_code=r["code"]).first():
+                db.add(
+                    Resource(
+                        resource_code=r["code"],
+                        description=r["description"],
+                        eoc=r["eoc"],
+                        cost=r["cost"],
+                        units=r["units"],
+                        supplier_code=r.get("supplier"),
                     )
                 )
         db.flush()
