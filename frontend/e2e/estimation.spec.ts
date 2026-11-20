@@ -294,3 +294,98 @@ for (const scheme of ['light', 'dark'] as const) {
     });
   }
 }
+
+// Crossing the md breakpoint (900 px) swaps the inline split pane for a drawer, which remounts the detail panel.
+// The tab, the open form and what was typed in it must survive.
+test.describe('WBS detail panel keeps an open form across layout changes', () => {
+  const DESKTOP = { width: 1280, height: 900 };
+  const TABLET_PORTRAIT = { width: 800, height: 1100 };
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'sets its own viewport sizes');
+  });
+
+  async function openRisksTab(page: Page, viewport: { width: number; height: number }) {
+    await page.setViewportSize(viewport);
+    await page.goto('/projects/1?tab=wbs&wbs=11');
+    await expect(page.getByRole('grid', { name: 'Resource assignments' })).toBeVisible();
+    await page.locator('#wbs-tab-1').click();
+  }
+
+  async function fillRiskForm(page: Page) {
+    await page.getByRole('button', { name: 'Add Risk' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'New Risk' });
+    await dialog.getByLabel(/^Title/).fill('Crane availability');
+    await dialog.getByLabel('Risk Cost').fill('1234.5');
+    await dialog.getByRole('combobox', { name: /Risk Category/ }).click();
+    await page.getByRole('option', { name: 'TECH - Technical' }).click();
+    return dialog;
+  }
+
+  async function expectRiskDraft(page: Page) {
+    const dialog = page.getByRole('dialog', { name: 'New Risk' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel(/^Title/)).toHaveValue('Crane availability');
+    await expect(dialog.getByLabel('Risk Cost')).toHaveValue('1234.5');
+    await expect(dialog.getByRole('combobox', { name: /Risk Category/ })).toContainText('TECH');
+    await expect(page.locator('#wbs-tab-1')).toHaveAttribute('aria-selected', 'true');
+  }
+
+  test('risk form: desktop to tablet portrait and back', async ({ page }, testInfo) => {
+    await openRisksTab(page, DESKTOP);
+    await fillRiskForm(page);
+    await page.setViewportSize(TABLET_PORTRAIT);
+    await expectRiskDraft(page);
+    await saveScreenshot(page, testInfo, 'closeout', 'form-kept-tablet');
+    await page.setViewportSize(DESKTOP);
+    await expectRiskDraft(page);
+  });
+
+  test('risk form: started on tablet portrait, rotated to landscape', async ({ page }) => {
+    await openRisksTab(page, TABLET_PORTRAIT);
+    await fillRiskForm(page);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await expectRiskDraft(page);
+  });
+
+  test('a submitted form clears its draft', async ({ page }) => {
+    await openRisksTab(page, DESKTOP);
+    await fillRiskForm(page);
+    await page.route('**/api/v1/projects/1/wbs/11/risks', (r) =>
+      r.request().method() === 'POST' ? r.fulfill(json({ ...wbsRisk, id: 9, title: 'Crane availability' }, 201)) : r.fallback(),
+    );
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/wbs/11/risks'));
+    await page.getByRole('dialog', { name: 'New Risk' }).getByRole('button', { name: 'Create' }).click();
+    expect((await request).postDataJSON()).toMatchObject({ title: 'Crane availability', risk_cost: 1234.5 });
+    await expect(page.getByText('Risk created')).toBeVisible();
+    await page.setViewportSize(TABLET_PORTRAIT);
+    await expect(page.getByRole('dialog', { name: 'New Risk' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Add Risk' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'New Risk' }).getByLabel(/^Title/)).toHaveValue('');
+  });
+
+  test('assignment form: desktop to tablet portrait and back', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto('/projects/1?tab=wbs&wbs=11');
+    await expect(page.getByRole('grid', { name: 'Resource assignments' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add Assignment' }).first().click();
+    const typed = async () => {
+      const dialog = page.getByRole('dialog', { name: 'New Assignment' });
+      await expect(dialog.getByLabel('Best Estimate')).toHaveValue('100');
+      await expect(dialog.getByLabel('Likely Estimate')).toHaveValue('200');
+      await expect(dialog.getByLabel('Worst Estimate')).toHaveValue('400');
+      await expect(dialog.getByRole('combobox', { name: /Resource/ })).toContainText('ENG');
+      await expect(page.locator('#wbs-tab-0')).toHaveAttribute('aria-selected', 'true');
+    };
+    const dialog = page.getByRole('dialog', { name: 'New Assignment' });
+    await dialog.getByRole('combobox', { name: /Resource/ }).click();
+    await page.getByRole('option', { name: 'ENG - Engineer' }).click();
+    await dialog.getByLabel('Best Estimate').fill('100');
+    await dialog.getByLabel('Likely Estimate').fill('200');
+    await dialog.getByLabel('Worst Estimate').fill('400');
+    await page.setViewportSize(TABLET_PORTRAIT);
+    await typed();
+    await page.setViewportSize(DESKTOP);
+    await typed();
+  });
+});

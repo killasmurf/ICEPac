@@ -13,9 +13,13 @@ interface RiskFormProps {
   riskCategories: { code: string; description: string }[];
   probabilityLevels: { code: string; description: string; weight: number }[];
   severityLevels: { code: string; description: string; weight: number }[];
+  /** Restores typed values when the form remounts (e.g. a layout change). Ignored when absent. */
+  draft?: RiskFormDraft | null;
+  /** Called with the current values on every edit so the owner can keep them across a remount. */
+  onDraftChange?: (draft: RiskFormDraft) => void;
 }
 
-interface FormState {
+export interface RiskFormDraft {
   title: string;
   status: string;
   risk_category_code: string;
@@ -30,6 +34,8 @@ const STATUS_OPTIONS = [
   { value: 'mitigated', label: 'Mitigated' },
   { value: 'closed', label: 'Closed' },
 ];
+
+type FormState = RiskFormDraft;
 
 const toFormData = (risk?: Risk | null): FormState =>
   risk
@@ -60,8 +66,10 @@ const RiskForm: React.FC<RiskFormProps> = ({
   riskCategories,
   probabilityLevels,
   severityLevels,
+  draft,
+  onDraftChange,
 }) => {
-  const [formData, setFormData] = useState<FormState>(() => toFormData(risk));
+  const [formData, setFormData] = useState<FormState>(() => draft ?? toFormData(risk));
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
   // Reset the form when the dialog opens or the edited item changes
@@ -74,7 +82,9 @@ const RiskForm: React.FC<RiskFormProps> = ({
   }
 
   const handleChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    const next = { ...formData, [field]: event.target.value };
+    setFormData(next);
+    onDraftChange?.(next);
   };
 
   const costError = validateMoney(formData.risk_cost);

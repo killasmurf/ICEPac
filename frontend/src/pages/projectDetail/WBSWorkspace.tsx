@@ -14,6 +14,7 @@ import WBSTree from '../../components/project/WBSTree';
 import { useWbsTree } from '../../components/project/useWbsTree';
 import { findNode } from '../../components/project/wbsTreeLogic';
 import { invalidateEstimation } from '../../components/estimation/queryKeys';
+import { useWbsPanelState } from '../../components/estimation/useWbsPanelState';
 import type { ReferenceData } from './useProjectData';
 
 const SplitGroup = styled(Group)({ height: '100%', width: '100%' });
@@ -55,6 +56,8 @@ const WBSWorkspace: React.FC<WBSWorkspaceProps> = ({
   const queryClient = useQueryClient();
   const { data } = useWbsTree(projectId);
   const [detailOpen, setDetailOpen] = useState(selectedId !== null);
+  // The panel remounts when the layout crosses the md breakpoint; its tab, open forms and typed drafts live here.
+  const { state: panelUi, patch: patchPanelUi, reset: resetPanelUi } = useWbsPanelState();
 
   const selected = useMemo(
     () => (selectedId !== null && data ? findNode(data.items, selectedId) : undefined),
@@ -69,7 +72,10 @@ const WBSWorkspace: React.FC<WBSWorkspaceProps> = ({
     [onSelect],
   );
 
-  const handleClose = useCallback(() => setDetailOpen(false), []);
+  const handleClose = useCallback(() => {
+    setDetailOpen(false);
+    resetPanelUi();
+  }, [resetPanelUi]);
 
   // Refresh the tree (approval status, PERT totals) and the project estimation after every change in the panel.
   const handleChanged = useCallback(() => {
@@ -79,6 +85,8 @@ const WBSWorkspace: React.FC<WBSWorkspaceProps> = ({
   const panelProps = {
     onClose: handleClose,
     onChanged: handleChanged,
+    uiState: panelUi,
+    onUiStateChange: patchPanelUi,
     projectId,
     wbs: selected ?? null,
     resources: reference?.resources,
